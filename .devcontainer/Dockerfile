@@ -1,19 +1,18 @@
-# Use the Python Dev Containers image
-FROM mcr.microsoft.com/devcontainers/python:3.11
+# Base image with Python 3.10
+FROM mcr.microsoft.com/devcontainers/python:3.10
 
-# Install system-level dependencies
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    libmagic-dev \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Install ffmpeg
+RUN apt-get update && apt-get install -y ffmpeg && apt-get clean
 
-# Install Python utilities globally
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir \
-    black \
-    flake8 \
-    mypy \
-    pytest \
-    pre-commit \
-    python-dotenv \
-    tqdm
+# Install any additional system dependencies here (if needed)
+# e.g., RUN apt-get install -y libxml2-dev
+
+# Upgrade pip
+RUN pip install --upgrade pip
+
+# Set up working directory
+WORKDIR /workspace
+
+# Copy and install Python dependencies
+COPY requirements.txt .
+RUN pip install -r requirements.txt
