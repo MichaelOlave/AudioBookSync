@@ -1,0 +1,47 @@
+{
+  "name": "AudioBookSync",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11", // Use Python 3.11 base image
+  "features": {
+    "ghcr.io/devcontainers/features/ffmpeg:1": {} // Adds FFmpeg support
+  },
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "settings": {
+    "terminal.integrated.defaultProfile.linux": "bash",
+    "python.defaultInterpreterPath": "/usr/local/bin/python",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": true
+    }
+  },
+  "postCreateCommand": "pip install -r requirements.txt",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.linting.enabled": true,
+        "python.linting.flake8Enabled": true,
+        "python.formatting.provider": "black",
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "python.envFile": "${workspaceFolder}/.env"
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-toolsai.jupyter",
+        "github.vscode-pull-request-github",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  },
+  "mounts": [
+    "source=${localWorkspaceFolder}/audiobooks,target=/workspace/audiobooks,type=bind,consistency=cached"
+  ],
+  "remoteUser": "vscode",
+  "portsAttributes": {
+    "8000": {
+      "label": "Local API",
+      "onAutoForward": "openBrowser"
+    }
+  }
+}
