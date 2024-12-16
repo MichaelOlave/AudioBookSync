@@ -1,0 +1,6 @@
+audible-cli
+cryptography
+pycryptodome
+requests
+ffmpeg-python
+pytest
