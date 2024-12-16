@@ -1,0 +1,15 @@
+requests
+boto3
+pycryptodome
+mutagen
+pydub
+python-dotenv
+tqdm
+pytest
+flake8
+black
+mypy
+pre-commit
+ffmpeg-python
+rich
+loguru
