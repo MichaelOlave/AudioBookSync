@@ -10,14 +10,16 @@ import concurrent.futures
 
 # Loguru configuration
 logger.remove()
-logger.add(sys.stderr, level="INFO")
-logger.add("audible_download.log", rotation="500 MB", level="INFO")
+logger.add(sys.stderr, level="INFO", format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level}</level> | <level>{message}</level>",
+)
+logger.add("logs/{time}.log", rotation="500 MB", level="INFO", format="<green>  {time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>"
+)
 
 AUTH_FILE = "Michael.json"
 CSV_FILE = 'audiobooks/audible_library.csv'
 DOWNLOAD_DIR = 'audiobooks/downloaded'
 DECRYPTED_DIR = 'audiobooks/decrypted'
-ACC_BYTES = 'c3f80507'
+ACC_BYTES = ''
 
 def sync_get_library(client):
     """Synchronous method to get library"""
