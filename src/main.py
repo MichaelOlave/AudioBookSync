@@ -16,10 +16,12 @@ logger.add("logs/{time}.log", rotation="500 MB", level="INFO", format="<green>  
 )
 
 AUTH_FILE = "Michael.json"
-CSV_FILE = 'audiobooks/audible_library.csv'
+# AUDIBLE_LIBRARY_CSV_FILE = 'audiobooks/audible_library.csv' 
+AUDIBLE_LIBRARY_CSV_FILE = 'audiobooks/test_library.csv' 
+LOCAL_LIBRARY_CSV_FILE = 'audiobooks/local_library.csv'
 DOWNLOAD_DIR = 'audiobooks/downloaded'
 DECRYPTED_DIR = 'audiobooks/decrypted'
-ACC_BYTES = ''
+ACC_BYTES = 'c3f80507'
 
 def sync_get_library(client):
     """Synchronous method to get library"""
@@ -74,6 +76,9 @@ def authenticate():
         logger.error(f"Authentication failed: {e}")
         raise
 
+def normalize_filename(filename):
+    return ''.join(char for char in filename if char.isalnum() or char.isspace()).strip().lower()
+
 async def ensure_directory(directory):
     """Ensure the directory exists asynchronously."""
     Path(directory).mkdir(parents=True, exist_ok=True)
@@ -86,31 +91,76 @@ async def add_entry(csv_file, entry):
             existing_entries = [row async for row in reader]
 
         if any(existing_entry[0] == entry[0] for existing_entry in existing_entries):
-            logger.info(f"{entry[1]} is already in the library.")
-            return False
+            raise NameError(f"{entry[1]} is already in the library.")
 
         async with aiofiles.open(csv_file, 'a', encoding='utf-8', newline='') as f:
             writer = aiocsv.AsyncWriter(f)
             await writer.writerow(entry)
             logger.info(f"Added {entry[1]} to the library.")
         return True
+    except NameError as e:
+        logger.warning(e)
+        return False
     except Exception as e:
         logger.error(f"Error adding entry to CSV: {e}")
         return False
 
-async def download_book(book, output_dir):
+async def remove_entry(csv_file, asin):
+    """Remove a book entry from CSV."""
+    try:
+        async with aiofiles.open(csv_file, 'r', encoding='utf-8', newline='') as f:
+            reader = aiocsv.AsyncReader(f)
+            existing_entries = [row async for row in reader]
+
+        if not any(existing_entry[0] == asin for existing_entry in existing_entries):
+            raise Exception(f"{asin} is not in the library.")
+
+        async with aiofiles.open(csv_file, 'w', encoding='utf-8', newline='') as f:
+            writer = aiocsv.AsyncWriter(f)
+            for entry in existing_entries:
+                if entry[0] != asin:
+                    await writer.writerow(entry)
+            logger.info(f"Removed {asin} from the library.")
+        return True
+    except Exception as e:
+        logger.error(f"Error removing entry from CSV: {e}")
+        return False
+
+async def validate_book(book, directory):
+    """Validate a book by checking if it exists in the directory."""
+    book_asin = book[0]
+    book_title = normalize_filename(book[1])
+
+    for item in os.listdir(directory):
+        if book_asin in item or book_title in item:
+            logger.info(f"{book_title} exists.")
+            return True
+    return False
+
+async def download_book(book):
     """Download a book"""
-    book_title = book['title']
-    book_asin = book['asin']
+    book_asin = book[0]
+    book_title = book[1]
     
     try:
         logger.info(f"Starting download for {book_title}...")
         
-        await ensure_directory(output_dir)
+        await ensure_directory(DOWNLOAD_DIR)
         
+        command = [
+            'audible', 'download', 
+            '-o', DOWNLOAD_DIR, 
+            '-a', book_asin, 
+            '--aax-fallback', 
+            '-f', 'asin_ascii',
+            '-y'
+        ]
+
+        logger.info(f"Command: {' '.join(command)}")
+
         process = await asyncio.create_subprocess_exec(
             'audible', 'download', 
-            '-o', output_dir, 
+            '-o', DOWNLOAD_DIR, 
             '-a', book_asin, 
             '--aax-fallback', 
             '-f', 'asin_ascii',
@@ -122,47 +172,46 @@ async def download_book(book, output_dir):
         stdout, stderr = await process.communicate()
 
         if process.returncode == 0:
-            logger.success(f"Successfully downloaded {book_title}")
-            return True
+            if ("No new files downloaded" in stdout.decode().strip()):
+                raise Exception(f"No new files downloaded")
+            elif await validate_book(book, DOWNLOAD_DIR):
+                logger.success(f"{stdout.decode().strip()}")
+                return True
+            else:
+                raise Exception(f"Download failed for {book_title}: {stdout.decode().strip()}")
         else:
-            logger.error(f"Download failed for {book_title} with code {process.returncode}")
-            logger.error(f"Error output: {stderr.decode().strip()}")
-            return False
+            raise Exception(f"Download failed for {book_title} with code {process.returncode} Error output: {stderr.decode().strip()}")
     
     except asyncio.TimeoutError:
         logger.error(f"Download timed out for {book_title}")
         return False
     except Exception as e:
-        logger.exception(f"Unexpected error downloading {book_title}: {e}")
+        logger.error(f"Unexpected error downloading {book_title}: {e}")
         return False
     
-async def decrypt_book(book_entry, input_dir, output_dir, activation_bytes):
+async def decrypt_book(book):
     """Decrypt a book using FFmpeg"""
-    book_asin = book_entry[0]
-    book_title : str = book_entry[1]
-
-    book_title = ''.join(char for char in book_title if char.isalnum() or char.isspace()).strip()
+    book_asin = book[0]
+    book_title = normalize_filename(book[1])
 
     try:
         logger.info(f"Starting decryption for '{book_title}' ({book_asin})...")
 
         # Ensure output directory exists
-        await ensure_directory(output_dir)
+        await ensure_directory(DECRYPTED_DIR)
 
         # Iterate over files in the input directory
-        for item in os.listdir(input_dir):
-            input_file = os.path.join(input_dir, item)
-            output_file = os.path.join(output_dir, f"{book_title}.m4b")
+        for item in os.listdir(DOWNLOAD_DIR):
+            input_file = os.path.join(DOWNLOAD_DIR, item)
+            output_file = os.path.join(DECRYPTED_DIR, f"{book_title}.m4b")
 
             if book_asin not in item:
                 continue
 
-            logger.info(f"Decrypting file: {input_file}")
-
             # Create and await the FFmpeg subprocess
             process = await asyncio.create_subprocess_exec(
                 'ffmpeg',
-                '-activation_bytes', activation_bytes,
+                '-activation_bytes', ACC_BYTES,
                 '-i', input_file,
                 '-c', 'copy',
                 output_file,
@@ -175,33 +224,53 @@ async def decrypt_book(book_entry, input_dir, output_dir, activation_bytes):
             stdout, stderr = await process.communicate()
 
             if process.returncode == 0:
-                logger.success(f"Successfully decrypted: {output_file}")
-                return True
+                if await validate_book(book, DECRYPTED_DIR):
+                    logger.success(f"Decrypted: {output_file}: {stdout.decode().strip()}")
+                    return True
+                else:
+                    raise Exception(f"Decryption failed for '{item}': {stdout.decode().strip()}")
             else:
-                logger.error(f"FFmpeg error decrypting '{item}': {stderr.decode().strip()}")
-                return False
+                raise Exception(f"FFmpeg error decrypting '{item}': {stderr.decode().strip()}")
 
     except Exception as e:
-        logger.exception(f"An error occurred during decryption: {e}")
+        logger.error(f"An error occurred during decryption: {e}")
 
-
-async def main():
-    """Async main download workflow."""
+async def compare_libraries():
+    """Check the local library for existing books."""
     try:
-        # Ensure directories exist
-        await ensure_directory(os.path.dirname(CSV_FILE))
-        await ensure_directory(DOWNLOAD_DIR)
+        async with aiofiles.open(LOCAL_LIBRARY_CSV_FILE, 'r', encoding='utf-8', newline='') as f:
+            reader = aiocsv.AsyncReader(f)
+            local_entries = [row async for row in reader]
+            
+        async with aiofiles.open(AUDIBLE_LIBRARY_CSV_FILE, 'r', encoding='utf-8', newline='') as f:
+            reader = aiocsv.AsyncReader(f)
+            audible_entries = [row async for row in reader]
 
-        # Authenticate and get client
+        missing_entries = [entry for entry in audible_entries if entry not in local_entries]
+
+        if missing_entries:
+            logger.warning(f"Missing entries: {len(missing_entries)}")
+            return missing_entries
+        else:
+            logger.info("No missing entries found.")
+            return []
+        
+    except FileNotFoundError:
+        logger.warning(f"Local library file {LOCAL_LIBRARY_CSV_FILE} not found.")
+        return []
+    except Exception as e:
+        logger.error(f"Error checking local library: {e}")
+        return []
+
+async def update_audible_library():
+    """Update the Audible library CSV file."""
+    try:
         async with authenticate() as client_wrapper:
             library = await client_wrapper.get_library()
 
             if not library.get('items'):
-                logger.warning("No books found in library.")
-                return
-
-            # Create tasks for concurrent processing
-            tasks = []
+                raise NameError("No books found in library.")
+            
             for book in library['items']:
                 book_entry = [
                     book['asin'], 
@@ -209,23 +278,62 @@ async def main():
                     book['purchase_date'], 
                     book['runtime_length_min']
                 ]
-                
-                # Create a task that adds to CSV and downloads
-                task = asyncio.create_task(process_book(book_entry, book))
-                tasks.append(task)
+                await add_entry(AUDIBLE_LIBRARY_CSV_FILE, book_entry)
 
-            # Wait for all tasks to complete
-            await asyncio.gather(*tasks)
+    except NameError as e:
+        logger.warning(e)
+    except Exception as e:
+        logger.error(f"An error occurred updating the Audible library: {e}")
+
+async def update_local_library():
+    """Update the local library CSV file."""
+    try:
+        missing_entries = await compare_libraries()
+
+        tasks = []
+        for entry in missing_entries:
+            task = asyncio.create_task(process_book(LOCAL_LIBRARY_CSV_FILE, entry))
+            tasks.append(task)
+        
+        return tasks
 
     except Exception as e:
-        logger.exception(f"An error occurred in the main workflow: {e}")
+        logger.error(f"An error occurred updating the local library: {e}")
 
-async def process_book(book_entry, book):
-    """Process a single book: add to CSV and download."""
+async def main():
+    """Async main download workflow."""
+    try:
+        # Ensure directories exist
+        await ensure_directory(os.path.dirname(AUDIBLE_LIBRARY_CSV_FILE))
+        await ensure_directory(os.path.dirname(LOCAL_LIBRARY_CSV_FILE))
+
+        # Update the Audible library
+        # await update_audible_library()
+
+        # Update the local library
+        tasks = await update_local_library()
+
+        logger.warning(f"Tasks: {tasks}")
+
+        # Process books
+        await asyncio.gather(*tasks)
+    except NameError as e:
+        logger.warning(e)
+    except Exception as e:
+        logger.error(f"An error occurred in the main workflow: {e}")
+
+async def process_book(CSV_FILE, book_entry):
+    """Process a single book: add to CSV, download, and decrypt."""
     if await add_entry(CSV_FILE, book_entry):
-        if await download_book(book, DOWNLOAD_DIR):
-            await decrypt_book(book_entry, DOWNLOAD_DIR, DECRYPTED_DIR, ACC_BYTES)
+        try:
+            if await download_book(book_entry):
+                if not await decrypt_book(book_entry):
+                    raise Exception("Decryption failed")
+            else:
+                raise Exception("Download failed")
+        except Exception as e:
+            logger.error(f"Processing failed for {book_entry[1]}: {e}")
+            await remove_entry(CSV_FILE, book_entry[0])
 
 if __name__ == "__main__":
-    # Use asyncio to run the main coroutine
     asyncio.run(main())
