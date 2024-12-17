@@ -4,3 +4,6 @@ pycryptodome
 requests
 ffmpeg-python
 pytest
+aiofiles
+aiocsv
+loguru
