@@ -16,6 +16,8 @@ logger.add("audible_download.log", rotation="500 MB", level="INFO")
 AUTH_FILE = "Michael.json"
 CSV_FILE = 'audiobooks/audible_library.csv'
 DOWNLOAD_DIR = 'audiobooks/downloaded'
+DECRYPTED_DIR = 'audiobooks/decrypted'
+ACC_BYTES = 'c3f80507'
 
 def sync_get_library(client):
     """Synchronous method to get library"""
@@ -102,26 +104,27 @@ async def download_book(book, output_dir):
     try:
         logger.info(f"Starting download for {book_title}...")
         
-        # Ensure output directory exists
-        os.makedirs(output_dir, exist_ok=True)
+        await ensure_directory(output_dir)
         
-        # Create subprocess with standard output and error
         process = await asyncio.create_subprocess_exec(
             'audible', 'download', 
             '-o', output_dir, 
             '-a', book_asin, 
             '--aax-fallback', 
-            '--filename-mode', 'unicode',
+            '-f', 'asin_ascii',
             '-y',
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
+
+        stdout, stderr = await process.communicate()
 
         if process.returncode == 0:
             logger.success(f"Successfully downloaded {book_title}")
             return True
         else:
             logger.error(f"Download failed for {book_title} with code {process.returncode}")
+            logger.error(f"Error output: {stderr.decode().strip()}")
             return False
     
     except asyncio.TimeoutError:
@@ -131,8 +134,54 @@ async def download_book(book, output_dir):
         logger.exception(f"Unexpected error downloading {book_title}: {e}")
         return False
     
-async def decrypt_book(book, output_dir, acctivation_bytes):
-    pass
+async def decrypt_book(book_entry, input_dir, output_dir, activation_bytes):
+    """Decrypt a book using FFmpeg"""
+    book_asin = book_entry[0]
+    book_title : str = book_entry[1]
+
+    book_title = ''.join(char for char in book_title if char.isalnum() or char.isspace()).strip()
+
+    try:
+        logger.info(f"Starting decryption for '{book_title}' ({book_asin})...")
+
+        # Ensure output directory exists
+        await ensure_directory(output_dir)
+
+        # Iterate over files in the input directory
+        for item in os.listdir(input_dir):
+            input_file = os.path.join(input_dir, item)
+            output_file = os.path.join(output_dir, f"{book_title}.m4b")
+
+            if book_asin not in item:
+                continue
+
+            logger.info(f"Decrypting file: {input_file}")
+
+            # Create and await the FFmpeg subprocess
+            process = await asyncio.create_subprocess_exec(
+                'ffmpeg',
+                '-activation_bytes', activation_bytes,
+                '-i', input_file,
+                '-c', 'copy',
+                output_file,
+                '-n',
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+
+            # Wait for the process to complete
+            stdout, stderr = await process.communicate()
+
+            if process.returncode == 0:
+                logger.success(f"Successfully decrypted: {output_file}")
+                return True
+            else:
+                logger.error(f"FFmpeg error decrypting '{item}': {stderr.decode().strip()}")
+                return False
+
+    except Exception as e:
+        logger.exception(f"An error occurred during decryption: {e}")
+
 
 async def main():
     """Async main download workflow."""
@@ -172,7 +221,8 @@ async def main():
 async def process_book(book_entry, book):
     """Process a single book: add to CSV and download."""
     if await add_entry(CSV_FILE, book_entry):
-        await download_book(book, DOWNLOAD_DIR)
+        if await download_book(book, DOWNLOAD_DIR):
+            await decrypt_book(book_entry, DOWNLOAD_DIR, DECRYPTED_DIR, ACC_BYTES)
 
 if __name__ == "__main__":
     # Use asyncio to run the main coroutine
