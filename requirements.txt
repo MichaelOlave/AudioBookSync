@@ -7,3 +7,5 @@ pytest
 aiofiles
 aiocsv
 loguru
+psycopg2-binary
+python-dotenv
