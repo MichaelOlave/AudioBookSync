@@ -1,0 +1,51 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    container_name: audiobooksync-dev
+    working_dir: /workspace
+    volumes:
+      - ..:/workspace
+      - /workspace/.git
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: audiobooksync
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev_password
+      LOG_LEVEL: INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - audiobooksync-network
+    command: sleep infinity
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: audiobooksync-postgres
+    environment:
+      POSTGRES_DB: audiobooksync
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ../database/sample_data.sql:/docker-entrypoint-initdb.d/02-sample-data.sql
+    networks:
+      - audiobooksync-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d audiobooksync"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+
+networks:
+  audiobooksync-network:
+    driver: bridge

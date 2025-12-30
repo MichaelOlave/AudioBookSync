@@ -1,0 +1,266 @@
+"""FastAPI application for AudioBookSync.
+
+This module initializes the FastAPI application with middleware,
+exception handlers, routers, and lifespan management.
+"""
+
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from loguru import logger
+
+from ..core.config import Config
+from ..core.logging_config import configure_logging
+from ..database.db_pool import db_pool
+from .middleware.error_handler import add_exception_handlers
+from .middleware.logging import LoggingMiddleware
+from .routers import (
+    auth,
+    library,
+    books,
+    sync,
+    downloads,
+    decryptions,
+    errors,
+    files,
+    websocket,
+    settings,
+    audible_auth,
+)
+from .schemas.common import HealthResponse
+
+
+# ============================================================================
+# LIFESPAN MANAGEMENT
+# ============================================================================
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Manage application lifecycle (startup and shutdown).
+
+    This context manager handles:
+    - Startup: Configure logging, ensure directories exist
+    - Shutdown: Close database connections
+    """
+    # ========== STARTUP ==========
+    try:
+        # Configure logging with loguru
+        configure_logging(log_level=Config.LOG_LEVEL)
+        logger.info("Logging configured successfully")
+
+        # Ensure required directories exist
+        Config.ensure_directories()
+        logger.info("Required directories verified")
+
+        logger.info("=" * 80)
+        logger.info("AudioBookSync API Starting Up")
+        logger.info("=" * 80)
+        logger.info(f"Environment: {Config.LOG_LEVEL}")
+        logger.info(
+            "Database: "
+            f"{Config.DATABASE_URL.split('@')[1] if '@' in Config.DATABASE_URL else 'configured'}"
+        )
+        logger.info(f"CORS Origins: {Config.CORS_ORIGINS}")
+        logger.info("=" * 80)
+
+    except Exception as e:
+        logger.error(f"Startup failed: {e}", exc_info=True)
+        raise
+
+    yield  # Application runs here
+
+    # ========== SHUTDOWN ==========
+    try:
+        logger.info("AudioBookSync API Shutting Down")
+        db_pool.close_all_connections()
+        logger.info("Database connections closed")
+    except Exception as e:
+        logger.error(f"Shutdown error: {e}", exc_info=True)
+
+
+# ============================================================================
+# APPLICATION FACTORY
+# ============================================================================
+
+
+def create_app() -> FastAPI:
+    """
+    Create and configure the FastAPI application.
+
+    Returns:
+        FastAPI: Configured FastAPI instance
+
+    Features:
+        - Full async/await support
+        - JWT authentication ready
+        - Comprehensive error handling
+        - Request/response logging
+        - CORS configuration
+        - WebSocket support
+        - OpenAPI documentation
+    """
+
+    # Create FastAPI instance with metadata
+    app = FastAPI(
+        title="AudioBookSync API",
+        description=(
+            "Multi-user audiobook library management system with Audible sync, "
+            "downloads, and decryption"
+        ),
+        version="1.0.0",
+        docs_url="/docs",  # Swagger UI
+        redoc_url="/redoc",  # ReDoc
+        openapi_url="/openapi.json",
+        lifespan=lifespan,
+    )
+
+    # ========== MIDDLEWARE ==========
+
+    # CORS Middleware - Handle cross-origin requests
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=Config.CORS_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["Content-Range", "Content-Length"],
+    )
+
+    # Custom logging middleware - Log all requests and responses
+    app.add_middleware(LoggingMiddleware)
+
+    # ========== EXCEPTION HANDLERS ==========
+    # Register all custom exception handlers
+    add_exception_handlers(app)
+
+    # ========== ROUTERS ==========
+    # Register all API routers with version prefix
+
+    app.include_router(
+        auth.router,
+        prefix="/api/v1/auth",
+        tags=["Authentication"],
+    )
+
+    app.include_router(
+        library.router,
+        prefix="/api/v1/library",
+        tags=["Library"],
+    )
+
+    app.include_router(
+        books.router,
+        prefix="/api/v1/books",
+        tags=["Books"],
+    )
+
+    app.include_router(
+        sync.router,
+        prefix="/api/v1/sync",
+        tags=["Sync"],
+    )
+
+    app.include_router(
+        downloads.router,
+        prefix="/api/v1/downloads",
+        tags=["Downloads"],
+    )
+
+    app.include_router(
+        decryptions.router,
+        prefix="/api/v1/decryptions",
+        tags=["Decryptions"],
+    )
+
+    app.include_router(
+        errors.router,
+        prefix="/api/v1/errors",
+        tags=["Errors"],
+    )
+
+    app.include_router(
+        files.router,
+        prefix="/api/v1/files",
+        tags=["Files"],
+    )
+
+    app.include_router(
+        websocket.router,
+        prefix="/api/v1/ws",
+        tags=["WebSocket"],
+    )
+
+    app.include_router(
+        settings.router,
+        prefix="/api/v1/settings",
+        tags=["Settings"],
+    )
+
+    app.include_router(
+        audible_auth.router,
+        prefix="/api/v1/audible",
+        tags=["Audible"],
+    )
+
+    # ========== HEALTH CHECK ENDPOINT ==========
+
+    @app.get(
+        "/api/v1/health",
+        response_model=HealthResponse,
+        tags=["Health"],
+        summary="Health Check",
+        description="Check if the API is running and healthy",
+    )
+    async def health_check() -> HealthResponse:
+        """
+        Health check endpoint.
+
+        Returns:
+            HealthResponse: Service health status
+
+        Example:
+            GET /api/v1/health
+            Response: {"status": "healthy", "service": "AudioBookSync", "version": "1.0.0"}
+        """
+        return HealthResponse(
+            status="healthy",
+            service="AudioBookSync",
+            version="1.0.0",
+        )
+
+    # ========== DOCUMENTATION ==========
+
+    logger.info("FastAPI application created successfully")
+    logger.info("Documentation available at:")
+    logger.info(f"  - Swagger UI: http://localhost:{Config.API_PORT}/docs")
+    logger.info(f"  - ReDoc: http://localhost:{Config.API_PORT}/redoc")
+    logger.info(f"  - OpenAPI JSON: http://localhost:{Config.API_PORT}/openapi.json")
+
+    return app
+
+
+# ============================================================================
+# APPLICATION INSTANCE
+# ============================================================================
+
+app = create_app()
+
+
+# ============================================================================
+# MAIN ENTRY POINT
+# ============================================================================
+
+if __name__ == "__main__":
+    import uvicorn
+
+    logger.info(f"Starting AudioBookSync API on {Config.API_HOST}:{Config.API_PORT}")
+
+    uvicorn.run(
+        "src.api.main:app",
+        host=Config.API_HOST,
+        port=Config.API_PORT,
+        reload=True,  # Auto-reload on code changes (development)
+        log_level=Config.LOG_LEVEL.lower(),
+    )

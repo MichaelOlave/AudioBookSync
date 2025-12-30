@@ -1,11 +1,37 @@
-audible-cli
+# Core dependencies
 cryptography
 pycryptodome
 requests
 ffmpeg-python
-pytest
 aiofiles
-aiocsv
 loguru
 psycopg2-binary
 python-dotenv
+
+# FastAPI and async server
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# Authentication and security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.1.2
+
+# WebSocket support
+websockets==12.0
+
+# Rate limiting
+slowapi==0.1.9
+
+# Audible library
+audible
+
+# Audible CLI (optional - for actual Audible functionality)
+# audible-cli has dependency issues, install separately if needed:
+# pip install audible-cli --no-deps
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.23.3
+httpx
