@@ -63,6 +63,43 @@ class LibraryManager:
             logger.error(f"Failed to add book {asin}: {e}")
             return False
 
+    async def add_book_with_metadata(
+        self,
+        asin: str,
+        title: str,
+        book_data: Dict,
+        purchase_date: Optional[str] = None,
+    ) -> bool:
+        """Add a book with comprehensive metadata from Audible API.
+
+        This method integrates full metadata from the Audible API response,
+        populating all 7 metadata tables (contributors, media_info, reading_progress,
+        book_availability, companion_materials, book_metadata_json).
+
+        Args:
+            asin: Amazon Standard Identification Number
+            title: Book title
+            book_data: Complete Audible API response with all response groups
+            purchase_date: Purchase date (YYYY-MM-DD)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            success = self.book_ops.add_book_with_metadata(
+                asin=asin,
+                user_id=self.user_id,
+                title=title,
+                book_data=book_data,
+                purchase_date=purchase_date,
+            )
+            if success:
+                logger.info(f"Added book with comprehensive metadata: {title} (ASIN: {asin})")
+            return success
+        except Exception as e:
+            logger.error(f"Failed to add book with metadata {asin}: {e}")
+            return False
+
     async def remove_book(self, asin: str) -> bool:
         """Remove a book from the user's library.
 
