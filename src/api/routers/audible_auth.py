@@ -288,7 +288,7 @@ async def complete_audible_auth(
 
         # Get auth data directly from authenticator
         auth_json = authenticator.to_dict()
-        logger.info(f"Converting authenticator to dict for database storage")
+        logger.info("Converting authenticator to dict for database storage")
 
         # Save to database
         success = user_ops.update_audible_auth_json(

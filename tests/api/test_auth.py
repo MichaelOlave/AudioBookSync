@@ -263,3 +263,211 @@ class TestRefresh:
         )
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_refresh_inactive_user(self, client, test_user_with_tokens, monkeypatch):
+        """Test refresh with inactive user."""
+        from src.database.db_users import user_ops
+
+        def mock_get_user_by_id(user_id):
+            return {
+                "user_id": user_id,
+                "is_active": False,  # Inactive
+            }
+
+        monkeypatch.setattr(user_ops, "get_user_by_id", mock_get_user_by_id)
+
+        response = client.post(
+            "/api/v1/auth/refresh",
+            json={
+                "refresh_token": test_user_with_tokens["refresh_token"],
+            },
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        data = response.json()
+        assert "inactive" in data["detail"].lower()
+
+
+class TestAuthorization:
+    """Tests for authorization and authentication requirements."""
+
+    def test_missing_authorization_header(self, client):
+        """Test request without Authorization header."""
+        response = client.get("/api/v1/library/")
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_invalid_authorization_header_format(self, client):
+        """Test request with malformed Authorization header."""
+        response = client.get(
+            "/api/v1/library/",
+            headers={"Authorization": "InvalidFormat token"},
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_invalid_token(self, client):
+        """Test request with invalid token."""
+        response = client.get(
+            "/api/v1/library/",
+            headers={"Authorization": "Bearer invalid-token-xyz"},
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_malformed_jwt(self, client):
+        """Test request with malformed JWT token."""
+        response = client.get(
+            "/api/v1/library/",
+            headers={"Authorization": "Bearer not.a.jwt"},
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_token_with_tampered_payload(self, client):
+        """Test token with tampered payload doesn't work."""
+        import jwt
+
+        # Create a token with wrong signature
+        tampered_token = jwt.encode(
+            {"sub": "user123"},
+            "wrong-secret-key",
+            algorithm="HS256",
+        )
+
+        response = client.get(
+            "/api/v1/library/",
+            headers={"Authorization": f"Bearer {tampered_token}"},
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_empty_bearer_token(self, client):
+        """Test request with empty Bearer token."""
+        response = client.get(
+            "/api/v1/library/",
+            headers={"Authorization": "Bearer "},
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_case_insensitive_bearer(self, client, test_user_with_tokens):
+        """Test that Bearer keyword is case-sensitive."""
+        # FastAPI/OpenAPI expects "Bearer" with capital B
+        response = client.get(
+            "/api/v1/library/",
+            headers={"Authorization": f"bearer {test_user_with_tokens['access_token']}"},
+        )
+        # This should fail because "bearer" (lowercase) is not valid
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+class TestPasswordValidation:
+    """Tests for password validation during registration."""
+
+    def test_register_no_uppercase(self, client):
+        """Test registration with password missing uppercase."""
+        response = client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": "testuser",
+                "email": "test@example.com",
+                "password": "testpassword123!",  # No uppercase
+            },
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_register_no_lowercase(self, client):
+        """Test registration with password missing lowercase."""
+        response = client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": "testuser",
+                "email": "test@example.com",
+                "password": "TESTPASSWORD123!",  # No lowercase
+            },
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_register_no_digit(self, client):
+        """Test registration with password missing digit."""
+        response = client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": "testuser",
+                "email": "test@example.com",
+                "password": "TestPassword!",  # No digit
+            },
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_register_no_special_char(self, client):
+        """Test registration with password missing special character."""
+        response = client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": "testuser",
+                "email": "test@example.com",
+                "password": "TestPassword123",  # No special char
+            },
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_register_whitespace_in_password(self, client):
+        """Test registration with whitespace in password."""
+        response = client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": "testuser",
+                "email": "test@example.com",
+                "password": "Test Password123!",  # Has space
+            },
+        )
+        # Should accept - spaces are allowed in passwords
+        # Just checking it doesn't crash
+        assert response.status_code in [
+            status.HTTP_201_CREATED,
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+        ]
+
+
+class TestTokenExpiration:
+    """Tests for token expiration handling."""
+
+    def test_access_token_with_correct_expiration(self, test_user_with_tokens):
+        """Verify access token has correct expiration time."""
+        from datetime import datetime
+        import jwt
+
+        token = test_user_with_tokens["access_token"]
+        decoded = jwt.decode(
+            token,
+            options={"verify_signature": False},
+        )
+
+        # Should have exp claim
+        assert "exp" in decoded
+        exp_time = datetime.fromtimestamp(decoded["exp"])
+        # Should be approximately 30 minutes from now
+        from datetime import timedelta
+
+        now = datetime.utcnow()
+        diff = exp_time - now
+        # Allow 1 minute margin
+        assert 29 * 60 < diff.total_seconds() < 31 * 60
+
+    def test_refresh_token_with_correct_expiration(self, test_user_with_tokens):
+        """Verify refresh token has correct expiration time."""
+        from datetime import datetime
+        import jwt
+
+        token = test_user_with_tokens["refresh_token"]
+        decoded = jwt.decode(
+            token,
+            options={"verify_signature": False},
+        )
+
+        # Should have exp claim
+        assert "exp" in decoded
+        exp_time = datetime.fromtimestamp(decoded["exp"])
+        # Should be approximately 7 days from now
+        from datetime import timedelta
+
+        now = datetime.utcnow()
+        diff = exp_time - now
+        # Allow 1 minute margin
+        assert 6 * 24 * 60 * 60 < diff.total_seconds() < 7 * 24 * 60 * 60 + 60

@@ -5,6 +5,7 @@ It provides the same public API but backed by PostgreSQL.
 """
 
 import asyncio
+from typing import Optional, Callable, Any, Awaitable
 
 from loguru import logger
 
@@ -59,8 +60,8 @@ async def create_user(username: str = "user", email: str = "user@example.com") -
 
 
 async def sync_library(
-    user_id: str = None,
-    ws_broadcast_fn=None,
+    user_id: Optional[str] = None,
+    ws_broadcast_fn: Optional[Callable[..., Awaitable[Any]]] = None,
 ) -> None:
     """Main synchronization workflow using database.
 
@@ -118,8 +119,10 @@ async def sync_library(
                 # Process all books concurrently
                 await asyncio.gather(*tasks)
                 books_processed = len(missing_books)
+                logger.info(f"Successfully processed {books_processed} books")
             else:
                 logger.info("No books to process.")
+                books_processed = 0
 
             # Complete sync record
             stats = {

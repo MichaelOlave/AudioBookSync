@@ -1,7 +1,7 @@
 """Common/shared Pydantic schemas for API responses."""
 
-from typing import Generic, TypeVar, List, Any, Optional
-from pydantic import BaseModel, Field
+from typing import Generic, TypeVar, List, Optional
+from pydantic import BaseModel, Field, ConfigDict
 
 T = TypeVar("T")  # Generic type for pagination
 
@@ -50,8 +50,8 @@ class PaginatedResponse(BaseModel, Generic[T]):
         description="Total number of pages",
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "items": [],
                 "total": 0,
@@ -60,6 +60,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
                 "pages": 0,
             }
         }
+    )
 
 
 class MessageResponse(BaseModel):
@@ -95,8 +96,8 @@ class ErrorResponse(BaseModel):
         description="Additional error details (if applicable)",
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "error": "ValidationError",
                 "message": "Request validation failed",
@@ -104,6 +105,7 @@ class ErrorResponse(BaseModel):
                 "details": {"field_name": "error message"},
             }
         }
+    )
 
 
 class HealthResponse(BaseModel):
@@ -120,4 +122,4 @@ class HealthResponse(BaseModel):
     version: Optional[str] = Field(
         default=None,
         description="API version",
-    )
+    ), ConfigDict

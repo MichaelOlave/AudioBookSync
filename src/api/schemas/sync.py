@@ -2,7 +2,7 @@
 
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class SyncCreate(BaseModel):
@@ -85,9 +85,9 @@ class SyncResponse(BaseModel):
         description="When this record was last updated",
     )
 
-    class Config:
-        from_attributes = True
-        json_schema_extra = {
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
             "example": {
                 "sync_id": "sync-uuid-123",
                 "user_id": "user-uuid-456",
@@ -106,6 +106,7 @@ class SyncResponse(BaseModel):
                 "updated_at": "2025-12-20T20:15:30Z",
             }
         }
+    )
 
 
 class SyncHistoryList(BaseModel):
@@ -157,8 +158,8 @@ class SyncAcceptedResponse(BaseModel):
         description="When the sync started",
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "sync_id": "sync-uuid-123",
                 "status": "in_progress",
@@ -166,3 +167,4 @@ class SyncAcceptedResponse(BaseModel):
                 "sync_started_at": "2025-12-20T20:00:00Z",
             }
         }
+    )

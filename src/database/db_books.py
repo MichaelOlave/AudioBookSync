@@ -1,6 +1,5 @@
 """Book database operations."""
 
-from datetime import datetime, date
 from typing import Dict, List, Optional
 
 from loguru import logger
@@ -80,7 +79,7 @@ class BookOperations:
         user_id: str,
         title: str,
         book_data: Dict,
-        purchase_date: Optional[date] = None,
+        purchase_date: Optional[str] = None,
     ) -> bool:
         """
         Add book with comprehensive metadata from Audible API.
@@ -123,7 +122,8 @@ class BookOperations:
                 return False
 
             # Import metadata operations modules
-            from .db_contributors import contributor_ops, book_contributor_ops
+            from .db_contributors import contributor_ops
+            from .db_book_contributors import book_contributor_ops
             from .db_media_info import media_info_ops
             from .db_reading_progress import reading_progress_ops
             from .db_book_metadata import book_metadata_ops

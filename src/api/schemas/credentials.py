@@ -1,7 +1,7 @@
 """Audible authentication credentials schemas."""
 
 from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 class AuthSessionData(BaseModel):
@@ -18,22 +18,27 @@ class AudibleAuthJsonRequest(BaseModel):
     auth_json: Dict[str, Any] = Field(
         ...,
         description="Audible auth.json content (JSON object)",
-        example={
-            "access_token": "...",
-            "refresh_token": "...",
-            "expires_in": 3600,
-            "created_at": 1703100000,
-            "device_info": {"device_name": "Desktop"},
-            "customer_info": {"customer_id": "amzn-123"},
+        json_schema_extra={
+            "example": {
+                "access_token": "...",
+                "refresh_token": "...",
+                "expires_in": 3600,
+                "created_at": 1703100000,
+                "device_info": {"device_name": "Desktop"},
+                "customer_info": {"customer_id": "amzn-123"},
+            }
         },
     )
     activation_bytes: Optional[str] = Field(
         default=None,
         description="DRM activation bytes (hex string)",
-        example="1f2e3d4c5b6a7988",
+        json_schema_extra={
+            "example": "1f2e3d4c5b6a7988"
+        },
     )
 
-    @validator("auth_json")
+    @field_validator("auth_json")
+    @classmethod
     def validate_auth_json(cls, v):
         """Validate required fields in auth.json."""
         required_fields = ["access_token", "refresh_token"]
@@ -51,12 +56,16 @@ class AudibleCredentialsRequest(BaseModel):
         description=(
             "Path to Audible auth JSON file (usually auth.json) - DEPRECATED"
         ),
-        example="/path/to/auth.json",
+        json_schema_extra={
+            "example": "/path/to/auth.json"
+        },
     )
     activation_bytes: Optional[str] = Field(
         default=None,
         description="DRM activation bytes (hex string)",
-        example="1f2e3d4c5b6a7988",
+        json_schema_extra={
+            "example": "1f2e3d4c5b6a7988"
+        },
     )
 
 
@@ -92,8 +101,8 @@ class AudibleCredentialsResponse(BaseModel):
         description="Raw auth.json data (tokens redacted for security)",
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "user_id": "550e8400-e29b-41d4-a716-446655440000",
                 "audible_email": "user@example.com",
@@ -108,6 +117,7 @@ class AudibleCredentialsResponse(BaseModel):
                 },
             }
         }
+    )
 
 
 class AudibleCredentialsUpdate(BaseModel):
@@ -126,11 +136,12 @@ class AudibleCredentialsUpdate(BaseModel):
         description="Path to auth file",
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "message": "Audible credentials updated successfully",
                 "auth_configured": True,
                 "auth_file_path": "/home/user/.audible/auth.json",
             }
         }
+    )

@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 
 class UserBase(BaseModel):
@@ -72,8 +72,9 @@ class UserResponse(UserBase):
         description="Last update timestamp",
     )
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(
+        from_attributes=True
+    )
 
 
 class UserWithAuth(UserResponse):
@@ -86,4 +87,4 @@ class UserWithAuth(UserResponse):
     activation_bytes: Optional[str] = Field(
         default=None,
         description="DRM activation bytes (redacted)",
-    )
+    ), ConfigDict

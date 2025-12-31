@@ -2,7 +2,7 @@
 
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class BookBase(BaseModel):
@@ -88,9 +88,9 @@ class BookResponse(BookBase):
         description="When the book record was last updated",
     )
 
-    class Config:
-        from_attributes = True
-        json_schema_extra = {
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
             "example": {
                 "asin": "B084L6Z6M3",
                 "title": "Becoming",
@@ -110,6 +110,7 @@ class BookResponse(BookBase):
                 "updated_at": "2023-01-15T10:30:00Z",
             }
         }
+    )
 
 
 class BookList(BaseModel):
@@ -138,4 +139,4 @@ class BookList(BaseModel):
         default=0,
         ge=0,
         description="Total number of pages",
-    )
+    ), ConfigDict

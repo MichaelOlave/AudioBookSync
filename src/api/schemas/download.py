@@ -1,8 +1,8 @@
 """Schemas for download-related API requests and responses."""
 
-from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class DownloadCreate(BaseModel):
@@ -21,13 +21,14 @@ class DownloadCreate(BaseModel):
         description="Book title",
     )
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra = {
             "example": {
                 "asin": "B084L6Z6M3",
                 "title": "Becoming",
             }
         }
+    )
 
 
 class DownloadResponse(BaseModel):
@@ -70,8 +71,8 @@ class DownloadResponse(BaseModel):
         description="Status message",
     )
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra = {
             "example": {
                 "download_id": "550e8400-e29b-41d4-a716-446655440000",
                 "asin": "B084L6Z6M3",
@@ -80,6 +81,7 @@ class DownloadResponse(BaseModel):
                 "download_started_at": "2024-12-22T10:30:00",
             }
         }
+    )
 
 
 class DownloadList(BaseModel):
@@ -106,8 +108,8 @@ class DownloadList(BaseModel):
         description="Number of items per page",
     )
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "items": [
                     {
@@ -121,3 +123,4 @@ class DownloadList(BaseModel):
                 "page_size": 10,
             }
         }
+    )

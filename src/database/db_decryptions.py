@@ -1,6 +1,6 @@
 """Decryption status tracking database operations."""
 
-from typing import Optional
+from typing import Optional, List, Any
 
 from loguru import logger
 
@@ -141,8 +141,8 @@ class DecryptionOperations:
             return None
 
     def get_user_decryptions(
-        self, user_id: str, status: str = None, limit: int = 10, offset: int = 0
-    ) -> list[dict]:
+        self, user_id: str, status: Optional[str] = None, limit: int = 10, offset: int = 0
+    ) -> List[dict]:
         """
         Get decryptions for a specific user with optional status filter.
 
@@ -165,7 +165,7 @@ class DecryptionOperations:
                     JOIN books b ON ds.asin = b.asin
                     WHERE b.user_id = %s
                 """
-                params = [user_id]
+                params: List[Any] = [user_id]
 
                 if status:
                     query += " AND ds.status = %s"
@@ -184,7 +184,7 @@ class DecryptionOperations:
             logger.error(f"Failed to get user decryptions: {e}")
             return []
 
-    def count_user_decryptions(self, user_id: str, status: str = None) -> int:
+    def count_user_decryptions(self, user_id: str, status: Optional[str] = None) -> int:
         """
         Count decryptions for a user with optional status filter.
 

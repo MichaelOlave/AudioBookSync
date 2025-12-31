@@ -7,16 +7,19 @@ class UserRegister(BaseModel):
     """Schema for user registration request."""
 
     username: str = Field(
+        default=...,
         min_length=3,
         max_length=50,
         description="Username (3-50 characters)",
-        example="john_doe",
+        json_schema_extra={"example": "john_doe"},
     )
     email: EmailStr = Field(
+        default=...,
         description="User's email address",
-        example="john@example.com",
+        json_schema_extra={"example": "john@example.com"},
     )
     password: str = Field(
+        default=...,
         min_length=8,
         max_length=100,
         description="Password (minimum 8 characters)",
@@ -27,10 +30,12 @@ class UserLogin(BaseModel):
     """Schema for user login request (OAuth2 compatible)."""
 
     username: str = Field(
+        default=...,
         description="Username or email",
-        example="john_doe",
+        json_schema_extra={"example": "john_doe"},
     )
     password: str = Field(
+        default=...,
         description="User's password",
     )
 

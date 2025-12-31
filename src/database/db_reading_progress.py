@@ -1,6 +1,6 @@
 """Database operations for user reading progress tracking."""
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from datetime import datetime
 from loguru import logger
 
@@ -91,8 +91,8 @@ class ReadingProgressOperations:
         """
         try:
             with self.db_pool.get_cursor() as cursor:
-                updates = []
-                values = []
+                updates: List[str] = []
+                values: List[Any] = []
 
                 if percent_complete is not None:
                     updates.append("percent_complete = %s")

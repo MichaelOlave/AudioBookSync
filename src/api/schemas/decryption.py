@@ -1,8 +1,8 @@
 """Schemas for decryption-related API requests and responses."""
 
-from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class DecryptCreate(BaseModel):
@@ -21,13 +21,14 @@ class DecryptCreate(BaseModel):
         description="Book title",
     )
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "asin": "B084L6Z6M3",
                 "title": "Becoming",
             }
         }
+    )
 
 
 class DecryptResponse(BaseModel):
@@ -78,8 +79,8 @@ class DecryptResponse(BaseModel):
         description="Status message",
     )
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "decryption_id": "550e8400-e29b-41d4-a716-446655440000",
                 "asin": "B084L6Z6M3",
@@ -89,6 +90,7 @@ class DecryptResponse(BaseModel):
                 "decryption_started_at": "2024-12-22T10:30:00",
             }
         }
+    )
 
 
 class DecryptList(BaseModel):
@@ -115,8 +117,8 @@ class DecryptList(BaseModel):
         description="Number of items per page",
     )
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "items": [
                     {
@@ -131,3 +133,4 @@ class DecryptList(BaseModel):
                 "page_size": 10,
             }
         }
+    )

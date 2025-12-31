@@ -8,7 +8,7 @@ This service bridges the API layer (which uses dictionaries) with the operations
 - Error handling and logging
 """
 
-from typing import Optional, Callable, Dict, Any
+from typing import Callable, Any
 from datetime import datetime
 from loguru import logger
 
