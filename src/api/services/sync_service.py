@@ -5,6 +5,7 @@ from datetime import datetime
 from loguru import logger
 
 from ...database.db_sync import sync_ops
+from ...operations.library_sync import sync_library
 from ..websockets import ws_manager, EventType
 
 
@@ -80,8 +81,6 @@ class SyncService:
                 )
 
             # Execute actual library sync with user context and progress tracking
-            from ...operations.library_sync import sync_library
-
             await sync_library(
                 user_id=user_id,
                 ws_broadcast_fn=sync_progress_callback,

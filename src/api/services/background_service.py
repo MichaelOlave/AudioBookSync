@@ -23,6 +23,266 @@ from ..websockets import ws_manager, EventType
 from .sync_service import SyncService
 
 
+# ===========================================
+# Operation Executor Pattern (Template Method)
+# ===========================================
+
+
+class OperationExecutor:
+    """Base executor for download/decrypt operations using Template Method pattern.
+
+    This base class eliminates 160+ lines of duplication by defining the common
+    workflow for executing operations (download, decrypt) while allowing subclasses
+    to specialize specific behaviors.
+
+    The pattern works by having all orchestration logic here and subclasses override
+    just the operation-specific methods (_execute_operation, _update_status, etc).
+    """
+
+    def __init__(
+        self,
+        user_id: str,
+        operation_id: str,
+        book: dict,
+        operation_type: str,  # "download" or "decrypt"
+    ):
+        self.user_id = user_id
+        self.operation_id = operation_id
+        self.book = book
+        self.operation_type = operation_type
+        self.asin = None
+        self.title = None
+
+    async def execute(self) -> None:
+        """Template method that orchestrates operation execution.
+
+        This method defines the algorithm structure. Subclasses override
+        specific steps (_execute_operation, etc) to customize behavior.
+        """
+        try:
+            # Convert API format to operations format
+            book_list = BackgroundTaskService._dict_to_book_list(self.book)
+            self.asin = book_list[0]
+            self.title = book_list[1]
+
+            logger.info(
+                f"[{self.operation_type.capitalize()} {self.operation_id}] "
+                f"Starting {self.operation_type} for {self.title} ({self.asin})"
+            )
+
+            # Update status to in-progress
+            await self._update_status("in_progress")
+
+            # Create progress callback
+            progress_callback = await BackgroundTaskService._create_progress_callback(
+                self.user_id
+            )
+
+            # Execute the actual operation (subclass-specific)
+            success = await self._execute_operation(book_list, progress_callback)
+
+            if success:
+                await self._handle_success()
+            else:
+                await self._handle_failure("Operation returned false")
+
+        except ValueError as e:
+            await self._handle_validation_error(e)
+        except Exception as e:
+            await self._handle_unexpected_error(e)
+
+    async def _execute_operation(self, book_list: list, progress_callback) -> bool:
+        """Execute the actual operation. Override in subclass."""
+        raise NotImplementedError
+
+    async def _update_status(self, status: str, **kwargs) -> None:
+        """Update operation status in database. Override in subclass."""
+        raise NotImplementedError
+
+    async def _handle_success(self) -> None:
+        """Handle successful operation."""
+        logger.info(
+            f"[{self.operation_type.capitalize()} {self.operation_id}] "
+            f"Operation completed successfully"
+        )
+
+        await self._update_status("completed")
+
+        await self._broadcast_event(
+            f"{self.operation_type}.completed",
+            {
+                f"{self.operation_type}_id": self.operation_id,
+                "asin": self.asin,
+                "title": self.title,
+                "status": "completed",
+                "timestamp": datetime.now(timezone.utc).timestamp(),
+            },
+        )
+
+    async def _handle_failure(self, error: str) -> None:
+        """Handle failed operation."""
+        logger.warning(
+            f"[{self.operation_type.capitalize()} {self.operation_id}] "
+            f"Operation failed"
+        )
+
+        await self._update_status(
+            "failed",
+            error_message=error,
+        )
+
+        await self._broadcast_event(
+            f"{self.operation_type}.failed",
+            {
+                f"{self.operation_type}_id": self.operation_id,
+                "asin": self.asin,
+                "title": self.title,
+                "error": error,
+                "timestamp": datetime.now(timezone.utc).timestamp(),
+            },
+        )
+
+    async def _handle_validation_error(self, error: ValueError) -> None:
+        """Handle validation errors."""
+        logger.error(
+            f"[{self.operation_type.capitalize()} {self.operation_id}] "
+            f"Invalid parameters: {error}"
+        )
+
+        await self._update_status(
+            "failed",
+            error_message=f"Invalid book parameters: {str(error)}",
+        )
+
+        await self._broadcast_event(
+            f"{self.operation_type}.failed",
+            {
+                f"{self.operation_type}_id": self.operation_id,
+                "asin": self.asin,
+                "error": str(error),
+                "timestamp": datetime.now(timezone.utc).timestamp(),
+            },
+        )
+
+    async def _handle_unexpected_error(self, error: Exception) -> None:
+        """Handle unexpected errors."""
+        logger.error(
+            f"[{self.operation_type.capitalize()} {self.operation_id}] "
+            f"Unexpected error: {error}",
+            exc_info=True,
+        )
+
+        await self._update_status("failed", error_message=str(error))
+
+        # Log to error table
+        try:
+            await self._log_error(error)
+        except Exception as log_err:
+            logger.error(f"Failed to log {self.operation_type} error: {log_err}")
+
+        await self._broadcast_event(
+            f"{self.operation_type}.failed",
+            {
+                f"{self.operation_type}_id": self.operation_id,
+                "asin": self.asin,
+                "error": str(error),
+                "timestamp": datetime.now(timezone.utc).timestamp(),
+            },
+        )
+
+    async def _log_error(self, error: Exception) -> None:
+        """Log error to database. Override in subclass if needed."""
+        pass
+
+    async def _broadcast_event(self, event_type_key: str, data: dict) -> None:
+        """Broadcast WebSocket event."""
+        # Map event type key to EventType enum value
+        event_type_map = {
+            "download.started": EventType.DOWNLOAD_STARTED.value if hasattr(EventType, 'DOWNLOAD_STARTED') else "download.started",
+            "download.completed": EventType.DOWNLOAD_COMPLETED.value if hasattr(EventType, 'DOWNLOAD_COMPLETED') else "download.completed",
+            "download.failed": EventType.DOWNLOAD_FAILED.value if hasattr(EventType, 'DOWNLOAD_FAILED') else "download.failed",
+            "decrypt.started": EventType.DECRYPT_STARTED.value if hasattr(EventType, 'DECRYPT_STARTED') else "decrypt.started",
+            "decrypt.completed": EventType.DECRYPT_COMPLETED.value if hasattr(EventType, 'DECRYPT_COMPLETED') else "decrypt.completed",
+            "decrypt.failed": EventType.DECRYPT_FAILED.value if hasattr(EventType, 'DECRYPT_FAILED') else "decrypt.failed",
+        }
+
+        event_type_value = event_type_map.get(event_type_key, event_type_key)
+
+        await ws_manager.broadcast_to_user(
+            user_id=self.user_id,
+            event_type=event_type_value,
+            data=data,
+        )
+
+
+class DownloadExecutor(OperationExecutor):
+    """Specialized executor for download operations."""
+
+    def __init__(self, user_id: str, download_id: str, book: dict):
+        super().__init__(user_id, download_id, book, "download")
+
+    async def _execute_operation(self, book_list: list, progress_callback) -> bool:
+        """Execute download operation."""
+        return await download_book(
+            book_list,
+            user_id=self.user_id,
+            progress_callback=progress_callback,
+        )
+
+    async def _update_status(self, status: str, **kwargs) -> None:
+        """Update download status in database."""
+        download_ops.update_download_status(
+            download_id=self.operation_id,
+            status=status,
+            **kwargs,
+        )
+
+    async def _log_error(self, error: Exception) -> None:
+        """Log download error to database."""
+        error_ops.log_error(
+            error_type="download_error",
+            error_message=str(error),
+            user_id=self.user_id,
+            asin=self.asin,
+            severity="error",
+            context={"download_id": self.operation_id},
+        )
+
+
+class DecryptExecutor(OperationExecutor):
+    """Specialized executor for decrypt operations."""
+
+    def __init__(self, user_id: str, decryption_id: str, book: dict):
+        super().__init__(user_id, decryption_id, book, "decrypt")
+
+    async def _execute_operation(self, book_list: list, progress_callback) -> bool:
+        """Execute decrypt operation."""
+        return await decrypt_book(
+            book_list,
+            user_id=self.user_id,
+            progress_callback=progress_callback,
+        )
+
+    async def _update_status(self, status: str, **kwargs) -> None:
+        """Update decryption status in database."""
+        decryption_ops.update_decryption_status(
+            decryption_id=self.operation_id,
+            status=status,
+            **kwargs,
+        )
+
+    async def _log_error(self, error: Exception) -> None:
+        """Log decryption error to database."""
+        error_ops.log_error(
+            error_type="decryption_error",
+            error_message=str(error),
+            user_id=self.user_id,
+            asin=self.asin,
+            severity="error",
+            context={"decryption_id": self.operation_id},
+        )
+
+
 class BackgroundTaskService:
     """Service for executing long-running operations as background tasks.
 
@@ -192,26 +452,18 @@ class BackgroundTaskService:
         download_id: str,
         book: dict,
     ) -> None:
-        """
-        Execute a single book download operation in background.
+        """Execute a single book download operation in background.
 
-        This queues and monitors a single book download. It:
-        1. Converts API dict to operations list format
-        2. Updates download status to 'downloading'
-        3. Calls downloader with progress callback
-        4. Updates download status based on result
-        5. Broadcasts download events
+        Delegates to DownloadExecutor which uses the Template Method pattern
+        to orchestrate the download with progress tracking, status updates,
+        error handling, and WebSocket broadcasting.
 
         Args:
             user_id: User UUID initiating the download
             download_id: Unique download identifier
             book: Book dictionary with {"asin": str, "title": str}
 
-        Raises:
-            Logs errors to database instead of raising
-
         Example:
-            # In a router:
             background_tasks.add_task(
                 BackgroundTaskService.execute_download_operation,
                 user_id=user_id,
@@ -219,135 +471,8 @@ class BackgroundTaskService:
                 book={"asin": "B123456789", "title": "Example Book"}
             )
         """
-        asin = None
-        try:
-            # Convert API format to operations format
-            book_list = BackgroundTaskService._dict_to_book_list(book)
-            asin = book_list[0]
-            title = book_list[1]
-
-            logger.info(f"[Download {download_id}] Starting download for {title} ({asin})")
-
-            # Update status to downloading
-            download_ops.update_download_status(
-                download_id=download_id,
-                status="downloading",
-            )
-
-            # Create progress callback
-            progress_callback = await BackgroundTaskService._create_progress_callback(
-                user_id
-            )
-
-            # Execute download with user_id for MinIO integration
-            success = await download_book(
-                book_list,
-                user_id=user_id,
-                progress_callback=progress_callback,
-            )
-
-            if success:
-                logger.info(f"[Download {download_id}] Download completed successfully")
-
-                # Update status to completed
-                download_ops.update_download_status(
-                    download_id=download_id,
-                    status="completed",
-                )
-
-                # Broadcast completion event
-                await ws_manager.broadcast_to_user(
-                    user_id=user_id,
-                    event_type=EventType.DOWNLOAD_COMPLETED.value,
-                    data={
-                        "download_id": download_id,
-                        "asin": asin,
-                        "title": title,
-                        "status": "completed",
-                        "timestamp": datetime.now(timezone.utc).timestamp(),
-                    },
-                )
-            else:
-                logger.warning(f"[Download {download_id}] Download failed")
-
-                # Update status to failed
-                download_ops.update_download_status(
-                    download_id=download_id,
-                    status="failed",
-                    error_message="Download operation returned false",
-                )
-
-                # Broadcast failure event
-                await ws_manager.broadcast_to_user(
-                    user_id=user_id,
-                    event_type=EventType.DOWNLOAD_FAILED.value,
-                    data={
-                        "download_id": download_id,
-                        "asin": asin,
-                        "title": title,
-                        "error": "Download operation failed",
-                        "timestamp": datetime.now(timezone.utc).timestamp(),
-                    },
-                )
-
-        except ValueError as e:
-            # Parameter validation error
-            logger.error(f"[Download {download_id}] Invalid parameters: {e}")
-
-            download_ops.update_download_status(
-                download_id=download_id,
-                status="failed",
-                error_message=f"Invalid book parameters: {str(e)}",
-            )
-
-            await ws_manager.broadcast_to_user(
-                user_id=user_id,
-                event_type=EventType.DOWNLOAD_FAILED.value,
-                data={
-                    "download_id": download_id,
-                    "asin": asin,
-                    "error": str(e),
-                    "timestamp": datetime.now(timezone.utc).timestamp(),
-                },
-            )
-
-        except Exception as e:
-            logger.error(
-                f"[Download {download_id}] Unexpected error: {e}",
-                exc_info=True,
-            )
-
-            # Update status to failed
-            download_ops.update_download_status(
-                download_id=download_id,
-                status="failed",
-                error_message=str(e),
-            )
-
-            # Log error
-            try:
-                error_ops.log_error(
-                    error_type="download_error",
-                    error_message=str(e),
-                    user_id=user_id,
-                    asin=asin,
-                    severity="error",
-                    context={"download_id": download_id},
-                )
-            except Exception as log_err:
-                logger.error(f"Failed to log download error: {log_err}")
-
-            # Broadcast failure
-            await ws_manager.broadcast_to_user(
-                user_id=user_id,
-                event_type=EventType.DOWNLOAD_FAILED.value,
-                data={
-                    "download_id": download_id,
-                    "asin": asin,
-                    "error": str(e),
-                    "timestamp": datetime.now(timezone.utc).timestamp(),
-                },
-            )
+        executor = DownloadExecutor(user_id, download_id, book)
+        await executor.execute()
 
     @staticmethod
     async def execute_decrypt_operation(
@@ -355,26 +480,18 @@ class BackgroundTaskService:
         decryption_id: str,
         book: dict,
     ) -> None:
-        """
-        Execute a single book decryption operation in background.
+        """Execute a single book decryption operation in background.
 
-        This queues and monitors a single book decryption. It:
-        1. Converts API dict to operations list format
-        2. Updates decryption status to 'decrypting'
-        3. Calls decryptor with progress callback
-        4. Updates decryption status based on result
-        5. Broadcasts decryption events
+        Delegates to DecryptExecutor which uses the Template Method pattern
+        to orchestrate the decryption with progress tracking, status updates,
+        error handling, and WebSocket broadcasting.
 
         Args:
             user_id: User UUID initiating the decryption
             decryption_id: Unique decryption identifier
             book: Book dictionary with {"asin": str, "title": str}
 
-        Raises:
-            Logs errors to database instead of raising
-
         Example:
-            # In a router:
             background_tasks.add_task(
                 BackgroundTaskService.execute_decrypt_operation,
                 user_id=user_id,
@@ -382,137 +499,8 @@ class BackgroundTaskService:
                 book={"asin": "B123456789", "title": "Example Book"}
             )
         """
-        asin = None
-        try:
-            # Convert API format to operations format
-            book_list = BackgroundTaskService._dict_to_book_list(book)
-            asin = book_list[0]
-            title = book_list[1]
-
-            logger.info(
-                f"[Decryption {decryption_id}] Starting decryption for {title} ({asin})"
-            )
-
-            # Update status to decrypting
-            decryption_ops.update_decryption_status(
-                decryption_id=decryption_id,
-                status="decrypting",
-            )
-
-            # Create progress callback
-            progress_callback = await BackgroundTaskService._create_progress_callback(
-                user_id
-            )
-
-            # Execute decryption with user_id for MinIO integration
-            success = await decrypt_book(
-                book_list,
-                user_id=user_id,
-                progress_callback=progress_callback,
-            )
-
-            if success:
-                logger.info(f"[Decryption {decryption_id}] Decryption completed successfully")
-
-                # Update status to completed
-                decryption_ops.update_decryption_status(
-                    decryption_id=decryption_id,
-                    status="completed",
-                )
-
-                # Broadcast completion event
-                await ws_manager.broadcast_to_user(
-                    user_id=user_id,
-                    event_type=EventType.DECRYPT_COMPLETED.value,
-                    data={
-                        "decryption_id": decryption_id,
-                        "asin": asin,
-                        "title": title,
-                        "status": "completed",
-                        "timestamp": datetime.now(timezone.utc).timestamp(),
-                    },
-                )
-            else:
-                logger.warning(f"[Decryption {decryption_id}] Decryption failed")
-
-                # Update status to failed
-                decryption_ops.update_decryption_status(
-                    decryption_id=decryption_id,
-                    status="failed",
-                    error_message="Decryption operation returned false",
-                )
-
-                # Broadcast failure event
-                await ws_manager.broadcast_to_user(
-                    user_id=user_id,
-                    event_type=EventType.DECRYPT_FAILED.value,
-                    data={
-                        "decryption_id": decryption_id,
-                        "asin": asin,
-                        "title": title,
-                        "error": "Decryption operation failed",
-                        "timestamp": datetime.now(timezone.utc).timestamp(),
-                    },
-                )
-
-        except ValueError as e:
-            # Parameter validation error
-            logger.error(f"[Decryption {decryption_id}] Invalid parameters: {e}")
-
-            decryption_ops.update_decryption_status(
-                decryption_id=decryption_id,
-                status="failed",
-                error_message=f"Invalid book parameters: {str(e)}",
-            )
-
-            await ws_manager.broadcast_to_user(
-                user_id=user_id,
-                event_type=EventType.DECRYPT_FAILED.value,
-                data={
-                    "decryption_id": decryption_id,
-                    "asin": asin,
-                    "error": str(e),
-                    "timestamp": datetime.now(timezone.utc).timestamp(),
-                },
-            )
-
-        except Exception as e:
-            logger.error(
-                f"[Decryption {decryption_id}] Unexpected error: {e}",
-                exc_info=True,
-            )
-
-            # Update status to failed
-            decryption_ops.update_decryption_status(
-                decryption_id=decryption_id,
-                status="failed",
-                error_message=str(e),
-            )
-
-            # Log error
-            try:
-                error_ops.log_error(
-                    error_type="decryption_error",
-                    error_message=str(e),
-                    user_id=user_id,
-                    asin=asin,
-                    severity="error",
-                    context={"decryption_id": decryption_id},
-                )
-            except Exception as log_err:
-                logger.error(f"Failed to log decryption error: {log_err}")
-
-            # Broadcast failure
-            await ws_manager.broadcast_to_user(
-                user_id=user_id,
-                event_type=EventType.DECRYPT_FAILED.value,
-                data={
-                    "decryption_id": decryption_id,
-                    "asin": asin,
-                    "error": str(e),
-                    "timestamp": datetime.now(timezone.utc).timestamp(),
-                },
-            )
+        executor = DecryptExecutor(user_id, decryption_id, book)
+        await executor.execute()
 
 
 # Singleton instance

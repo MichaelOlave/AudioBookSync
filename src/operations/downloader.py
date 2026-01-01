@@ -1,9 +1,11 @@
 """Book download functionality."""
 
 import asyncio
+import os
 from loguru import logger
 
 from ..core.config import Config
+from ..domain.progress import safe_progress_callback
 from ..infrastructure.file_utils import (
     ensure_directory,
     file_exists_in_directory,
@@ -42,15 +44,12 @@ async def download_book(
         logger.info(f"Starting download for {book_title}...")
 
         # Broadcast download started
-        if progress_callback:
-            try:
-                await progress_callback(
-                    event_type="download.started",
-                    asin=book_asin,
-                    filename=book_title,
-                )
-            except Exception as e:
-                logger.warning(f"Failed to broadcast download.started: {e}")
+        await safe_progress_callback(
+            progress_callback,
+            event_type="download.started",
+            asin=book_asin,
+            filename=book_title,
+        )
 
         await ensure_directory(Config.DOWNLOAD_DIR)
 
@@ -88,15 +87,12 @@ async def download_book(
                 await _upload_downloaded_file_to_minio(book_asin, book_title, user_id)
 
                 # Broadcast download completed
-                if progress_callback:
-                    try:
-                        await progress_callback(
-                            event_type="download.completed",
-                            asin=book_asin,
-                            filename=book_title,
-                        )
-                    except Exception as e:
-                        logger.warning(f"Failed to broadcast download.completed: {e}")
+                await safe_progress_callback(
+                    progress_callback,
+                    event_type="download.completed",
+                    asin=book_asin,
+                    filename=book_title,
+                )
 
                 return True
             else:
@@ -112,32 +108,26 @@ async def download_book(
         logger.error(f"Download timed out for {book_title}")
 
         # Broadcast download failed
-        if progress_callback:
-            try:
-                await progress_callback(
-                    event_type="download.failed",
-                    asin=book_asin,
-                    filename=book_title,
-                    error="Download timed out",
-                )
-            except Exception as e:
-                logger.warning(f"Failed to broadcast download.failed: {e}")
+        await safe_progress_callback(
+            progress_callback,
+            event_type="download.failed",
+            asin=book_asin,
+            filename=book_title,
+            error="Download timed out",
+        )
 
         return False
     except Exception as e:
         logger.error(f"Unexpected error downloading {book_title}: {e}")
 
         # Broadcast download failed
-        if progress_callback:
-            try:
-                await progress_callback(
-                    event_type="download.failed",
-                    asin=book_asin,
-                    filename=book_title,
-                    error=str(e),
-                )
-            except Exception as cb_err:
-                logger.warning(f"Failed to broadcast download.failed: {cb_err}")
+        await safe_progress_callback(
+            progress_callback,
+            event_type="download.failed",
+            asin=book_asin,
+            filename=book_title,
+            error=str(e),
+        )
 
         return False
 
@@ -156,12 +146,12 @@ async def _upload_downloaded_file_to_minio(
     try:
         # Find the downloaded file
         file_path = None
-        for item in __import__("os").listdir(Config.DOWNLOAD_DIR):
+        for item in os.listdir(Config.DOWNLOAD_DIR):
             if book_asin in item:
-                file_path = __import__("os").path.join(Config.DOWNLOAD_DIR, item)
+                file_path = os.path.join(Config.DOWNLOAD_DIR, item)
                 break
 
-        if not file_path or not __import__("os").path.exists(file_path):
+        if not file_path or not os.path.exists(file_path):
             logger.warning(f"Downloaded file not found for {book_asin}")
             return
 

@@ -5,6 +5,7 @@ import os
 from loguru import logger
 
 from ..core.config import Config
+from ..domain.progress import safe_progress_callback
 from ..infrastructure.file_utils import (
     ensure_directory,
     file_exists_in_directory,
@@ -43,15 +44,12 @@ async def decrypt_book(
         logger.info(f"Starting decryption for '{book_title}' ({book_asin})...")
 
         # Broadcast decrypt started
-        if progress_callback:
-            try:
-                await progress_callback(
-                    event_type="decrypt.started",
-                    asin=book_asin,
-                    filename=book_title,
-                )
-            except Exception as e:
-                logger.warning(f"Failed to broadcast decrypt.started: {e}")
+        await safe_progress_callback(
+            progress_callback,
+            event_type="decrypt.started",
+            asin=book_asin,
+            filename=book_title,
+        )
 
         await ensure_directory(Config.DECRYPTED_DIR)
 
@@ -91,15 +89,12 @@ async def decrypt_book(
                     await _upload_decrypted_file_to_minio(book_asin, book_title, user_id)
 
                     # Broadcast decrypt completed
-                    if progress_callback:
-                        try:
-                            await progress_callback(
-                                event_type="decrypt.completed",
-                                asin=book_asin,
-                                filename=book_title,
-                            )
-                        except Exception as e:
-                            logger.warning(f"Failed to broadcast decrypt.completed: {e}")
+                    await safe_progress_callback(
+                        progress_callback,
+                        event_type="decrypt.completed",
+                        asin=book_asin,
+                        filename=book_title,
+                    )
 
                     return True
                 else:
@@ -116,16 +111,13 @@ async def decrypt_book(
         logger.error(f"An error occurred during decryption: {e}")
 
         # Broadcast decrypt failed
-        if progress_callback:
-            try:
-                await progress_callback(
-                    event_type="decrypt.failed",
-                    asin=book_asin,
-                    filename=book_title,
-                    error=str(e),
-                )
-            except Exception as cb_err:
-                logger.warning(f"Failed to broadcast decrypt.failed: {cb_err}")
+        await safe_progress_callback(
+            progress_callback,
+            event_type="decrypt.failed",
+            asin=book_asin,
+            filename=book_title,
+            error=str(e),
+        )
 
         return False
 

@@ -11,9 +11,11 @@ from loguru import logger
 
 from ..core.config import Config
 from ..database import user_ops
+from ..domain.progress import safe_progress_callback
 from .db_manager import get_library_manager
 from .decryptor import decrypt_book
 from .downloader import download_book
+from .handlers import book_processor
 
 
 async def get_user(username: str = "user") -> str:
@@ -158,92 +160,18 @@ async def process_book(
 ) -> None:
     """Process a single book: download and decrypt.
 
+    Delegates to BookProcessingHandler for orchestration of the
+    download and decrypt workflow with progress tracking.
+
     Args:
         user_id: User ID
         book: Book dictionary with ASIN and title
         library_manager: LibraryManager instance
         progress_callback: Optional async callable for progress updates
     """
-    asin = book["asin"]
-    title = book["title"]
-
-    try:
-        logger.info(f"Processing book: {title}")
-
-        # Broadcast download started
-        if progress_callback:
-            try:
-                await progress_callback(
-                    event_type="download.started",
-                    asin=asin,
-                    title=title,
-                )
-            except Exception as e:
-                logger.warning(f"Failed to broadcast download.started: {e}")
-
-        # Download book
-        download_success = await download_book([asin, title])
-        if not download_success:
-            raise Exception("Download failed")
-
-        # Broadcast download completed
-        if progress_callback:
-            try:
-                await progress_callback(
-                    event_type="download.completed",
-                    asin=asin,
-                    title=title,
-                )
-            except Exception as e:
-                logger.warning(f"Failed to broadcast download.completed: {e}")
-
-        # Broadcast decrypt started
-        if progress_callback:
-            try:
-                await progress_callback(
-                    event_type="decrypt.started",
-                    asin=asin,
-                    title=title,
-                )
-            except Exception as e:
-                logger.warning(f"Failed to broadcast decrypt.started: {e}")
-
-        # Decrypt book
-        decrypt_success = await decrypt_book([asin, title])
-        if not decrypt_success:
-            raise Exception("Decryption failed")
-
-        # Broadcast decrypt completed
-        if progress_callback:
-            try:
-                await progress_callback(
-                    event_type="decrypt.completed",
-                    asin=asin,
-                    title=title,
-                )
-            except Exception as e:
-                logger.warning(f"Failed to broadcast decrypt.completed: {e}")
-
-        logger.info(f"Successfully processed: {title}")
-
-    except Exception as e:
-        logger.error(f"Processing failed for {title}: {e}")
-
-        # Broadcast error event
-        if progress_callback:
-            try:
-                await progress_callback(
-                    event_type="sync.error",
-                    asin=asin,
-                    title=title,
-                    error=str(e),
-                )
-            except Exception as cb_err:
-                logger.warning(f"Failed to broadcast error event: {cb_err}")
-
-        await library_manager.log_error(
-            error_type="sync_error",
-            error_message=f"Failed to process book: {str(e)}",
-            asin=asin,
-            severity="error",
-        )
+    await book_processor.process_book(
+        user_id=user_id,
+        book=book,
+        library_manager=library_manager,
+        progress_callback=progress_callback,
+    )
