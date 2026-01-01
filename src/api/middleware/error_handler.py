@@ -88,8 +88,8 @@ def add_exception_handlers(app: FastAPI):
         return JSONResponse(
             status_code=exc.status_code,
             content={
+                "detail": exc.message,
                 "error": exc.__class__.__name__,
-                "message": exc.message,
                 "status_code": exc.status_code,
                 **(exc.detail if exc.detail else {}),
             },
