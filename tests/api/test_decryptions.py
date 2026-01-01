@@ -3,6 +3,7 @@
 import pytest
 from fastapi import status
 import uuid
+from datetime import datetime
 
 
 @pytest.fixture
@@ -37,6 +38,8 @@ class TestTriggerDecryption:
                 "asin": asin,
                 "status": "completed",
                 "download_path": "/audiobooks/downloaded/B084L6Z6M3.m4b",
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         def mock_create_decryption_status(asin, download_id=None, status="pending", **kwargs):
@@ -84,6 +87,8 @@ class TestTriggerDecryption:
                 "asin": asin,
                 "status": "downloading",  # Still downloading
                 "download_path": None,
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(download_ops, "get_download_by_asin", mock_get_download_by_asin)
@@ -125,6 +130,8 @@ class TestTriggerDecryption:
                 "asin": asin,
                 "status": "completed",
                 "download_path": "/audiobooks/downloaded/B084L6Z6M3.m4b",
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         def mock_create_decryption_status(asin, download_id=None, status="pending", output_format="m4b"):
@@ -291,6 +298,8 @@ class TestGetDecryptionStatus:
                 "asin": "B084L6Z6M3",
                 "status": "decrypting",
                 "user_id": test_user_id,
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(
@@ -339,6 +348,8 @@ class TestGetDecryptionStatus:
                 "asin": "B084L6Z6M3",
                 "status": "decrypting",
                 "user_id": "different-user-id",  # Different user
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(

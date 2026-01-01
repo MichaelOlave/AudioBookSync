@@ -2,6 +2,7 @@
 
 import pytest
 from fastapi import status
+from datetime import datetime
 
 
 class TestCreateBook:
@@ -15,7 +16,12 @@ class TestCreateBook:
 
         def mock_get_book_by_asin(asin):
             if asin == test_book_data["asin"]:
-                return {**test_book_data, "user_id": authenticated_client.user_id}
+                return {
+                    **test_book_data,
+                    "user_id": authenticated_client.user_id,
+                    "created_at": datetime.now(),
+                    "updated_at": datetime.now(),
+                }
             return None
 
         monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
@@ -112,6 +118,8 @@ class TestDeleteBook:
                 "asin": asin,
                 "title": "Some Book",
                 "user_id": "different-user-id",  # Different user
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
@@ -150,6 +158,8 @@ class TestCreateBookWithMetadata:
                 "rating": 4.5,
                 "runtime_min": 300,
                 "user_id": authenticated_client.user_id,
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "add_book", mock_add_book)
@@ -194,6 +204,8 @@ class TestCreateBookWithMetadata:
                 "description": None,
                 "rating": None,
                 "user_id": authenticated_client.user_id,
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "add_book", mock_add_book)
@@ -268,7 +280,12 @@ class TestDuplicateBookHandling:
             return True
 
         def mock_get_book_by_asin(asin):
-            return {**test_book_data, "user_id": authenticated_client.user_id}
+            return {
+                **test_book_data,
+                "user_id": authenticated_client.user_id,
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
+            }
 
         monkeypatch.setattr(book_ops, "add_book", mock_add_book)
         monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
@@ -309,8 +326,8 @@ class TestBookResponseFormat:
                 "title": "Test Book",
                 "author": "Test Author",
                 "user_id": authenticated_client.user_id,
-                "created_at": "2024-12-20T10:00:00",
-                "updated_at": "2024-12-20T10:00:00",
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "add_book", mock_add_book)
@@ -346,6 +363,8 @@ class TestBookResponseFormat:
                 "asin": asin,
                 "title": "Test Book",
                 "user_id": authenticated_client.user_id,
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "add_book", mock_add_book)
@@ -395,6 +414,8 @@ class TestBookValidation:
                 "asin": asin,
                 "title": very_long_title,
                 "user_id": authenticated_client.user_id,
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "add_book", mock_add_book)
@@ -430,6 +451,8 @@ class TestBookValidation:
                 "asin": asin,
                 "title": special_title,
                 "user_id": authenticated_client.user_id,
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "add_book", mock_add_book)

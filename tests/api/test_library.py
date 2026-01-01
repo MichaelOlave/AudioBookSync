@@ -2,6 +2,7 @@
 
 import pytest
 from fastapi import status
+from datetime import datetime
 
 
 class TestGetLibrary:
@@ -74,6 +75,7 @@ class TestGetBookDetails:
 
         monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
 
+
         response = authenticated_client.get("/api/v1/library/NOTEXIST")
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -88,6 +90,8 @@ class TestGetBookDetails:
                 "title": "Some Book",
                 "user_id": "different-user-id",  # Different user
                 "author": "Some Author",
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
@@ -159,6 +163,8 @@ class TestPaginationEdgeCases:
                     "title": f"Book {i}",
                     "user_id": user_id,
                     "author": "Author",
+                    "created_at": datetime.now(),
+                    "updated_at": datetime.now(),
                 }
                 for i in range(3)
             ]
@@ -277,6 +283,8 @@ class TestLibraryResponseFormat:
                         "title": "User Book",
                         "user_id": user_id,
                         "author": "User Author",
+                        "created_at": datetime.now(),
+                        "updated_at": datetime.now(),
                     }
                 ]
             else:
@@ -286,6 +294,8 @@ class TestLibraryResponseFormat:
                         "title": "Other Book",
                         "user_id": "other-user-id",
                         "author": "Other Author",
+                        "created_at": datetime.now(),
+                        "updated_at": datetime.now(),
                     }
                 ]
 

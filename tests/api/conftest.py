@@ -2,7 +2,7 @@
 
 import pytest
 from fastapi.testclient import TestClient
-from datetime import timedelta
+from datetime import timedelta, datetime
 import uuid
 
 from src.api.main import app
@@ -64,7 +64,7 @@ def test_user_with_tokens(test_user_id):
 
 
 @pytest.fixture
-def authenticated_client(client, test_user_with_tokens):
+def authenticated_client(client, test_user_with_tokens, mock_user_ops):
     """Test client with authentication headers."""
     client.headers = test_user_with_tokens["headers"]
     client.user_id = test_user_with_tokens["user_id"]
@@ -85,6 +85,16 @@ def test_book_data():
         "description": "An intimate, powerful, and inspiring memoir.",
         "rating": 4.8,
         "runtime_min": 1440,
+    }
+
+
+@pytest.fixture
+def test_book_response_data(test_book_data):
+    """Test book data with datetime fields for response mocks."""
+    return {
+        **test_book_data,
+        "created_at": datetime.now(),
+        "updated_at": datetime.now(),
     }
 
 
@@ -140,8 +150,8 @@ def mock_user_ops(monkeypatch):
             "email": "testuser@example.com",
             "password_hash": hash_password("TestPassword123!"),
             "is_active": True,
-            "created_at": None,
-            "updated_at": None,
+            "created_at": datetime.now(),
+            "updated_at": datetime.now(),
         }
 
     monkeypatch.setattr(user_ops, "get_user_by_username", mock_get_user_by_username)
@@ -158,6 +168,8 @@ def mock_user_ops(monkeypatch):
 def mock_book_ops(monkeypatch, test_user_id):
     """Mock book database operations."""
 
+    now = datetime.now()
+
     def mock_get_user_books(user_id):
         if user_id == test_user_id:
             return [
@@ -173,8 +185,8 @@ def mock_book_ops(monkeypatch, test_user_id):
                     "is_decrypted": True,
                     "download_path": "/audiobooks/downloaded/B084L6Z6M3.m4b",
                     "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
-                    "created_at": None,
-                    "updated_at": None,
+                    "created_at": now,
+                    "updated_at": now,
                 }
             ]
         return []
@@ -193,8 +205,8 @@ def mock_book_ops(monkeypatch, test_user_id):
                 "is_decrypted": True,
                 "download_path": "/audiobooks/downloaded/B084L6Z6M3.m4b",
                 "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
-                "created_at": None,
-                "updated_at": None,
+                "created_at": now,
+                "updated_at": now,
             }
         return None
 

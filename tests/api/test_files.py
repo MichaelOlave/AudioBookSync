@@ -4,6 +4,7 @@ import pytest
 from fastapi import status
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+from datetime import datetime
 
 
 class TestStreamAudiobook:
@@ -19,6 +20,8 @@ class TestStreamAudiobook:
                 "title": "Test Book",
                 "user_id": authenticated_client.user_id,
                 "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
@@ -44,6 +47,8 @@ class TestStreamAudiobook:
                 "title": "Test Book",
                 "user_id": authenticated_client.user_id,
                 "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
@@ -85,6 +90,8 @@ class TestStreamAudiobook:
                 "asin": asin,
                 "title": "Test Book",
                 "user_id": "different-user-id",  # Different user
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
@@ -127,6 +134,8 @@ class TestStreamAudiobook:
                 "title": "Test Book",
                 "user_id": authenticated_client.user_id,
                 "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)

@@ -3,6 +3,7 @@
 import pytest
 from fastapi import status
 import os
+from datetime import datetime
 
 
 class TestFileStreamingBasics:
@@ -18,6 +19,8 @@ class TestFileStreamingBasics:
                 "user_id": authenticated_client.user_id,
                 "title": "Test Book",
                 "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
@@ -57,6 +60,8 @@ class TestFileStreamingBasics:
                 "asin": asin,
                 "user_id": "different-user-id",  # Different user
                 "title": "Test Book",
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
@@ -97,6 +102,8 @@ class TestRangeRequests:
                 "user_id": authenticated_client.user_id,
                 "title": "Test Book",
                 "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
@@ -127,6 +134,8 @@ class TestRangeRequests:
                 "user_id": authenticated_client.user_id,
                 "title": "Test Book",
                 "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
@@ -156,6 +165,8 @@ class TestRangeRequests:
                 "user_id": authenticated_client.user_id,
                 "title": "Test Book",
                 "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
@@ -183,6 +194,8 @@ class TestRangeRequests:
                 "user_id": authenticated_client.user_id,
                 "title": "Test Book",
                 "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
@@ -211,6 +224,8 @@ class TestRangeRequests:
                 "user_id": authenticated_client.user_id,
                 "title": "Test Book",
                 "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
@@ -242,6 +257,8 @@ class TestFileStreamingHeaders:
                 "user_id": authenticated_client.user_id,
                 "title": "Test Book",
                 "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
@@ -262,6 +279,8 @@ class TestFileStreamingHeaders:
                 "user_id": authenticated_client.user_id,
                 "title": "Test Book",
                 "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
@@ -287,6 +306,8 @@ class TestFileStreamingHeaders:
                 "user_id": authenticated_client.user_id,
                 "title": "Test Book",
                 "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)

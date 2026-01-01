@@ -258,6 +258,8 @@ class TestDecryptOperationFlow:
                 "asin": asin,
                 "status": "downloading",  # Still downloading
                 "download_path": None,
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(

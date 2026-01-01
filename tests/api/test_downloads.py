@@ -3,6 +3,7 @@
 import pytest
 from fastapi import status
 import uuid
+from datetime import datetime
 
 
 @pytest.fixture
@@ -212,6 +213,8 @@ class TestGetDownloadStatus:
                 "asin": "B084L6Z6M3",
                 "status": "downloading",
                 "user_id": test_user_id,
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(download_ops, "get_download_by_id", mock_get_download_by_id)
@@ -256,6 +259,8 @@ class TestGetDownloadStatus:
                 "asin": "B084L6Z6M3",
                 "status": "downloading",
                 "user_id": "different-user-id",  # Different user
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(download_ops, "get_download_by_id", mock_get_download_by_id)

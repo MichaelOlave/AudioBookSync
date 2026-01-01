@@ -3,6 +3,7 @@
 import pytest
 from fastapi import status
 import uuid
+from datetime import datetime
 
 
 @pytest.fixture
@@ -147,6 +148,8 @@ class TestCompleteUserJourney:
                     "title": "Becoming",
                     "user_id": test_user_id,
                     "author": "Michelle Obama",
+                    "created_at": datetime.now(),
+                    "updated_at": datetime.now(),
                 }
             return None
 
@@ -199,6 +202,8 @@ class TestCompleteUserJourney:
                     "asin": asin,
                     "status": "completed",
                     "download_path": f"/audiobooks/downloaded/{asin}.m4b",
+                    "created_at": datetime.now(),
+                    "updated_at": datetime.now(),
                 }
             return None
 
@@ -210,6 +215,8 @@ class TestCompleteUserJourney:
             return {
                 "download_id": did,
                 "status": "completed",
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
 
         monkeypatch.setattr(
