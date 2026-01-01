@@ -169,3 +169,6 @@ Michael.json
 
 # Agent-OS files
 agent-os/
+
+# Log files
+logs/
