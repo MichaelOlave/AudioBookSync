@@ -1,7 +1,6 @@
 """Book download functionality."""
 
 import asyncio
-
 from loguru import logger
 
 from ..core.config import Config
@@ -10,14 +9,21 @@ from ..infrastructure.file_utils import (
     file_exists_in_directory,
     normalize_filename,
 )
+from ..infrastructure.storage_service import StorageService
+from ..database.db_downloads import download_ops
 
 
-async def download_book(book: list, progress_callback=None) -> bool:
+async def download_book(
+    book: list,
+    user_id: str,
+    progress_callback=None,
+) -> bool:
     """
     Download a book from Audible using the audible-cli tool.
 
     Args:
         book: List [asin, title]
+        user_id: UUID of user for MinIO uploads (required)
         progress_callback: Optional async callable for progress updates.
                           Called with event_type and kwargs.
 
@@ -26,6 +32,11 @@ async def download_book(book: list, progress_callback=None) -> bool:
     """
     book_asin = book[0]
     book_title = book[1]
+
+    # Validate user_id is provided (required for MinIO)
+    if not user_id:
+        logger.error("user_id is required for MinIO storage")
+        return False
 
     try:
         logger.info(f"Starting download for {book_title}...")
@@ -72,6 +83,9 @@ async def download_book(book: list, progress_callback=None) -> bool:
                 raise Exception("No new files downloaded")
             elif await validate_book(book):
                 logger.success(f"{stdout_text}")
+
+                # Upload to MinIO (native storage)
+                await _upload_downloaded_file_to_minio(book_asin, book_title, user_id)
 
                 # Broadcast download completed
                 if progress_callback:
@@ -126,6 +140,48 @@ async def download_book(book: list, progress_callback=None) -> bool:
                 logger.warning(f"Failed to broadcast download.failed: {cb_err}")
 
         return False
+
+
+async def _upload_downloaded_file_to_minio(
+    book_asin: str, book_title: str, user_id: str
+) -> None:
+    """
+    Upload downloaded file to MinIO after successful download.
+
+    Args:
+        book_asin: Amazon Standard Identification Number
+        book_title: Title of the book
+        user_id: User UUID
+    """
+    try:
+        # Find the downloaded file
+        file_path = None
+        for item in __import__("os").listdir(Config.DOWNLOAD_DIR):
+            if book_asin in item:
+                file_path = __import__("os").path.join(Config.DOWNLOAD_DIR, item)
+                break
+
+        if not file_path or not __import__("os").path.exists(file_path):
+            logger.warning(f"Downloaded file not found for {book_asin}")
+            return
+
+        # Upload to MinIO
+        storage_service = StorageService()
+        success, object_key = storage_service.save_file(
+            user_id=user_id,
+            file_path=file_path,
+            file_type="downloaded",
+            asin=book_asin,
+        )
+
+        if success and object_key:
+            logger.info(f"Successfully uploaded download to MinIO: {object_key}")
+        else:
+            logger.warning(f"Failed to upload download to MinIO for {book_asin}")
+
+    except Exception as e:
+        # Log error but don't fail the download
+        logger.error(f"Error uploading download to MinIO: {e}")
 
 
 async def validate_book(book: list) -> bool:

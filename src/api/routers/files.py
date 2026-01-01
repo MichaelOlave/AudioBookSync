@@ -2,16 +2,40 @@
 
 from pathlib import Path
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Header
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException, status, Header, Request
+from fastapi.responses import FileResponse, StreamingResponse
 from loguru import logger
 
 from ...database.db_books import book_ops
+from ...database.db_decryptions import decryption_ops
+from ...infrastructure.storage_service import StorageService
 from ...core.config import Config
 from ..security.auth import get_current_user
 from ..middleware.error_handler import ResourceNotFoundError
 
 router = APIRouter()
+
+
+def _get_object_key_for_asin(user_id: str, asin: str) -> Optional[str]:
+    """Get MinIO object_key for a specific ASIN from decryption status.
+
+    Args:
+        user_id: User ID
+        asin: Amazon Standard Identification Number
+
+    Returns:
+        object_key if found and not None, None otherwise
+    """
+    try:
+        # Get user's decryptions and find matching ASIN
+        decryptions = decryption_ops.get_user_decryptions(user_id=user_id, limit=100)
+        for decryption in decryptions:
+            if decryption.get("asin") == asin:
+                return decryption.get("object_key")
+        return None
+    except Exception as e:
+        logger.warning(f"Failed to get object_key for {asin}: {e}")
+        return None
 
 
 @router.get(
@@ -37,9 +61,10 @@ async def stream_audiobook(
     asin: str,
     current_user: dict = Depends(get_current_user),
     range_header: Optional[str] = Header(default=None),
+    request: Optional[Request] = None,
 ):
     """
-    Stream an audiobook file with Range request support.
+    Stream an audiobook file from MinIO with Range request support.
 
     Streams the decrypted audiobook file with support for HTTP Range requests,
     which allows audio players to seek through the file without downloading
@@ -49,9 +74,10 @@ async def stream_audiobook(
         asin: Amazon Standard Identification Number
         current_user: Current authenticated user (from JWT token)
         range_header: HTTP Range header (e.g., "bytes=0-1023")
+        request: FastAPI request object for extracting headers
 
     Returns:
-        StreamingResponse or FileResponse with audio file
+        StreamingResponse with audio file
 
     Raises:
         ResourceNotFoundError: If book or file not found
@@ -64,6 +90,13 @@ async def stream_audiobook(
     """
     try:
         user_id = current_user.get("user_id")
+        if not user_id:
+            logger.error("User ID not found in token")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication token",
+            )
+        
         logger.info(f"Audio stream requested for {asin} by user {user_id}")
 
         # Verify book exists and belongs to user
@@ -82,38 +115,23 @@ async def stream_audiobook(
                 detail="Not authorized to access this book",
             )
 
-        # Get decrypted file path
-        decrypted_path = book.get("decrypted_path")
-        if not decrypted_path:
-            logger.warning(f"Decrypted file path not available for {asin}")
+        # Get MinIO object_key from decryption status (required)
+        object_key = _get_object_key_for_asin(user_id, asin)
+        if not object_key:
+            logger.warning(f"MinIO object_key not available for {asin}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Decrypted audiobook file not available",
             )
 
-        # Verify file exists and prevent path traversal
-        file_path = Path(decrypted_path).resolve()
-        decrypted_dir = Path(Config.DECRYPTED_DIR).resolve()
+        # Initialize storage service
+        storage_service = StorageService()
+        logger.debug(f"Retrieved object_key for {asin}: {object_key}")
 
-        # Security: ensure file is within decrypted directory
-        if not str(file_path).startswith(str(decrypted_dir)):
-            logger.warning(f"Path traversal attempt detected for {asin}: {file_path}")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied",
-            )
+        # Parse Range header if present (HTTP 206 Partial Content)
+        start = 0
+        content_length = None
 
-        if not file_path.exists():
-            logger.warning(f"Decrypted file not found: {file_path}")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Decrypted audiobook file not found on disk",
-            )
-
-        # Get file size
-        file_size = file_path.stat().st_size
-
-        # Handle Range requests (HTTP 206 Partial Content)
         if range_header:
             try:
                 # Parse Range header: "bytes=start-end"
@@ -124,43 +142,58 @@ async def stream_audiobook(
 
                 start_str, end_str = range_str.split("-", 1)
                 start = int(start_str) if start_str else 0
-                end = int(end_str) if end_str else file_size - 1
+                end = int(end_str) if end_str else None
 
-                # Validate range
-                if start < 0 or end >= file_size or start > end:
-                    raise ValueError("Invalid range values")
+                if end is not None:
+                    content_length = end - start + 1
 
-                content_length = end - start + 1
-
-                logger.info(f"Streaming range {start}-{end}/{file_size} for {asin}")
-
-                # Return partial content with proper headers
-                return FileResponse(
-                    path=file_path,
-                    media_type="audio/mp4",
-                    headers={
-                        "Content-Range": f"bytes {start}-{end}/{file_size}",
-                        "Content-Length": str(content_length),
-                        "Accept-Ranges": "bytes",
-                    },
-                    status_code=206,
-                )
+                logger.info(f"Streaming range {start}-{end} for {asin}")
 
             except (ValueError, IndexError) as e:
                 logger.warning(f"Invalid range header: {range_header}: {e}")
                 # Fall through to return full file
-                pass
+                start = 0
+                content_length = None
 
-        # Return full file
-        logger.info(f"Streaming full file for {asin} (size: {file_size} bytes)")
+        # Stream from MinIO
+        logger.info(
+            f"Streaming from MinIO: {asin}, object_key={object_key}, "
+            f"offset={start}, length={content_length}"
+        )
 
-        return FileResponse(
-            path=file_path,
+        data = storage_service.stream_file(
+            user_id=user_id,
+            object_key=object_key,
+            offset=start,
+            length=content_length,
+        )
+
+        if not data:
+            logger.error(f"Failed to stream from MinIO: {asin}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to stream audiobook",
+            )
+
+        def stream_generator():
+            yield data
+
+        # Return with proper headers for Range requests
+        headers = {
+            "Content-Length": str(len(data)),
+            "Accept-Ranges": "bytes",
+        }
+
+        status_code = 200
+        if content_length is not None:
+            headers["Content-Range"] = f"bytes {start}-{start + len(data) - 1}/*"
+            status_code = 206
+
+        return StreamingResponse(
+            stream_generator(),
             media_type="audio/mp4",
-            headers={
-                "Content-Length": str(file_size),
-                "Accept-Ranges": "bytes",
-            },
+            headers=headers,
+            status_code=status_code,
         )
 
     except HTTPException:

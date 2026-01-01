@@ -82,6 +82,38 @@ class Config:
     RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
     RATE_LIMIT_LOGIN_PER_MINUTE = int(os.getenv("RATE_LIMIT_LOGIN_PER_MINUTE", "5"))
 
+    # ========================================================================
+    # MinIO Object Storage Configuration
+    # ========================================================================
+    # MinIO Connection Settings
+    MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "localhost:9000")
+    MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
+    MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
+    MINIO_SECURE = os.getenv("MINIO_SECURE", "false").lower() in ("true", "1", "yes")
+
+    # MinIO Feature Flags
+    USE_MINIO_STORAGE = os.getenv("USE_MINIO_STORAGE", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
+    # MinIO Migration Settings
+    MIGRATION_FAILURE_THRESHOLD = float(
+        os.getenv("MIGRATION_FAILURE_THRESHOLD", "0.10")
+    )  # 10% failure rate triggers rollback
+    MIGRATION_LOCK_TIMEOUT_HOURS = int(
+        os.getenv("MIGRATION_LOCK_TIMEOUT_HOURS", "2")
+    )  # Lock timeout for stale migrations
+    MIGRATION_BATCH_SIZE = int(
+        os.getenv("MIGRATION_BATCH_SIZE", "10")
+    )  # Files per batch during migration
+
+    # MinIO Cleanup Settings
+    CLEANUP_SCHEDULE = os.getenv(
+        "CLEANUP_SCHEDULE", "0 2 * * *"
+    )  # Cron schedule for orphaned file cleanup (default: daily at 2 AM)
+
     @classmethod
     def ensure_directories(cls) -> None:
         """Create necessary directories if they don't exist."""

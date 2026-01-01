@@ -211,23 +211,54 @@ def create_app() -> FastAPI:
         response_model=HealthResponse,
         tags=["Health"],
         summary="Health Check",
-        description="Check if the API is running and healthy",
+        description="Check if the API and MinIO storage are running and healthy",
     )
     async def health_check() -> HealthResponse:
         """
-        Health check endpoint.
+        Health check endpoint with MinIO connectivity status.
+
+        MinIO is required for all operations in native mode, so connectivity
+        is mandatory for the service to be considered healthy.
 
         Returns:
-            HealthResponse: Service health status
+            HealthResponse: Service health status with MinIO connectivity
 
         Example:
             GET /api/v1/health
-            Response: {"status": "healthy", "service": "AudioBookSync", "version": "1.0.0"}
+            Response: {
+                "status": "healthy",
+                "service": "AudioBookSync",
+                "version": "1.0.0",
+                "minio": "connected"
+            }
+
+        MinIO Status:
+            - "connected": MinIO service is accessible and responding
+            - "disconnected: <error>": MinIO service is not accessible
         """
+        # Check MinIO connectivity (required for native MinIO mode)
+        overall_status = "healthy"
+        minio_status = "connected"
+
+        try:
+            # Import MinIOClient here to avoid circular imports
+            from ..infrastructure.minio_client import MinIOClient
+
+            minio_client = MinIOClient()
+            # Try to check bucket existence as a connectivity test
+            # This is a lightweight operation that verifies MinIO is accessible
+            minio_client.bucket_exists("test-health-check")
+            logger.debug("MinIO health check: connected")
+        except Exception as e:
+            minio_status = f"disconnected: {str(e)}"
+            overall_status = "unhealthy"  # MinIO is critical infrastructure
+            logger.error(f"MinIO health check failed: {e}")
+
         return HealthResponse(
-            status="healthy",
+            status=overall_status,
             service="AudioBookSync",
             version="1.0.0",
+            minio=minio_status,
         )
 
     # ========== DOCUMENTATION ==========

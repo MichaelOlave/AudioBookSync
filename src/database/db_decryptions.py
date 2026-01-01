@@ -113,6 +113,35 @@ class DecryptionOperations:
             logger.error(f"Failed to update decryption status: {e}")
             return False
 
+    def update_decryption_object_key(
+        self, decryption_id: str, object_key: str
+    ) -> bool:
+        """
+        Update decryption status with MinIO object_key.
+
+        Args:
+            decryption_id: Decryption status UUID
+            object_key: MinIO object key for the decrypted file
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            with self.db_pool.get_cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE decryption_status
+                    SET object_key = %s
+                    WHERE decryption_id = %s
+                """,
+                    (object_key, decryption_id),
+                )
+                logger.info(f"Updated decryption {decryption_id} with object_key: {object_key}")
+                return True
+        except Exception as e:
+            logger.error(f"Failed to update decryption object_key: {e}")
+            return False
+
     def get_decryption_by_id(self, decryption_id: str) -> Optional[dict]:
         """
         Get a decryption record by decryption_id.

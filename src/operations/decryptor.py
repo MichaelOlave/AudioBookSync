@@ -2,7 +2,6 @@
 
 import asyncio
 import os
-
 from loguru import logger
 
 from ..core.config import Config
@@ -11,14 +10,21 @@ from ..infrastructure.file_utils import (
     file_exists_in_directory,
     normalize_filename,
 )
+from ..infrastructure.storage_service import StorageService
+from ..database.db_decryptions import decryption_ops
 
 
-async def decrypt_book(book: list, progress_callback=None) -> bool:
+async def decrypt_book(
+    book: list,
+    user_id: str,
+    progress_callback=None,
+) -> bool:
     """
     Decrypt a book using FFmpeg and activation bytes.
 
     Args:
         book: List [asin, title]
+        user_id: UUID of user for MinIO uploads (required)
         progress_callback: Optional async callable for progress updates.
                           Called with event_type and kwargs.
 
@@ -27,6 +33,11 @@ async def decrypt_book(book: list, progress_callback=None) -> bool:
     """
     book_asin = book[0]
     book_title = normalize_filename(book[1])
+
+    # Validate user_id is provided (required for MinIO)
+    if not user_id:
+        logger.error("user_id is required for MinIO storage")
+        return False
 
     try:
         logger.info(f"Starting decryption for '{book_title}' ({book_asin})...")
@@ -76,6 +87,9 @@ async def decrypt_book(book: list, progress_callback=None) -> bool:
                     stdout_text = stdout.decode().strip()
                     logger.success(f"Decrypted: {output_file}: {stdout_text}")
 
+                    # Upload to MinIO (native storage)
+                    await _upload_decrypted_file_to_minio(book_asin, book_title, user_id)
+
                     # Broadcast decrypt completed
                     if progress_callback:
                         try:
@@ -114,6 +128,48 @@ async def decrypt_book(book: list, progress_callback=None) -> bool:
                 logger.warning(f"Failed to broadcast decrypt.failed: {cb_err}")
 
         return False
+
+
+async def _upload_decrypted_file_to_minio(
+    book_asin: str, book_title: str, user_id: str
+) -> None:
+    """
+    Upload decrypted file to MinIO after successful decryption.
+
+    Args:
+        book_asin: Amazon Standard Identification Number
+        book_title: Normalized title of the book
+        user_id: User UUID
+    """
+    try:
+        # Find the decrypted file
+        file_path = None
+        for item in os.listdir(Config.DECRYPTED_DIR):
+            if book_title in item and item.endswith(".m4b"):
+                file_path = os.path.join(Config.DECRYPTED_DIR, item)
+                break
+
+        if not file_path or not os.path.exists(file_path):
+            logger.warning(f"Decrypted file not found for {book_title}")
+            return
+
+        # Upload to MinIO
+        storage_service = StorageService()
+        success, object_key = storage_service.save_file(
+            user_id=user_id,
+            file_path=file_path,
+            file_type="decrypted",
+            title=book_title,
+        )
+
+        if success and object_key:
+            logger.info(f"Successfully uploaded decryption to MinIO: {object_key}")
+        else:
+            logger.warning(f"Failed to upload decryption to MinIO for {book_title}")
+
+    except Exception as e:
+        # Log error but don't fail the decryption
+        logger.error(f"Error uploading decryption to MinIO: {e}")
 
 
 async def validate_decrypted_book(book: list) -> bool:

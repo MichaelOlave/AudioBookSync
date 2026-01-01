@@ -5,6 +5,7 @@ requests
 ffmpeg-python
 aiofiles
 loguru
+minio==7.2.3
 psycopg2-binary
 python-dotenv
 

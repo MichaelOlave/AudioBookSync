@@ -105,6 +105,35 @@ class DownloadOperations:
             logger.error(f"Failed to update download status: {e}")
             return False
 
+    def update_download_object_key(
+        self, download_id: str, object_key: str
+    ) -> bool:
+        """
+        Update download status with MinIO object_key.
+
+        Args:
+            download_id: Download status UUID
+            object_key: MinIO object key for the downloaded file
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            with self.db_pool.get_cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE download_status
+                    SET object_key = %s
+                    WHERE download_id = %s
+                """,
+                    (object_key, download_id),
+                )
+                logger.info(f"Updated download {download_id} with object_key: {object_key}")
+                return True
+        except Exception as e:
+            logger.error(f"Failed to update download object_key: {e}")
+            return False
+
     def get_download_by_id(self, download_id: str) -> Optional[dict]:
         """
         Get a download record by download_id.

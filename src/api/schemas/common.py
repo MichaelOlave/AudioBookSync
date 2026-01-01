@@ -122,4 +122,19 @@ class HealthResponse(BaseModel):
     version: Optional[str] = Field(
         default=None,
         description="API version",
-    ), ConfigDict
+    )
+    minio: Optional[str] = Field(
+        default=None,
+        description="MinIO storage connectivity status: 'connected', 'disconnected', or error message",
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "healthy",
+                "service": "AudioBookSync",
+                "version": "1.0.0",
+                "minio": "connected",
+            }
+        }
+    )

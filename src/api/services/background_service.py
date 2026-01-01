@@ -8,6 +8,7 @@ This service bridges the API layer (which uses dictionaries) with the operations
 - Error handling and logging
 """
 
+import asyncio
 from typing import Callable, Any
 from datetime import datetime, timezone
 from loguru import logger
@@ -93,7 +94,7 @@ class BackgroundTaskService:
             try:
                 # Add timestamp if not provided
                 if "timestamp" not in data:
-                    data["timestamp"] = datetime.utcnow().timestamp()
+                    data["timestamp"] = datetime.now(timezone.utc).timestamp()
 
                 logger.debug(f"Broadcasting {event_type} for user {user_id}: {data}")
                 await ws_manager.broadcast_to_user(
@@ -238,8 +239,12 @@ class BackgroundTaskService:
                 user_id
             )
 
-            # Execute download
-            success = await download_book(book_list, progress_callback=progress_callback)
+            # Execute download with user_id for MinIO integration
+            success = await download_book(
+                book_list,
+                user_id=user_id,
+                progress_callback=progress_callback,
+            )
 
             if success:
                 logger.info(f"[Download {download_id}] Download completed successfully")
@@ -259,7 +264,7 @@ class BackgroundTaskService:
                         "asin": asin,
                         "title": title,
                         "status": "completed",
-                        "timestamp": datetime.utcnow().timestamp(),
+                        "timestamp": datetime.now(timezone.utc).timestamp(),
                     },
                 )
             else:
@@ -281,7 +286,7 @@ class BackgroundTaskService:
                         "asin": asin,
                         "title": title,
                         "error": "Download operation failed",
-                        "timestamp": datetime.now(timezone  .utc).timestamp(),
+                        "timestamp": datetime.now(timezone.utc).timestamp(),
                     },
                 )
 
@@ -399,8 +404,12 @@ class BackgroundTaskService:
                 user_id
             )
 
-            # Execute decryption
-            success = await decrypt_book(book_list, progress_callback=progress_callback)
+            # Execute decryption with user_id for MinIO integration
+            success = await decrypt_book(
+                book_list,
+                user_id=user_id,
+                progress_callback=progress_callback,
+            )
 
             if success:
                 logger.info(f"[Decryption {decryption_id}] Decryption completed successfully")
