@@ -88,7 +88,7 @@ AudioBookSync/
 │
 ├── database/
 │   ├── migrations/             # SQL migration files
-│   └── sample_data.sql         # Sample data
+│   └── schema.sql              # Database schema
 │
 ├── tests/                      # Comprehensive test suite
 │   ├── api/                    # API endpoint tests
@@ -97,11 +97,10 @@ AudioBookSync/
 │   └── infrastructure/         # Utility tests
 │
 └── docs/
-    ├── API.md                  # API documentation
-    ├── DATABASE_ENHANCEMENTS.md # Schema details
-    ├── METADATA_INTEGRATION_GUIDE.md # Metadata integration
-    ├── FASTAPI_PROGRESS.md     # Implementation status
-    └── TEST_COVERAGE_REPORT.md # Testing status
+    ├── api/                    # API documentation
+    ├── database/               # Schema details
+    ├── guides/                 # Integration guides
+    └── reports/                # Reports and progress
 ```
 
 ---
@@ -353,7 +352,7 @@ pytest -m asyncio            # Only async tests
 
 Current test coverage: **~45% on API endpoints, 80%+ on database layer**
 
-See [TEST_COVERAGE_REPORT.md](TEST_COVERAGE_REPORT.md) for detailed coverage breakdown and roadmap.
+See [TEST_COVERAGE_REPORT.md](docs/reports/TEST_COVERAGE_REPORT.md) for detailed coverage breakdown and roadmap.
 
 ---
 
@@ -416,17 +415,17 @@ make lint
 | Documentation | 🔄 In Progress | 80% |
 | Production Ready | ✅ Ready | 90% |
 
-See [FASTAPI_PROGRESS.md](FASTAPI_PROGRESS.md) for detailed implementation status.
+See [FASTAPI_PROGRESS.md](docs/reports/FASTAPI_PROGRESS.md) for detailed implementation status.
 
 ---
 
 ## Documentation
 
-- [API Documentation](docs/API.md) - Complete API endpoint reference with examples
-- [Database Schema](docs/DATABASE_ENHANCEMENTS.md) - Database structure and design
-- [Metadata Integration](docs/METADATA_INTEGRATION_GUIDE.md) - How to use rich metadata features
-- [Implementation Status](docs/FASTAPI_PROGRESS.md) - Detailed progress report
-- [Test Coverage](docs/TEST_COVERAGE_REPORT.md) - Testing status and roadmap
+- [API Documentation](docs/api/API.md) - Complete API endpoint reference with examples
+- [Database Schema](docs/database/DATABASE_ENHANCEMENTS.md) - Database structure and design
+- [Metadata Integration](docs/guides/METADATA_INTEGRATION_GUIDE.md) - How to use rich metadata features
+- [Implementation Status](docs/reports/FASTAPI_PROGRESS.md) - Detailed progress report
+- [Test Coverage](docs/reports/TEST_COVERAGE_REPORT.md) - Testing status and roadmap
 
 ---
 
@@ -567,10 +566,10 @@ This project is licensed under the MIT License - see LICENSE file for details.
 ## Project Links
 
 - [GitHub Repository](https://github.com/yourusername/AudioBookSync)
-- [API Documentation](./docs/API.md)
-- [Database Schema](./docs/DATABASE_ENHANCEMENTS.md)
-- [Test Coverage Report](./docs/TEST_COVERAGE_REPORT.md)
-- [Implementation Status](./docs/FASTAPI_PROGRESS.md)
+- [API Documentation](./docs/api/API.md)
+- [Database Schema](./docs/database/DATABASE_ENHANCEMENTS.md)
+- [Test Coverage Report](./docs/reports/TEST_COVERAGE_REPORT.md)
+- [Implementation Status](./docs/reports/FASTAPI_PROGRESS.md)
 
 ---
 
