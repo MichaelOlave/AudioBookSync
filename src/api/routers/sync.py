@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
 from loguru import logger
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ...database.db_sync import sync_ops
 from ..security.auth import get_current_user
@@ -93,7 +93,7 @@ async def trigger_sync(
             sync_id=sync_id,
             status="in_progress",
             message="Sync initiated successfully, running in background",
-            sync_started_at=datetime.utcnow(),
+            sync_started_at=datetime.now(timezone.utc),
         )
 
     except HTTPException:

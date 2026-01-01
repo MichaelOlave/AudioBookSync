@@ -9,7 +9,7 @@ This service bridges the API layer (which uses dictionaries) with the operations
 """
 
 from typing import Callable, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from loguru import logger
 
 from ...database.db_downloads import download_ops
@@ -281,7 +281,7 @@ class BackgroundTaskService:
                         "asin": asin,
                         "title": title,
                         "error": "Download operation failed",
-                        "timestamp": datetime.utcnow().timestamp(),
+                        "timestamp": datetime.now(timezone  .utc).timestamp(),
                     },
                 )
 
@@ -302,7 +302,7 @@ class BackgroundTaskService:
                     "download_id": download_id,
                     "asin": asin,
                     "error": str(e),
-                    "timestamp": datetime.utcnow().timestamp(),
+                    "timestamp": datetime.now(timezone.utc).timestamp(),
                 },
             )
 
@@ -340,7 +340,7 @@ class BackgroundTaskService:
                     "download_id": download_id,
                     "asin": asin,
                     "error": str(e),
-                    "timestamp": datetime.utcnow().timestamp(),
+                    "timestamp": datetime.now(timezone.utc).timestamp(),
                 },
             )
 
@@ -420,7 +420,7 @@ class BackgroundTaskService:
                         "asin": asin,
                         "title": title,
                         "status": "completed",
-                        "timestamp": datetime.utcnow().timestamp(),
+                        "timestamp": datetime.now(timezone.utc).timestamp(),
                     },
                 )
             else:
@@ -442,7 +442,7 @@ class BackgroundTaskService:
                         "asin": asin,
                         "title": title,
                         "error": "Decryption operation failed",
-                        "timestamp": datetime.utcnow().timestamp(),
+                        "timestamp": datetime.now(timezone.utc).timestamp(),
                     },
                 )
 
@@ -463,7 +463,7 @@ class BackgroundTaskService:
                     "decryption_id": decryption_id,
                     "asin": asin,
                     "error": str(e),
-                    "timestamp": datetime.utcnow().timestamp(),
+                    "timestamp": datetime.now(timezone.utc).timestamp(),
                 },
             )
 
@@ -501,7 +501,7 @@ class BackgroundTaskService:
                     "decryption_id": decryption_id,
                     "asin": asin,
                     "error": str(e),
-                    "timestamp": datetime.utcnow().timestamp(),
+                    "timestamp": datetime.now(timezone.utc).timestamp(),
                 },
             )
 

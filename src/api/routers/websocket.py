@@ -1,5 +1,6 @@
 """WebSocket endpoints for real-time updates."""
 
+from datetime import datetime, timezone
 import json
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
@@ -83,11 +84,11 @@ async def websocket_updates(
                     message_type = message.get("type")
 
                     if message_type == "ping":
-                        # Respond to heartbea
+                        # Respond to heartbeat
                         await ws_manager.send_to_connection(
                             websocket,
                             "pong",
-                            {"timestamp": None},  # Could add timestamp
+                            {"timestamp": datetime.now(timezone.utc).timestamp()},
                         )
                         logger.debug(f"WebSocket ping/pong for user {user_id}")
 
@@ -106,7 +107,7 @@ async def websocket_updates(
                     await ws_manager.send_to_connection(
                         websocket,
                         "error",
-                        {"error": "Invalid message format"},
+                        {"error": "Invalid message format", "timestamp": datetime.now(timezone.utc).timestamp()},
                     )
 
         except WebSocketDisconnect:

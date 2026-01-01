@@ -1,6 +1,6 @@
 """JWT token creation, validation, and dependency injection for FastAPI."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import uuid
 
@@ -36,9 +36,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
     # Set expiration time
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(
+        expire = datetime.now(timezone.utc) + timedelta(
             minutes=Config.ACCESS_TOKEN_EXPIRE_MINUTES
         )
 
@@ -47,7 +47,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         {
             "exp": expire,
             "type": "access",  # Token type for validation
-            "iat": datetime.utcnow(),  # Issued at
+            "iat": datetime.now(timezone.utc),  # Issued at
             "jti": str(uuid.uuid4()),  # JWT ID for uniqueness
         }
     )
@@ -79,13 +79,13 @@ def create_refresh_token(data: dict) -> str:
     to_encode = data.copy()
 
     # Refresh tokens are longer-lived
-    expire = datetime.utcnow() + timedelta(days=Config.REFRESH_TOKEN_EXPIRE_DAYS)
+    expire = datetime.now(timezone.utc) + timedelta(days=Config.REFRESH_TOKEN_EXPIRE_DAYS)
 
     to_encode.update(
         {
             "exp": expire,
             "type": "refresh",  # Token type for validation
-            "iat": datetime.utcnow(),
+            "iat": datetime.now(timezone.utc),
             "jti": str(uuid.uuid4()),
         }
     )
@@ -192,24 +192,3 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
         )
 
     return user
-
-
-async def get_current_active_user(
-    current_user: dict = Depends(get_current_user),
-) -> dict:
-    """
-    Dependency to ensure current user is active.
-
-    This is a convenience wrapper around get_current_user for routes that
-    specifically need to verify the user is active.
-
-    Args:
-        current_user: Current user from get_current_user dependency
-
-    Returns:
-        Current user if active
-
-    Raises:
-        HTTPException: If user is inactive
-    """
-    return current_user

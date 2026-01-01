@@ -143,7 +143,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
         Token: Access and refresh tokens
 
     Raises:
-        AuthenticationError: If username not found or password incorrec
+        AuthenticationError: If username not found or password incorrect
         HTTPException: If user is inactive
 
     Example:
