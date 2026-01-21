@@ -11,7 +11,7 @@ from ..schemas.user import UserResponse, PasswordChangeRequest, EmailChangeReque
 from ..schemas.common import MessageResponse
 from ..security.auth import get_current_user
 from ..security.password import hash_password, verify_password
-from ..middleware.error_handler import AuthenticationError, ConflictError
+from ..middleware.error_handler import AuthenticationError, ConflictError, AuthorizationError, InternalServerError, handle_route_errors
 
 router = APIRouter()
 
@@ -26,6 +26,7 @@ router = APIRouter()
         401: {"description": "Not authenticated"},
     },
 )
+@handle_route_errors("fetch user profile")
 async def get_current_user_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
@@ -64,26 +65,13 @@ async def get_current_user_profile(
     """
     logger.info(f"Fetching profile for user: {current_user.user_id}")
 
-    try:
-        # current_user is already fetched and validated by get_current_user dependency
-        if not current_user.is_active:
-            logger.warning(f"Inactive user profile access attempt: {current_user.user_id}")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="User account is inactive",
-            )
+    # current_user is already fetched and validated by get_current_user dependency
+    if not current_user.is_active:
+        logger.warning(f"Inactive user profile access attempt: {current_user.user_id}")
+        raise AuthorizationError("User account is inactive")
 
-        logger.info(f"User profile retrieved successfully: {current_user.user_id}")
-        return UserResponse.from_orm(current_user)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching user profile: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch user profile",
-        )
+    logger.info(f"User profile retrieved successfully: {current_user.user_id}")
+    return UserResponse.from_orm(current_user)
 
 
 @router.patch(
@@ -98,6 +86,7 @@ async def get_current_user_profile(
         422: {"description": "Validation error (weak password)"},
     },
 )
+@handle_route_errors("change user password")
 async def change_password(
     password_data: PasswordChangeRequest,
     current_user: User = Depends(get_current_user),
@@ -134,62 +123,36 @@ async def change_password(
     """
     logger.info(f"Password change request for user: {current_user.user_id}")
 
-    try:
-        # Verify current password
-        if not current_user.password_hash or not verify_password(
-            password_data.current_password, current_user.password_hash
-        ):
-            logger.warning(f"Password change failed: Wrong current password for user: {current_user.user_id}")
-            raise AuthenticationError("Current password is incorrect")
+    # Verify current password
+    if not current_user.password_hash or not verify_password(
+        password_data.current_password, current_user.password_hash
+    ):
+        logger.warning(f"Password change failed: Wrong current password for user: {current_user.user_id}")
+        raise AuthenticationError("Current password is incorrect")
 
-        # Check new password is different from current
-        if verify_password(password_data.new_password, current_user.password_hash):
-            logger.warning(f"Password change failed: New password same as current for user: {current_user.user_id}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="New password must be different from current password",
-            )
+    # Check new password is different from current
+    if verify_password(password_data.new_password, current_user.password_hash):
+        logger.warning(f"Password change failed: New password same as current for user: {current_user.user_id}")
+        raise AuthenticationError("New password must be different from current password")
 
-        # Hash new password and update database
-        try:
-            new_password_hash = hash_password(password_data.new_password)
-            success = await user_service.update_user_password(
-                db,
-                str(current_user.user_id),
-                new_password_hash
-            )
+    # Hash new password and update database
+    new_password_hash = hash_password(password_data.new_password)
+    success = await user_service.update_user_password(
+        db,
+        str(current_user.user_id),
+        new_password_hash
+    )
 
-            if not success:
-                logger.error(f"Failed to update password in database for user: {current_user.user_id}")
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to update password",
-                )
+    if not success:
+        logger.error(f"Failed to update password in database for user: {current_user.user_id}")
+        raise InternalServerError("Failed to update password")
 
-            await db.commit()
-            logger.info(f"Password changed successfully for user: {current_user.user_id}")
-            return MessageResponse(
-                message="Password updated successfully",
-                success=True,
-            )
-
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Password hashing or update failed for user {current_user.user_id}: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to update password",
-            )
-
-    except (AuthenticationError, HTTPException):
-        raise
-    except Exception as e:
-        logger.error(f"Error changing password: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to change password",
-        )
+    await db.commit()
+    logger.info(f"Password changed successfully for user: {current_user.user_id}")
+    return MessageResponse(
+        message="Password updated successfully",
+        success=True,
+    )
 
 
 @router.patch(
@@ -205,6 +168,7 @@ async def change_password(
         422: {"description": "Validation error (invalid email format)"},
     },
 )
+@handle_route_errors("change user email")
 async def change_email(
     email_data: EmailChangeRequest,
     current_user: User = Depends(get_current_user),
@@ -242,65 +206,39 @@ async def change_email(
     """
     logger.info(f"Email change request for user: {current_user.user_id}")
 
-    try:
-        # Verify password
-        if not current_user.password_hash or not verify_password(email_data.password, current_user.password_hash):
-            logger.warning(f"Email change failed: Wrong password for user: {current_user.user_id}")
-            raise AuthenticationError("Password is incorrect")
+    # Verify password
+    if not current_user.password_hash or not verify_password(email_data.password, current_user.password_hash):
+        logger.warning(f"Email change failed: Wrong password for user: {current_user.user_id}")
+        raise AuthenticationError("Password is incorrect")
 
-        # Check new email is different from current
-        if email_data.new_email.lower() == current_user.email.lower():
-            logger.warning(f"Email change failed: New email same as current for user: {current_user.user_id}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="New email must be different from current email",
-            )
+    # Check new email is different from current
+    if email_data.new_email.lower() == current_user.email.lower():
+        logger.warning(f"Email change failed: New email same as current for user: {current_user.user_id}")
+        raise AuthenticationError("New email must be different from current email")
 
-        # Check if email is already in use by another user
-        existing_user = await user_service.get_user_by_email(db, email_data.new_email)
-        if existing_user:
-            logger.warning(
-                f"Email change failed: Email already in use: {email_data.new_email}"
-            )
-            raise ConflictError(f"Email '{email_data.new_email}' is already in use")
-
-        # Update email in database
-        try:
-            success = await user_service.update_user_email(
-                db,
-                str(current_user.user_id),
-                email_data.new_email
-            )
-
-            if not success:
-                logger.error(f"Failed to update email in database for user: {current_user.user_id}")
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to update email",
-                )
-
-            await db.commit()
-            logger.info(f"Email changed successfully for user: {current_user.user_id}")
-            return EmailChangeResponse(
-                message="Email updated successfully",
-                success=True,
-                email=email_data.new_email,
-            )
-
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Email update failed for user {current_user.user_id}: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to update email",
-            )
-
-    except (AuthenticationError, ConflictError, HTTPException):
-        raise
-    except Exception as e:
-        logger.error(f"Error changing email: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to change email",
+    # Check if email is already in use by another user
+    existing_user = await user_service.get_user_by_email(db, email_data.new_email)
+    if existing_user:
+        logger.warning(
+            f"Email change failed: Email already in use: {email_data.new_email}"
         )
+        raise ConflictError(f"Email '{email_data.new_email}' is already in use")
+
+    # Update email in database
+    success = await user_service.update_user_email(
+        db,
+        str(current_user.user_id),
+        email_data.new_email
+    )
+
+    if not success:
+        logger.error(f"Failed to update email in database for user: {current_user.user_id}")
+        raise InternalServerError("Failed to update email")
+
+    await db.commit()
+    logger.info(f"Email changed successfully for user: {current_user.user_id}")
+    return EmailChangeResponse(
+        message="Email updated successfully",
+        success=True,
+        email=email_data.new_email,
+    )

@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from ...database.db_users import user_ops
 from ..schemas.credentials import AudibleCredentialsUpdate, AuthSessionData
 from ..security.auth import get_current_user
+from ..middleware.error_handler import AuthenticationError, InternalServerError, handle_route_errors
 from audible.localization import Locale
 from audible.login import build_oauth_url, create_code_verifier
 from audible.register import register

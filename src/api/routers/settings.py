@@ -90,7 +90,7 @@ async def get_audible_credentials(
         }
     """
     try:
-        user_id = current_user.user_id
+        user_id = str(current_user.user_id)
         if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -169,7 +169,7 @@ async def clear_audible_credentials(
         }
     """
     try:
-        user_id = current_user.user_id
+        user_id = str(current_user.user_id)
         if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -247,7 +247,7 @@ async def get_storage_config(
         }
     """
     try:
-        user_id = current_user.user_id
+        user_id = str(current_user.user_id)
         if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -365,7 +365,7 @@ async def update_storage_config(
         }
     """
     try:
-        user_id = current_user.user_id
+        user_id = str(current_user.user_id)
         if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -498,7 +498,7 @@ async def test_storage_connection(
         }
     """
     try:
-        user_id = current_user.user_id
+        user_id = str(current_user.user_id)
         if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
