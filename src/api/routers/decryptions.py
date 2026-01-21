@@ -1,10 +1,13 @@
 """Decryption management endpoints."""
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
 from loguru import logger
 
-from ...database.db_decryptions import decryption_ops
-from ...database.db_downloads import download_ops
+from ...database.services import decryption_service
+from ...database.engine import get_db_session
+from ...database.models.user import User
 from ..security.auth import get_current_user
 from ..schemas.decryption import (
     DecryptCreate,
@@ -32,7 +35,8 @@ router = APIRouter()
 async def trigger_decrypt(
     decrypt_data: DecryptCreate,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
 ) -> DecryptResponse:
     """
     Trigger a book decryption operation in background.
@@ -44,6 +48,7 @@ async def trigger_decrypt(
         decrypt_data: Book information (asin, title)
         background_tasks: FastAPI background tasks queue
         current_user: Authenticated user from JWT token
+        db: Database session
 
     Returns:
         DecryptResponse: Initial decryption record with status 'pending'
@@ -67,17 +72,11 @@ async def trigger_decrypt(
         }
     """
     try:
-        user_id = current_user.get("user_id")
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid user authentication",
-            )
-
-        logger.info(f"Decryption triggered for {decrypt_data.asin} by user {user_id}")
+        logger.info(f"Decryption triggered for {decrypt_data.asin} by user {current_user.user_id}")
 
         # Verify download exists and is completed
-        download = download_ops.get_download_by_asin(decrypt_data.asin)
+        from ...database.services import download_service
+        download = await download_service.get_latest_download(db, decrypt_data.asin)
         if not download:
             logger.warning(f"Download not found for {decrypt_data.asin}")
             raise HTTPException(
@@ -85,41 +84,44 @@ async def trigger_decrypt(
                 detail="Book must be downloaded before decryption",
             )
 
-        if download.get("status") != "completed":
+        if download.status != "completed":
             logger.warning(
-                f"Download not completed for {decrypt_data.asin}: {download.get('status')}"
+                f"Download not completed for {decrypt_data.asin}: {download.status}"
             )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Download must be completed before decryption (current status: {download.get('status')})",
+                detail=f"Download must be completed before decryption (current status: {download.status})",
             )
 
         # Create decryption status record in database
-        decryption_id = decryption_ops.create_decryption_status(
+        decryption = await decryption_service.create_decryption_status(
+            db=db,
             asin=decrypt_data.asin,
-            download_id=download.get("download_id"),
+            download_id=download.download_id,
             status="pending",
         )
 
-        if not decryption_id:
+        if not decryption:
             logger.error(f"Failed to create decryption record for {decrypt_data.asin}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to create decryption record",
             )
 
+        await db.commit()
+
         # Queue background decryption task
         background_tasks.add_task(
             BackgroundTaskService.execute_decrypt_operation,
-            user_id=user_id,
-            decryption_id=decryption_id,
+            user_id=str(current_user.user_id),
+            decryption_id=decryption.decryption_id,
             book=decrypt_data.dict(),
         )
 
-        logger.info(f"Decryption queued: {decryption_id}")
+        logger.info(f"Decryption queued: {decryption.decryption_id}")
 
         return DecryptResponse(
-            decryption_id=decryption_id,
+            decryption_id=decryption.decryption_id,
             asin=decrypt_data.asin,
             status="pending",
             message="Decryption initiated",
@@ -146,7 +148,8 @@ async def trigger_decrypt(
     },
 )
 async def list_decryptions(
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
     status_filter: str = Query(
         None,
         alias="status",
@@ -183,26 +186,23 @@ async def list_decryptions(
         GET /api/v1/decryptions/?status=completed&page=1&page_size=10
     """
     try:
-        user_id = current_user.get("user_id")
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid user authentication",
-            )
-
-        logger.info(f"Fetching decryptions for user {user_id}")
+        logger.info(f"Fetching decryptions for user {current_user.user_id}")
 
         # Get decryptions with pagination
-        # Note: db_decryptions.py needs to be extended with get_user_decryptions()
-        decryptions = decryption_ops.get_user_decryptions(
-            user_id=user_id,
+        decryptions = await decryption_service.get_decryptions_by_user(
+            db=db,
+            user_id=str(current_user.user_id),
             status=status_filter,
             limit=page_size,
             offset=(page - 1) * page_size,
         )
 
         # Get total count
-        total = decryption_ops.count_user_decryptions(user_id, status_filter)
+        total = await decryption_service.count_decryptions_by_user(
+            db=db,
+            user_id=str(current_user.user_id),
+            status=status_filter,
+        )
 
         # Calculate pages
         pages = (total + page_size - 1) // page_size if total > 0 else 1
@@ -213,10 +213,10 @@ async def list_decryptions(
             page = pages
 
         # Convert to response objects
-        items = [DecryptResponse(**decryption) for decryption in decryptions]
+        items = [DecryptResponse.from_orm(decryption) for decryption in decryptions]
 
         logger.info(
-            f"Retrieved {len(items)} decryptions for user {user_id} (page {page}/{pages})"
+            f"Retrieved {len(items)} decryptions for user {current_user.user_id} (page {page}/{pages})"
         )
 
         return DecryptList(
@@ -250,7 +250,8 @@ async def list_decryptions(
 )
 async def get_decryption_status(
     decryption_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
 ) -> DecryptResponse:
     """
     Get detailed status of a specific decryption.
@@ -261,6 +262,7 @@ async def get_decryption_status(
     Args:
         decryption_id: Unique decryption identifier
         current_user: Authenticated user from JWT token
+        db: Database session
 
     Returns:
         DecryptResponse: Complete decryption record
@@ -273,35 +275,21 @@ async def get_decryption_status(
         GET /api/v1/decryptions/550e8400-e29b-41d4-a716-446655440000
     """
     try:
-        user_id = current_user.get("user_id")
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid user authentication",
-            )
+        logger.info(f"Fetching decryption status: {decryption_id} for user {current_user.user_id}")
 
-        logger.info(f"Fetching decryption status: {decryption_id} for user {user_id}")
-
-        # Get decryption by ID
-        decryption = decryption_ops.get_decryption_by_id(decryption_id)
+        # Get decryption by ID with user authorization check
+        decryption = await decryption_service.get_decryption_by_id_for_user(
+            db=db,
+            decryption_id=UUID(decryption_id),
+            user_id=str(current_user.user_id),
+        )
 
         if not decryption:
-            logger.warning(f"Decryption not found: {decryption_id}")
+            logger.warning(f"Decryption not found or user not authorized: {decryption_id}")
             raise ResourceNotFoundError(f"Decryption '{decryption_id}' not found")
 
-        # Verify ownership by checking associated book user_id
-        # (requires join with books table, which db_decryptions.py needs to support)
-        if decryption.get("user_id") != user_id:
-            logger.warning(
-                f"Unauthorized access attempt to decryption {decryption_id} by user {user_id}"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to access this decryption",
-            )
-
         logger.info(f"Retrieved decryption details: {decryption_id}")
-        return DecryptResponse(**decryption)
+        return DecryptResponse.from_orm(decryption)
 
     except HTTPException:
         raise
