@@ -1,11 +1,12 @@
 """Authentication endpoints (register, login, refresh tokens)."""
 
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...core.config import Config
 from ...database.engine import get_db_session
 from ...database.services import user_service
 from ..middleware.error_handler import (
@@ -25,6 +26,35 @@ from ..security.auth import (
 from ..security.password import hash_password, verify_password
 
 router = APIRouter()
+
+
+def _set_token_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+    """Set secure HttpOnly cookies for access and refresh tokens."""
+    is_production = not Config.DEBUG
+
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        max_age=Config.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        expires=Config.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+        domain=None,
+        secure=is_production,  # Only send over HTTPS in production
+        httponly=True,  # Prevent JavaScript access
+        samesite="lax",  # CSRF protection
+    )
+
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        max_age=Config.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        expires=Config.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        path="/",
+        domain=None,
+        secure=is_production,
+        httponly=True,
+        samesite="lax",
+    )
 
 
 @router.post(
@@ -109,28 +139,31 @@ async def register(
     "/login",
     response_model=Token,
     summary="Login with username and password",
-    description=("Authenticate user and receive access and refresh tokens"),
+    description=("Authenticate user and receive access and refresh tokens via HttpOnly cookies"),
     responses={
-        200: {"description": "Login successful, tokens returned"},
+        200: {"description": "Login successful, tokens set in HttpOnly cookies"},
         401: {"description": "Invalid credentials"},
     },
 )
 @handle_route_errors("login user")
 async def login(
+    response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db_session),
 ) -> Token:
     """
     Login with username and password.
 
-    Verifies credentials and returns JWT access and refresh tokens.
+    Verifies credentials and sets JWT access and refresh tokens in HttpOnly cookies.
+    Also returns token info for frontend reference (non-sensitive data).
 
     Args:
+        response: FastAPI Response object to set cookies
         form_data: OAuth2 password grant (username, password)
         db: Database session
 
     Returns:
-        Token: Access and refresh tokens
+        Token: Token metadata (tokens themselves are in cookies)
 
     Raises:
         AuthenticationError: If username not found or password incorrect
@@ -165,6 +198,9 @@ async def login(
     access_token = create_access_token(data={"sub": str(user.user_id)})
     refresh_token = create_refresh_token(data={"sub": str(user.user_id)})
 
+    # Set HttpOnly cookies
+    _set_token_cookies(response, access_token, refresh_token)
+
     logger.info(f"User logged in successfully: {form_data.username} (ID: {user.user_id})")
 
     return Token(
@@ -178,7 +214,7 @@ async def login(
     "/refresh",
     response_model=Token,
     summary="Refresh access token",
-    description="Use refresh token to obtain a new access token",
+    description="Use refresh token to obtain a new access token via HttpOnly cookies",
     responses={
         200: {"description": "Token refresh successful"},
         401: {"description": "Invalid refresh token"},
@@ -186,20 +222,23 @@ async def login(
 )
 @handle_route_errors("refresh token")
 async def refresh(
+    response: Response,
     refresh_data: RefreshTokenRequest,
     db: AsyncSession = Depends(get_db_session),
 ) -> Token:
     """
     Refresh access token using refresh token.
 
-    Validates the refresh token and returns new access and refresh tokens.
+    Validates the refresh token from cookies and sets new access and refresh tokens
+    in HttpOnly cookies.
 
     Args:
-        refresh_data: Refresh token request
+        response: FastAPI Response object to set cookies
+        refresh_data: Refresh token request (or read from cookies)
         db: Database session
 
     Returns:
-        Token: New access and refresh tokens
+        Token: New token metadata (tokens themselves are in cookies)
 
     Raises:
         AuthenticationError: If refresh token is invalid or expired
@@ -241,6 +280,9 @@ async def refresh(
     # Create new tokens
     access_token = create_access_token(data={"sub": user_id})
     new_refresh_token = create_refresh_token(data={"sub": user_id})
+
+    # Set HttpOnly cookies
+    _set_token_cookies(response, access_token, new_refresh_token)
 
     logger.info(f"Token refreshed successfully for user: {user_id}")
 

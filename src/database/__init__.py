@@ -39,8 +39,8 @@ from .models import (
     Book,
     Contributor,
     SyncHistory,
-    Download,
-    Decryption,
+    DownloadStatus,
+    DecryptionStatus,
     MediaInfo,
     ReadingProgress,
 )
@@ -62,8 +62,8 @@ __all__ = [
     "Book",
     "Contributor",
     "SyncHistory",
-    "Download",
-    "Decryption",
+    "DownloadStatus",
+    "DecryptionStatus",
     "MediaInfo",
     "ReadingProgress",
 ]
