@@ -2,9 +2,11 @@
 
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
-from ...database.db_users import user_ops
+from ...database.services import user_service
+from ...database.engine import get_db_session
 from ..schemas.auth import UserRegister, Token, RefreshTokenRequest
 from ..schemas.user import UserResponse
 from ..security.password import hash_password, verify_password
@@ -26,7 +28,10 @@ router = APIRouter()
         422: {"description": "Validation error"},
     },
 )
-async def register(user_data: UserRegister) -> UserResponse:
+async def register(
+    user_data: UserRegister,
+    db: AsyncSession = Depends(get_db_session),
+) -> UserResponse:
     """
     Register a new user account.
 
@@ -35,6 +40,7 @@ async def register(user_data: UserRegister) -> UserResponse:
 
     Args:
         user_data: Registration data (username, email, password)
+        db: Database session
 
     Returns:
         UserResponse: Created user details (without password)
@@ -56,7 +62,7 @@ async def register(user_data: UserRegister) -> UserResponse:
     )
 
     # Check if username already exists
-    existing_user = user_ops.get_user_by_username(user_data.username)
+    existing_user = await user_service.get_user_by_username(db, user_data.username)
     if existing_user:
         logger.warning(
             f"Registration failed: Username already exists: {user_data.username}"
@@ -64,7 +70,7 @@ async def register(user_data: UserRegister) -> UserResponse:
         raise ConflictError(f"Username '{user_data.username}' is already taken")
 
     # Check if email already exists
-    existing_email = user_ops.get_user_by_email(user_data.email)
+    existing_email = await user_service.get_user_by_email(db, user_data.email)
     if existing_email:
         logger.warning(
             f"Registration failed: Email already registered: {user_data.email}"
@@ -83,32 +89,25 @@ async def register(user_data: UserRegister) -> UserResponse:
 
     # Create user in database
     try:
-        user_id = user_ops.create_user_with_password(
+        user = await user_service.create_user(
+            db=db,
             username=user_data.username,
             email=user_data.email,
             password_hash=password_hash,
         )
 
-        if not user_id:
+        if not user:
             logger.error(f"Failed to create user in database: {user_data.username}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to create user",
             )
 
-        # Fetch and return created user
-        user = user_ops.get_user_by_id(user_id)
-        if not user:
-            logger.error(f"Created user not found in database: {user_id}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to retrieve created user",
-            )
-
+        await db.commit()
         logger.info(
-            f"User registered successfully: {user_data.username} (ID: {user_id})"
+            f"User registered successfully: {user_data.username} (ID: {user.user_id})"
         )
-        return UserResponse(**user)
+        return UserResponse.from_orm(user)
 
     except HTTPException:
         raise
@@ -130,7 +129,10 @@ async def register(user_data: UserRegister) -> UserResponse:
         401: {"description": "Invalid credentials"},
     },
 )
-async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_db_session),
+) -> Token:
     """
     Login with username and password.
 
@@ -138,6 +140,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
 
     Args:
         form_data: OAuth2 password grant (username, password)
+        db: Database session
 
     Returns:
         Token: Access and refresh tokens
@@ -155,19 +158,19 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
     logger.info(f"Login attempt for user: {form_data.username}")
 
     # Get user by username
-    user = user_ops.get_user_by_username(form_data.username)
+    user = await user_service.get_user_by_username(db, form_data.username)
     if not user:
         logger.warning(f"Login failed: User not found: {form_data.username}")
         raise AuthenticationError("Invalid username or password")
 
     # Verify password
-    password_hash = user.get("password_hash")
+    password_hash = user.password_hash
     if not password_hash or not verify_password(form_data.password, password_hash):
         logger.warning(f"Login failed: Invalid password for user: {form_data.username}")
         raise AuthenticationError("Invalid username or password")
 
     # Check if user is active
-    if not user.get("is_active", True):
+    if not user.is_active:
         logger.warning(f"Login failed: User account is inactive: {form_data.username}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -176,11 +179,11 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
 
     # Create tokens
     try:
-        access_token = create_access_token(data={"sub": str(user["user_id"])})
-        refresh_token = create_refresh_token(data={"sub": str(user["user_id"])})
+        access_token = create_access_token(data={"sub": str(user.user_id)})
+        refresh_token = create_refresh_token(data={"sub": str(user.user_id)})
 
         logger.info(
-            f"User logged in successfully: {form_data.username} (ID: {user['user_id']})"
+            f"User logged in successfully: {form_data.username} (ID: {user.user_id})"
         )
 
         return Token(
@@ -207,14 +210,18 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
         401: {"description": "Invalid refresh token"},
     },
 )
-async def refresh(refresh_data: RefreshTokenRequest) -> Token:
+async def refresh(
+    refresh_data: RefreshTokenRequest,
+    db: AsyncSession = Depends(get_db_session),
+) -> Token:
     """
     Refresh access token using refresh token.
 
     Validates the refresh token and returns new access and refresh tokens.
 
     Args:
-        refresh_data: Refresh token reques
+        refresh_data: Refresh token request
+        db: Database session
 
     Returns:
         Token: New access and refresh tokens
@@ -248,12 +255,12 @@ async def refresh(refresh_data: RefreshTokenRequest) -> Token:
             raise AuthenticationError("Invalid token payload")
 
         # Verify user exists and is active
-        user = user_ops.get_user_by_id(user_id)
+        user = await user_service.get_user_by_id(db, user_id)
         if not user:
             logger.warning(f"Token refresh failed: User not found: {user_id}")
             raise AuthenticationError("User not found")
 
-        if not user.get("is_active", True):
+        if not user.is_active:
             logger.warning(f"Token refresh failed: User is inactive: {user_id}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
