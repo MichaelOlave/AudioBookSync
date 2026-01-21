@@ -4,96 +4,26 @@ These endpoints allow a user to authenticate with Audible in the browser and
 store the resulting credentials in the database for later use.
 """
 
-from typing import Dict, Optional
-import json
-from pathlib import Path
+from typing import Dict
 from urllib.parse import parse_qs
 
 import audible
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from loguru import logger
-from pydantic import BaseModel, Field
 
 from ...database.db_users import user_ops
+from ..schemas.auth import AuthStartRequest, AuthStartResponse, AuthCompleteRequest
 from ..schemas.credentials import AudibleCredentialsUpdate, AuthSessionData
 from ..security.auth import get_current_user
 from ..middleware.error_handler import AuthenticationError, InternalServerError, handle_route_errors
+from ..services.session_manager import session_manager
+from ..utils.auth_utils import normalize_activation_bytes
 from audible.localization import Locale
 from audible.login import build_oauth_url, create_code_verifier
 from audible.register import register
 
 router = APIRouter()
-
-# Directory for storing temporary auth sessions
-_SESSION_DIR = Path("logs") / "auth_sessions"
-_SESSION_DIR.mkdir(parents=True, exist_ok=True)
-
-
-def _save_session(user_id: str, session_data: AuthSessionData) -> None:
-    """Save auth session data to disk."""
-    user_id_str = str(user_id)  # Ensure it's a string
-    session_file = _SESSION_DIR / f"{user_id_str}.json"
-    try:
-        session_file.write_text(session_data.model_dump_json())
-        logger.info(f"Saved auth session for user {user_id_str} to {session_file}")
-    except Exception as e:
-        logger.error(f"Failed to save session for user {user_id_str}: {e}")
-        raise
-
-
-def _load_session(user_id: str) -> Optional[AuthSessionData]:
-    """Load auth session data from disk."""
-    user_id_str = str(user_id)  # Ensure it's a string
-    session_file = _SESSION_DIR / f"{user_id_str}.json"
-    logger.info(
-        f"Looking for session file: {session_file} (exists: {session_file.exists()})"
-    )
-    if not session_file.exists():
-        logger.warning(
-            f"No session file found for user {user_id_str} at {session_file}"
-        )
-        # List all session files for debugging
-        session_files = list(_SESSION_DIR.glob("*.json"))
-        logger.info(f"Available session files: {[f.name for f in session_files]}")
-        return None
-    try:
-        data = json.loads(session_file.read_text())
-        logger.info(f"Successfully loaded session for user {user_id_str}")
-        return AuthSessionData(**data)
-    except Exception as e:
-        logger.error(f"Failed to load session for user {user_id_str}: {e}")
-        return None
-
-
-def _delete_session(user_id: str) -> None:
-    """Delete auth session data from disk."""
-    user_id_str = str(user_id)  # Ensure it's a string
-    session_file = _SESSION_DIR / f"{user_id_str}.json"
-    if session_file.exists():
-        session_file.unlink()
-        logger.info(f"Deleted auth session for user {user_id_str}")
-
-
-class AuthStartRequest(BaseModel):
-    """Request to start Audible authentication."""
-
-    country_code: str = Field(
-        "us",
-        description="Audible country code (e.g., 'us', 'de', 'uk')",
-    )
-
-
-class AuthStartResponse(BaseModel):
-    """Response containing the Audible login URL."""
-
-    login_url: str
-
-
-class AuthCompleteRequest(BaseModel):
-    """Request to complete Audible authentication."""
-
-    redirect_url: str
 
 
 @router.post(
@@ -138,7 +68,7 @@ async def start_audible_auth(
         code_verifier=code_verifier.decode("utf-8"),
         serial=serial,
     )
-    _save_session(user_id, session_data)
+    session_manager.save_session(user_id, session_data)
 
     logger.info(
         f"Stored auth session for user {user_id} "
@@ -150,20 +80,6 @@ async def start_audible_auth(
         f"(locale={request.country_code}), login_url generated."
     )
     return AuthStartResponse(login_url=oauth_url)
-
-
-def _normalize_activation_bytes(raw_bytes: object) -> Optional[str]:
-    """Convert activation bytes value to a hex string if possible."""
-    if raw_bytes is None:
-        return None
-
-    try:
-        if isinstance(raw_bytes, (bytes, bytearray)):
-            return raw_bytes.hex()
-        return str(raw_bytes)
-    except Exception as exc:  # pragma: no cover - defensive logging
-        logger.warning(f"Failed to normalize activation bytes: {exc}")
-        return None
 
 
 @router.post(
@@ -195,7 +111,7 @@ async def complete_audible_auth(
 
     logger.info(f"Looking for auth session for user_id: {user_id}")
 
-    session_data = _load_session(user_id)
+    session_data = session_manager.load_session(user_id)
     if not session_data:
         logger.error(
             f"No auth session found for user {user_id}. "
@@ -261,7 +177,7 @@ async def complete_audible_auth(
     except Exception as exc:  # pragma: no cover - library-specific behavior
         logger.warning(f"Could not get activation bytes for user {user_id}: {exc}")
 
-    activation_bytes = _normalize_activation_bytes(activation_bytes_raw)
+    activation_bytes = normalize_activation_bytes(activation_bytes_raw)
     if activation_bytes:
         logger.info(
             f"Retrieved activation bytes for user {user_id}: "
@@ -296,7 +212,7 @@ async def complete_audible_auth(
     finally:
         # Only clean up the session file if it was successfully loaded
         if session_data is not None:
-            _delete_session(user_id)
+            session_manager.delete_session(user_id)
         else:
             logger.warning(
                 f"Session data was None, not deleting session file for user {user_id}"
