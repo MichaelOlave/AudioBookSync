@@ -3,6 +3,7 @@
 from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel, Field, ConfigDict
+from .common import PaginatedResponse
 
 
 class BookBase(BaseModel):
@@ -113,30 +114,5 @@ class BookResponse(BookBase):
     )
 
 
-class BookList(BaseModel):
-    """List of books with pagination."""
-
-    items: list[BookResponse] = Field(
-        default_factory=list,
-        description="List of books",
-    )
-    total: int = Field(
-        default=0,
-        ge=0,
-        description="Total number of books in user's library",
-    )
-    page: int = Field(
-        default=1,
-        ge=1,
-        description="Current page number",
-    )
-    page_size: int = Field(
-        default=50,
-        ge=1,
-        description="Number of items per page",
-    )
-    pages: int = Field(
-        default=0,
-        ge=0,
-        description="Total number of pages",
-    ), ConfigDict
+BookList = PaginatedResponse[BookResponse]
+"""Type alias for paginated book list response."""

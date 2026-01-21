@@ -3,32 +3,13 @@
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict
+from .common import BookActionCreate, PaginatedResponse
 
 
-class DownloadCreate(BaseModel):
+class DownloadCreate(BookActionCreate):
     """Request to initiate a book download."""
 
-    asin: str = Field(
-        ...,
-        min_length=10,
-        max_length=10,
-        description="Amazon Standard Identification Number (10 characters)",
-    )
-    title: str = Field(
-        ...,
-        min_length=1,
-        max_length=500,
-        description="Book title",
-    )
-
-    model_config = ConfigDict(
-        json_schema_extra = {
-            "example": {
-                "asin": "B084L6Z6M3",
-                "title": "Becoming",
-            }
-        }
-    )
+    pass
 
 
 class DownloadResponse(BaseModel):
@@ -84,43 +65,5 @@ class DownloadResponse(BaseModel):
     )
 
 
-class DownloadList(BaseModel):
-    """Paginated list of downloads."""
-
-    items: list[DownloadResponse] = Field(
-        default_factory=list,
-        description="List of download records",
-    )
-    total: int = Field(
-        ...,
-        ge=0,
-        description="Total number of downloads (unfiltered)",
-    )
-    page: int = Field(
-        ...,
-        ge=1,
-        description="Current page number",
-    )
-    page_size: int = Field(
-        ...,
-        ge=1,
-        le=50,
-        description="Number of items per page",
-    )
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "items": [
-                    {
-                        "download_id": "550e8400-e29b-41d4-a716-446655440000",
-                        "asin": "B084L6Z6M3",
-                        "status": "completed",
-                    }
-                ],
-                "total": 15,
-                "page": 1,
-                "page_size": 10,
-            }
-        }
-    )
+DownloadList = PaginatedResponse[DownloadResponse]
+"""Type alias for paginated download list response."""

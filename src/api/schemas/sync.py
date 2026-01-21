@@ -3,6 +3,7 @@
 from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel, Field, ConfigDict
+from .common import PaginatedResponse
 
 
 class SyncCreate(BaseModel):
@@ -109,33 +110,8 @@ class SyncResponse(BaseModel):
     )
 
 
-class SyncHistoryList(BaseModel):
-    """List of sync records with pagination."""
-
-    items: list[SyncResponse] = Field(
-        default_factory=list,
-        description="List of sync records",
-    )
-    total: int = Field(
-        default=0,
-        ge=0,
-        description="Total number of syncs for user",
-    )
-    page: int = Field(
-        default=1,
-        ge=1,
-        description="Current page number",
-    )
-    page_size: int = Field(
-        default=50,
-        ge=1,
-        description="Number of items per page",
-    )
-    pages: int = Field(
-        default=0,
-        ge=0,
-        description="Total number of pages",
-    )
+SyncHistoryList = PaginatedResponse[SyncResponse]
+"""Type alias for paginated sync history list response."""
 
 
 class SyncAcceptedResponse(BaseModel):
