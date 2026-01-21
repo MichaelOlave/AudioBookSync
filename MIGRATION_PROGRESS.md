@@ -48,16 +48,35 @@ All models created and verified:
 - [x] 000_baseline_existing_schema.py (8 core tables)
 - [x] 001_add_metadata_tables.py (7 metadata tables)
 
-### Routes Updated (2/10) ✓
-1. **auth.py** ✓
+### Routes Updated (6/10) ✓
+1. **auth.py** ✓ (3 endpoints)
    - POST /register: Fully converted to async
    - POST /login: Fully converted to async
    - POST /refresh: Fully converted to async
 
-2. **users.py** ✓
+2. **users.py** ✓ (3 endpoints)
    - GET /me: Profile retrieval (simplified)
    - PATCH /me/password: Password change
    - PATCH /me/email: Email change with uniqueness check
+
+3. **books.py** ✓ (2 endpoints)
+   - POST / (create_book): Uses await book_service.add_book()
+   - DELETE /{asin} (delete_book): Uses await book_service.delete_book()
+
+4. **library.py** ✓ (3 endpoints)
+   - GET / (get_library): Uses await book_service.get_books_by_user()
+   - GET /audible/fetch (fetch_audible_library): Replaced raw SQL with user_service
+   - GET /{asin} (get_book_details): Uses await book_service.get_book_by_asin()
+
+5. **downloads.py** ✓ (3 endpoints)
+   - POST / (trigger_download): Creates download record
+   - GET / (list_downloads): Lists with pagination and filtering
+   - GET /{download_id} (get_download_status): Gets with user authorization
+
+6. **decryptions.py** ✓ (3 endpoints)
+   - POST / (trigger_decrypt): Creates decryption record
+   - GET / (list_decryptions): Lists with pagination and filtering
+   - GET /{decryption_id} (get_decryption_status): Gets with user authorization
 
 ### Dependency Injection ✓
 - [x] get_current_user() updated to be fully async
@@ -68,16 +87,12 @@ All models created and verified:
 
 ## 🔄 IN PROGRESS
 
-### Route Migrations (2/10 complete)
+### Route Migrations (6/10 complete - 34% of endpoints)
 **Remaining routes needing update:**
-- [ ] books.py (6 endpoints)
-- [ ] library.py (4 endpoints)
-- [ ] downloads.py (5 endpoints)
-- [ ] decryptions.py (4 endpoints)
-- [ ] sync.py (3 endpoints)
-- [ ] audible_auth.py (2 endpoints)
-- [ ] files.py (3 endpoints)
-- [ ] settings.py (2 endpoints)
+- [ ] sync.py (3 endpoints) - Sync workflow operations
+- [ ] audible_auth.py (2 endpoints) - Audible authentication
+- [ ] files.py (3 endpoints) - File upload/download operations
+- [ ] settings.py (2 endpoints) - User settings management
 
 **Pattern established:**
 ```python
@@ -134,8 +149,8 @@ alembic upgrade head
 | Services | 8 | 8 | 100% |
 | Service Functions | 83+ | 83+ | 100% |
 | Tests | 30 | 30 | 100% |
-| Routes | 10 | 2 | 20% |
-| Endpoints | ~50 | ~6 | 12% |
+| Routes | 10 | 6 | 60% |
+| Endpoints | ~50 | ~17 | 34% |
 | Documentation | 4 | 4 | 100% |
 | Migrations | 2 | 2 | 100% |
 
