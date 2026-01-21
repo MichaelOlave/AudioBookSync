@@ -12,7 +12,7 @@ from ..schemas.sync import (
     SyncHistoryList,
     SyncAcceptedResponse,
 )
-from ..middleware.error_handler import ResourceNotFoundError, AuthorizationError, InternalServerError, handle_route_errors
+from ..middleware.error_handler import ResourceNotFoundError, AuthorizationError, InternalServerError, AuthenticationError, handle_route_errors
 from ..utils.generic_handlers import get_paginated_list
 
 router = APIRouter()
@@ -58,10 +58,7 @@ async def trigger_sync(
     """
     user_id = current_user.get("user_id")
     if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid user authentication",
-        )
+        raise AuthenticationError("Invalid user authentication")
     logger.info(
         f"Sync triggered for user {user_id} with type: {sync_data.sync_type}"
     )
@@ -138,10 +135,7 @@ async def get_sync_history(
     """
     user_id = current_user.get("user_id")
     if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid user authentication",
-        )
+        raise AuthenticationError("Invalid user authentication")
 
     def get_syncs(**kwargs):
         return sync_ops.get_user_sync_history(kwargs["user_id"], limit=1000)

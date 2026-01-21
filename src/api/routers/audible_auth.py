@@ -176,6 +176,7 @@ def _normalize_activation_bytes(raw_bytes: object) -> Optional[str]:
         "save auth.json to disk, and persist credentials in the database."
     ),
 )
+@handle_route_errors("complete Audible auth")
 async def complete_audible_auth(
     request: AuthCompleteRequest,
     current_user: Dict = Depends(get_current_user),
@@ -190,10 +191,7 @@ async def complete_audible_auth(
     """
     user_id = current_user.get("user_id")
     if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User context is required to complete Audible authentication.",
-        )
+        raise AuthenticationError("User context is required to complete Audible authentication")
 
     logger.info(f"Looking for auth session for user_id: {user_id}")
 
@@ -203,117 +201,98 @@ async def complete_audible_auth(
             f"No auth session found for user {user_id}. "
             f"Please call /auth/start first."
         )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Authentication process not started. Please call /auth/start first.",
-        )
+        raise AuthenticationError("Authentication process not started. Please call /auth/start first")
 
     logger.info(f"Session data loaded successfully for user {user_id}")
 
+    # Double-check session_data is not None
+    if session_data is None:
+        raise InternalServerError("Session data is unexpectedly None")
+
+    # Get locale information
+    logger.info(f"Getting locale for country_code: {session_data.country_code}")
+    locale = Locale(country_code=session_data.country_code)
+
+    # Parse the authorization code from the redirect URL
+    logger.info(
+        f"Parsing authorization code from redirect_url: "
+        f"{request.redirect_url[:100]}..."
+    )
     try:
-        # Double-check session_data is not None
-        if session_data is None:
-            raise ValueError("Session data is unexpectedly None")
-
-        # Get locale information
-        logger.info(f"Getting locale for country_code: {session_data.country_code}")
-        locale = Locale(country_code=session_data.country_code)
-
-        # Parse the authorization code from the redirect URL
+        response_url = httpx.URL(request.redirect_url)
+        parsed_url = parse_qs(response_url.query.decode())
+        authorization_code = parsed_url["openid.oa2.authorization_code"][0]
         logger.info(
-            f"Parsing authorization code from redirect_url: "
-            f"{request.redirect_url[:100]}..."
+            f"Successfully extracted authorization code "
+            f"(length: {len(authorization_code)})"
         )
-        try:
-            response_url = httpx.URL(request.redirect_url)
-            parsed_url = parse_qs(response_url.query.decode())
-            authorization_code = parsed_url["openid.oa2.authorization_code"][0]
-            logger.info(
-                f"Successfully extracted authorization code "
-                f"(length: {len(authorization_code)})"
-            )
-        except (KeyError, IndexError) as e:
-            logger.error(f"Failed to parse authorization code from URL: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid redirect URL. Missing authorization code.",
-            ) from e
+    except (KeyError, IndexError) as e:
+        logger.error(f"Failed to parse authorization code from URL: {e}")
+        raise AuthenticationError("Invalid redirect URL. Missing authorization code")
 
-        # Prepare login device data using stored code_verifier
-        login_device = {
-            "authorization_code": authorization_code,
-            "code_verifier": session_data.code_verifier.encode("utf-8"),
-            "domain": locale.domain,
-            "serial": session_data.serial,
-        }
-        logger.info("Login device data prepared")
+    # Prepare login device data using stored code_verifier
+    login_device = {
+        "authorization_code": authorization_code,
+        "code_verifier": session_data.code_verifier.encode("utf-8"),
+        "domain": locale.domain,
+        "serial": session_data.serial,
+    }
+    logger.info("Login device data prepared")
 
-        # Register the device and create Authenticator
-        logger.info("Registering device...")
-        register_device = register(
-            with_username=False,  # Assuming not using username login for external flow
-            **login_device,
-        )
-        logger.info("Device registration completed")
+    # Register the device and create Authenticator
+    logger.info("Registering device...")
+    register_device = register(
+        with_username=False,  # Assuming not using username login for external flow
+        **login_device,
+    )
+    logger.info("Device registration completed")
 
-        authenticator = audible.Authenticator()
-        authenticator.locale = locale  # Set the locale before saving
-        authenticator._update_attrs(
-            with_username=False,
-            **register_device,
-        )
+    authenticator = audible.Authenticator()
+    authenticator.locale = locale  # Set the locale before saving
+    authenticator._update_attrs(
+        with_username=False,
+        **register_device,
+    )
 
-        logger.info("Getting activation bytes...")
-        activation_bytes_raw = None
-        try:
-            activation_bytes_raw = authenticator.get_activation_bytes()
-        except Exception as exc:  # pragma: no cover - library-specific behavior
-            logger.warning(f"Could not get activation bytes for user {user_id}: {exc}")
+    logger.info("Getting activation bytes...")
+    activation_bytes_raw = None
+    try:
+        activation_bytes_raw = authenticator.get_activation_bytes()
+    except Exception as exc:  # pragma: no cover - library-specific behavior
+        logger.warning(f"Could not get activation bytes for user {user_id}: {exc}")
 
-        activation_bytes = _normalize_activation_bytes(activation_bytes_raw)
-        if activation_bytes:
-            logger.info(
-                f"Retrieved activation bytes for user {user_id}: "
-                f"{bool(activation_bytes)}"
-            )
-
-        # Get auth data directly from authenticator
-        auth_json = authenticator.to_dict()
-        logger.info("Converting authenticator to dict for database storage")
-
-        # Save to database
-        success = user_ops.update_audible_auth_json(
-            user_id=user_id,
-            auth_json=auth_json,
-            activation_bytes=activation_bytes,
-        )
-        if not success:
-            logger.error(f"Failed to persist Audible auth.json for user {user_id}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to save authentication data to database.",
-            )
-
+    activation_bytes = _normalize_activation_bytes(activation_bytes_raw)
+    if activation_bytes:
         logger.info(
-            f"Completed Audible authentication for user {user_id}; "
-            f"credentials saved to database"
+            f"Retrieved activation bytes for user {user_id}: "
+            f"{bool(activation_bytes)}"
         )
 
+    # Get auth data directly from authenticator
+    auth_json = authenticator.to_dict()
+    logger.info("Converting authenticator to dict for database storage")
+
+    # Save to database
+    success = user_ops.update_audible_auth_json(
+        user_id=user_id,
+        auth_json=auth_json,
+        activation_bytes=activation_bytes,
+    )
+    if not success:
+        logger.error(f"Failed to persist Audible auth.json for user {user_id}")
+        raise InternalServerError("Failed to save authentication data to database")
+
+    logger.info(
+        f"Completed Audible authentication for user {user_id}; "
+        f"credentials saved to database"
+    )
+
+    try:
         return AudibleCredentialsUpdate(
             message="Authentication successful. Credentials saved to database.",
             auth_configured=True,
             auth_file_path=None,
         )
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.exception(
-            f"Failed to complete Audible authentication for user {user_id}: {exc}"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to complete Audible authentication: {str(exc)}",
-        ) from exc
     finally:
         # Only clean up the session file if it was successfully loaded
         if session_data is not None:
