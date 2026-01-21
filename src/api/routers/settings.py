@@ -279,7 +279,7 @@ async def get_storage_config(
             if normalized_endpoint:
                 client = MinIOClient(
                     endpoint=normalized_endpoint,
-                    use_ssl=use_ssl,
+                    secure=use_ssl,
                 )
             else:
                 client = MinIOClient()
