@@ -1,12 +1,15 @@
 """User library endpoints."""
 
 import audible
+import json
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 from typing import Dict, Any
 
-from ...database.db_books import book_ops
-from ...database.db_users import user_ops
+from ...database.services import book_service, user_service
+from ...database.engine import get_db_session
+from ...database.models.user import User
 from ..security.auth import get_current_user
 from ..schemas.book import BookResponse, BookList
 from ..middleware.error_handler import ResourceNotFoundError
@@ -25,7 +28,8 @@ router = APIRouter()
     },
 )
 async def get_library(
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
     page: int = Query(
         default=1,
         ge=1,
@@ -45,6 +49,7 @@ async def get_library(
 
     Args:
         current_user: Current authenticated user (from JWT token)
+        db: Database session
         page: Page number for pagination (default: 1)
         page_size: Items per page (default: 50, max: 100)
 
@@ -55,18 +60,12 @@ async def get_library(
         GET /api/v1/library?page=1&page_size=50
     """
     try:
-        user_id = current_user.get("user_id")
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User ID not found in token",
-            )
         logger.info(
-            f"Fetching library for user: {user_id} (page {page}, size {page_size})"
+            f"Fetching library for user: {current_user.user_id} (page {page}, size {page_size})"
         )
 
         # Get all books for user
-        all_books = book_ops.get_user_books(user_id)
+        all_books = await book_service.get_books_by_user(db, str(current_user.user_id))
 
         # Calculate pagination
         total = len(all_books)
@@ -74,7 +73,7 @@ async def get_library(
 
         # Validate page number
         if page > pages and total > 0:
-            logger.warning(f"Page {page} exceeds max pages {pages} for user {user_id}")
+            logger.warning(f"Page {page} exceeds max pages {pages} for user {current_user.user_id}")
             page = pages
 
         # Apply pagination
@@ -83,10 +82,10 @@ async def get_library(
         paginated_books = all_books[start_idx:end_idx]
 
         # Convert to BookResponse objects
-        items = [BookResponse(**book) for book in paginated_books]
+        items = [BookResponse.from_orm(book) for book in paginated_books]
 
         logger.info(
-            f"Retrieved {len(items)} books for user {user_id} (page {page}/{pages})"
+            f"Retrieved {len(items)} books for user {current_user.user_id} (page {page}/{pages})"
         )
 
         return BookList(
@@ -99,7 +98,7 @@ async def get_library(
 
     except Exception as e:
         logger.error(
-            f"Error fetching library for user {current_user.get('user_id')}: {e}"
+            f"Error fetching library for user {current_user.user_id}: {e}"
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -119,7 +118,8 @@ async def get_library(
     },
 )
 async def fetch_audible_library(
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
     num_results: int = Query(
         default=1000,
         ge=1,
@@ -140,6 +140,7 @@ async def fetch_audible_library(
 
     Args:
         current_user: Current authenticated user (from JWT token)
+        db: Database session
         num_results: Number of books to fetch (default: 1000, max: 1000)
 
     Returns:
@@ -152,43 +153,25 @@ async def fetch_audible_library(
         GET /api/v1/library/audible/fetch?num_results=100
     """
     try:
-        user_id = current_user.get("user_id")
-        if not user_id:
+        logger.info(f"Fetching Audible library for user: {current_user.user_id}")
+
+        # Get user's Audible credentials from database
+        user = await user_service.get_user_by_id(db, str(current_user.user_id))
+
+        if not user or not user.audible_auth_json:
+            logger.error(f"No Audible credentials found for user {current_user.user_id}")
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User ID not found in token",
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Audible credentials not configured. Please authenticate with Audible first.",
             )
 
-        logger.info(f"Fetching Audible library for user: {user_id}")
-
-        # Get user's Audible credentials from database (without redaction for API use)
-        with user_ops.db_pool.get_cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT audible_auth_json
-                FROM users
-                WHERE user_id = %s
-                """,
-                (user_id,),
-            )
-            result = cursor.fetchone()
-
-            if not result or not result.get("audible_auth_json"):
-                logger.error(f"No Audible credentials found for user {user_id}")
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Audible credentials not configured. Please authenticate with Audible first.",
-                )
-
-            import json
-
-            auth_data = json.loads(result["audible_auth_json"])
+        auth_data = json.loads(user.audible_auth_json)
 
         # Create Audible client from stored credentials
         logger.info("Creating Audible authenticator from stored credentials")
         auth = audible.Authenticator.from_dict(auth_data)
 
-        # Create async clien
+        # Create async client and fetch library
         logger.info(f"Fetching library from Audible (num_results={num_results})")
         async with audible.AsyncClient(auth=auth) as client:
             library_response = await client.get(
@@ -206,13 +189,13 @@ async def fetch_audible_library(
 
         items = library_response.get("items", [])
         logger.info(
-            f"Successfully fetched {len(items)} books from Audible for user {user_id}"
+            f"Successfully fetched {len(items)} books from Audible for user {current_user.user_id}"
         )
 
         return {
             "items": items,
             "total": len(items),
-            "user_id": user_id,
+            "user_id": str(current_user.user_id),
             "num_results": num_results,
         }
 
@@ -220,7 +203,7 @@ async def fetch_audible_library(
         raise
     except Exception as e:
         logger.exception(
-            f"Error fetching Audible library for user {current_user.get('user_id')}: {e}"
+            f"Error fetching Audible library for user {current_user.user_id}: {e}"
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -242,7 +225,8 @@ async def fetch_audible_library(
 )
 async def get_book_details(
     asin: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
 ) -> BookResponse:
     """
     Get detailed information about a specific audiobook.
@@ -253,6 +237,7 @@ async def get_book_details(
     Args:
         asin: Amazon Standard Identification Number (10-character code)
         current_user: Current authenticated user (from JWT token)
+        db: Database session
 
     Returns:
         BookResponse: Complete book details with metadata
@@ -265,25 +250,19 @@ async def get_book_details(
         GET /api/v1/library/B084L6Z6M3
     """
     try:
-        user_id = current_user.get("user_id")
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User ID not found in token",
-            )
-        logger.info(f"Fetching book details: {asin} for user: {user_id}")
+        logger.info(f"Fetching book details: {asin} for user: {current_user.user_id}")
 
         # Get book by ASIN
-        book = book_ops.get_book_by_asin(asin)
+        book = await book_service.get_book_by_asin(db, asin)
 
         if not book:
             logger.warning(f"Book not found: {asin}")
             raise ResourceNotFoundError(f"Book '{asin}' not found")
 
         # Verify ownership
-        if book.get("user_id") != user_id:
+        if book.user_id != current_user.user_id:
             logger.warning(
-                f"Unauthorized access attempt to book {asin} " f"by user {user_id}"
+                f"Unauthorized access attempt to book {asin} by user {current_user.user_id}"
             )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -291,7 +270,7 @@ async def get_book_details(
             )
 
         logger.info(f"Retrieved book details: {asin}")
-        return BookResponse(**book)
+        return BookResponse.from_orm(book)
 
     except HTTPException:
         raise

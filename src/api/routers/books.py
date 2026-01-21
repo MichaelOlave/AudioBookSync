@@ -1,9 +1,12 @@
 """Book management endpoints."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
-from ...database.db_books import book_ops
+from ...database.services import book_service
+from ...database.engine import get_db_session
+from ...database.models.user import User
 from ..security.auth import get_current_user
 from ..schemas.book import BookBase, BookResponse
 from ..schemas.common import MessageResponse
@@ -26,7 +29,8 @@ router = APIRouter()
 )
 async def create_book(
     book_data: BookBase,
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
 ) -> BookResponse:
     """
     Add a new book to user's library.
@@ -36,6 +40,7 @@ async def create_book(
     Args:
         book_data: Book details (asin, title, author, etc.)
         current_user: Current authenticated user (from JWT token)
+        db: Database session
 
     Returns:
         BookResponse: Added/updated book details
@@ -55,18 +60,13 @@ async def create_book(
         }
     """
     try:
-        user_id = current_user.get("user_id")
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid user authentication",
-            )
-        logger.info(f"Adding book {book_data.asin} for user {user_id}")
+        logger.info(f"Adding book {book_data.asin} for user {current_user.user_id}")
 
         # Add/update book in database
-        success = book_ops.add_book(
+        success = await book_service.add_book(
+            db=db,
             asin=book_data.asin,
-            user_id=user_id,
+            user_id=str(current_user.user_id),
             title=book_data.title,
             runtime_min=book_data.runtime_min,
             author=book_data.author,
@@ -84,7 +84,7 @@ async def create_book(
             )
 
         # Fetch and return the added book
-        book = book_ops.get_book_by_asin(book_data.asin)
+        book = await book_service.get_book_by_asin(db, book_data.asin)
         if not book:
             logger.error(f"Added book not found: {book_data.asin}")
             raise HTTPException(
@@ -92,8 +92,9 @@ async def create_book(
                 detail="Failed to retrieve added book",
             )
 
-        logger.info(f"Book added successfully: {book_data.asin} for user {user_id}")
-        return BookResponse(**book)
+        await db.commit()
+        logger.info(f"Book added successfully: {book_data.asin} for user {current_user.user_id}")
+        return BookResponse.from_orm(book)
 
     except HTTPException:
         raise
@@ -120,7 +121,8 @@ async def create_book(
 )
 async def delete_book(
     asin: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
 ) -> MessageResponse:
     """
     Delete a book from user's library.
@@ -130,6 +132,7 @@ async def delete_book(
     Args:
         asin: Amazon Standard Identification Number (10-character code)
         current_user: Current authenticated user (from JWT token)
+        db: Database session
 
     Returns:
         MessageResponse: Confirmation of deletion
@@ -142,19 +145,18 @@ async def delete_book(
         DELETE /api/v1/books/B084L6Z6M3
     """
     try:
-        user_id = current_user.get("user_id")
-        logger.info(f"Deleting book {asin} for user {user_id}")
+        logger.info(f"Deleting book {asin} for user {current_user.user_id}")
 
         # Verify book exists and belongs to user
-        book = book_ops.get_book_by_asin(asin)
+        book = await book_service.get_book_by_asin(db, asin)
         if not book:
             logger.warning(f"Book not found: {asin}")
             raise ResourceNotFoundError(f"Book '{asin}' not found")
 
         # Verify ownership
-        if book.get("user_id") != user_id:
+        if book.user_id != current_user.user_id:
             logger.warning(
-                f"Unauthorized delete attempt for book {asin} by user {user_id}"
+                f"Unauthorized delete attempt for book {asin} by user {current_user.user_id}"
             )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -162,7 +164,7 @@ async def delete_book(
             )
 
         # Delete the book
-        success = book_ops.remove_book(asin)
+        success = await book_service.delete_book(db, asin)
         if not success:
             logger.error(f"Failed to delete book {asin}")
             raise HTTPException(
@@ -170,6 +172,7 @@ async def delete_book(
                 detail="Failed to delete book",
             )
 
+        await db.commit()
         logger.info(f"Book deleted successfully: {asin}")
         return MessageResponse(
             message=f"Book '{asin}' deleted successfully",
