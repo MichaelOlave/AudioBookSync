@@ -1,16 +1,15 @@
 """Download status model for SQLAlchemy ORM."""
 
-from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, DateTime, String, Text, Integer, BigInteger, ForeignKey, JSON
+from sqlalchemy import JSON, BigInteger, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from src.database.models.base import Base, get_current_timestamp
 
 if TYPE_CHECKING:
-    from src.database.models.book import Book
+    pass
 
 
 class DownloadStatus(Base):
@@ -23,7 +22,9 @@ class DownloadStatus(Base):
         primary_key=True,
         server_default="uuid_generate_v4()",
     )
-    asin = Column(String(10), ForeignKey("books.asin", ondelete="CASCADE"), nullable=False, index=True)
+    asin = Column(
+        String(10), ForeignKey("books.asin", ondelete="CASCADE"), nullable=False, index=True
+    )
     status = Column(String(20), default="pending", nullable=False, index=True)
     download_path = Column(String(1000), nullable=True)
     download_started_at = Column(DateTime(timezone=True), nullable=True)
@@ -34,7 +35,12 @@ class DownloadStatus(Base):
     error_message = Column(Text, nullable=True)
     error_details = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), default=get_current_timestamp, nullable=False)
-    updated_at = Column(DateTime(timezone=True), default=get_current_timestamp, onupdate=get_current_timestamp, nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=get_current_timestamp,
+        onupdate=get_current_timestamp,
+        nullable=False,
+    )
 
     # Relationships
     book = relationship("Book", back_populates="download_status", lazy="select")

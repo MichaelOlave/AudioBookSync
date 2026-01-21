@@ -71,9 +71,7 @@ class MinIOClient:
             secure=self.secure,
         )
 
-        logger.info(
-            f"MinIO client initialized: endpoint={self.endpoint}, secure={self.secure}"
-        )
+        logger.info(f"MinIO client initialized: endpoint={self.endpoint}, secure={self.secure}")
 
     def bucket_exists(self, bucket_name: str) -> bool:
         """Check if a bucket exists.
@@ -172,8 +170,7 @@ class MinIOClient:
                 # Upload file
                 self.client.fput_object(bucket_name, object_key, file_path)
                 logger.info(
-                    f"Uploaded file to MinIO: {file_path} -> "
-                    f"{bucket_name}/{object_key}"
+                    f"Uploaded file to MinIO: {file_path} -> " f"{bucket_name}/{object_key}"
                 )
 
                 # Verify upload by checking metadata
@@ -184,13 +181,10 @@ class MinIOClient:
                 # Verify file size
                 if metadata["size"] != source_size:
                     raise Exception(
-                        f"Size mismatch: source={source_size}, "
-                        f"uploaded={metadata['size']}"
+                        f"Size mismatch: source={source_size}, " f"uploaded={metadata['size']}"
                     )
 
-                logger.info(
-                    f"Upload verification successful: {bucket_name}/{object_key}"
-                )
+                logger.info(f"Upload verification successful: {bucket_name}/{object_key}")
                 return True
 
             except Exception as e:
@@ -210,9 +204,7 @@ class MinIOClient:
 
         return False
 
-    def download_file(
-        self, bucket_name: str, object_key: str, destination_path: str
-    ) -> bool:
+    def download_file(self, bucket_name: str, object_key: str, destination_path: str) -> bool:
         """Download file from MinIO to local filesystem.
 
         Args:
@@ -226,24 +218,17 @@ class MinIOClient:
         try:
             self.client.fget_object(bucket_name, object_key, destination_path)
             logger.info(
-                f"Downloaded file from MinIO: {bucket_name}/{object_key} -> "
-                f"{destination_path}"
+                f"Downloaded file from MinIO: {bucket_name}/{object_key} -> " f"{destination_path}"
             )
             return True
         except S3Error as e:
             if e.code == "NoSuchKey":
-                logger.warning(
-                    f"File not found in MinIO: {bucket_name}/{object_key}"
-                )
+                logger.warning(f"File not found in MinIO: {bucket_name}/{object_key}")
                 return False
-            logger.error(
-                f"Failed to download file {bucket_name}/{object_key}: {e}"
-            )
+            logger.error(f"Failed to download file {bucket_name}/{object_key}: {e}")
             return False
         except Exception as e:
-            logger.error(
-                f"Failed to download file {bucket_name}/{object_key}: {e}"
-            )
+            logger.error(f"Failed to download file {bucket_name}/{object_key}: {e}")
             return False
 
     def stream_file(
@@ -272,9 +257,7 @@ class MinIOClient:
                     bucket_name, object_key, offset=offset, length=length
                 )
             else:
-                response = self.client.get_object(
-                    bucket_name, object_key, offset=offset
-                )
+                response = self.client.get_object(bucket_name, object_key, offset=offset)
             data = response.read()
             response.close()
             logger.debug(
@@ -284,9 +267,7 @@ class MinIOClient:
             return data
         except S3Error as e:
             if e.code == "NoSuchKey":
-                logger.warning(
-                    f"File not found for streaming: {bucket_name}/{object_key}"
-                )
+                logger.warning(f"File not found for streaming: {bucket_name}/{object_key}")
                 return b""
             logger.error(f"Failed to stream file {bucket_name}/{object_key}: {e}")
             return b""
@@ -310,19 +291,13 @@ class MinIOClient:
         except S3Error as e:
             if e.code == "NoSuchKey":
                 return False
-            logger.error(
-                f"Error checking file existence {bucket_name}/{object_key}: {e}"
-            )
+            logger.error(f"Error checking file existence {bucket_name}/{object_key}: {e}")
             return False
         except Exception as e:
-            logger.error(
-                f"Error checking file existence {bucket_name}/{object_key}: {e}"
-            )
+            logger.error(f"Error checking file existence {bucket_name}/{object_key}: {e}")
             return False
 
-    def get_file_metadata(
-        self, bucket_name: str, object_key: str
-    ) -> Optional[dict]:
+    def get_file_metadata(self, bucket_name: str, object_key: str) -> Optional[dict]:
         """Get file metadata from MinIO.
 
         Args:
@@ -345,18 +320,12 @@ class MinIOClient:
             return metadata
         except S3Error as e:
             if e.code == "NoSuchKey":
-                logger.debug(
-                    f"File not found for metadata: {bucket_name}/{object_key}"
-                )
+                logger.debug(f"File not found for metadata: {bucket_name}/{object_key}")
                 return None
-            logger.error(
-                f"Failed to get metadata for {bucket_name}/{object_key}: {e}"
-            )
+            logger.error(f"Failed to get metadata for {bucket_name}/{object_key}: {e}")
             return None
         except Exception as e:
-            logger.error(
-                f"Failed to get metadata for {bucket_name}/{object_key}: {e}"
-            )
+            logger.error(f"Failed to get metadata for {bucket_name}/{object_key}: {e}")
             return None
 
     def delete_file(self, bucket_name: str, object_key: str) -> bool:
@@ -379,8 +348,7 @@ class MinIOClient:
             if e.code == "NoSuchKey":
                 # Idempotent operation - file already doesn't exist
                 logger.debug(
-                    f"File already deleted or doesn't exist: "
-                    f"{bucket_name}/{object_key}"
+                    f"File already deleted or doesn't exist: " f"{bucket_name}/{object_key}"
                 )
                 return True
             logger.error(f"Failed to delete file {bucket_name}/{object_key}: {e}")

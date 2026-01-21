@@ -1,7 +1,6 @@
 """User model for SQLAlchemy ORM."""
 
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Column, DateTime, String, Text
 from sqlalchemy.dialects.postgresql import UUID
@@ -10,7 +9,7 @@ from sqlalchemy.orm import relationship
 from src.database.models.base import Base, get_current_timestamp
 
 if TYPE_CHECKING:
-    from src.database.models.book import Book
+    pass
 
 
 class User(Base):
@@ -34,7 +33,12 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False, index=True)
     last_sync_date = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=get_current_timestamp, nullable=False)
-    updated_at = Column(DateTime(timezone=True), default=get_current_timestamp, onupdate=get_current_timestamp, nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=get_current_timestamp,
+        onupdate=get_current_timestamp,
+        nullable=False,
+    )
 
     # Relationships
     books = relationship(

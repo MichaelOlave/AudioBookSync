@@ -5,8 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.infrastructure.audible_client import (AsyncAudibleClient,
-                                               authenticate, sync_get_library)
+from src.infrastructure.audible_client import AsyncAudibleClient, authenticate, sync_get_library
 
 
 @pytest.mark.unit
@@ -96,9 +95,7 @@ class TestAsyncAudibleClient:
 
         with patch("src.infrastructure.audible_client.audible.Client"):
             with patch("asyncio.get_event_loop") as mock_loop:
-                mock_loop.return_value.run_in_executor = AsyncMock(
-                    return_value=mock_audible_client
-                )
+                mock_loop.return_value.run_in_executor = AsyncMock(return_value=mock_audible_client)
 
                 client = AsyncAudibleClient(auth)
                 result = await client.__aenter__()
@@ -134,9 +131,7 @@ class TestAsyncAudibleClient:
 
         with patch("src.infrastructure.audible_client.audible.Client"):
             with patch("asyncio.get_event_loop") as mock_loop:
-                mock_loop.return_value.run_in_executor = AsyncMock(
-                    return_value=mock_audible_client
-                )
+                mock_loop.return_value.run_in_executor = AsyncMock(return_value=mock_audible_client)
 
                 async with AsyncAudibleClient(auth) as client:
                     assert client.client == mock_audible_client
@@ -156,9 +151,7 @@ class TestAsyncAudibleClient:
                 client = AsyncAudibleClient(auth)
                 await client.__aenter__()
 
-                with patch(
-                    "src.infrastructure.audible_client.sync_get_library"
-                ) as mock_sync:
+                with patch("src.infrastructure.audible_client.sync_get_library") as mock_sync:
                     mock_sync.return_value = expected_library
                     result = await client.get_library()
 
@@ -181,9 +174,7 @@ class TestAsyncAudibleClient:
                 client = AsyncAudibleClient(auth)
                 await client.__aenter__()
 
-                with patch(
-                    "src.infrastructure.audible_client.sync_get_library"
-                ) as mock_sync:
+                with patch("src.infrastructure.audible_client.sync_get_library") as mock_sync:
                     mock_sync.return_value = expected_data
                     result = await client.get_library()
 
@@ -199,9 +190,7 @@ class TestAuthenticate:
         """Test authenticate with valid auth file."""
         mock_auth = MagicMock()
 
-        with patch(
-            "src.infrastructure.audible_client.audible.Authenticator"
-        ) as mock_auth_class:
+        with patch("src.infrastructure.audible_client.audible.Authenticator") as mock_auth_class:
             mock_auth_class.from_file = MagicMock(return_value=mock_auth)
             with patch(
                 "src.infrastructure.audible_client.Config.AUTH_FILE",
@@ -217,9 +206,7 @@ class TestAuthenticate:
         """Test that authenticate calls Authenticator.from_file."""
         mock_auth = MagicMock()
 
-        with patch(
-            "src.infrastructure.audible_client.audible.Authenticator"
-        ) as mock_auth_class:
+        with patch("src.infrastructure.audible_client.audible.Authenticator") as mock_auth_class:
             mock_auth_class.from_file = MagicMock(return_value=mock_auth)
             with patch(
                 "src.infrastructure.audible_client.Config.AUTH_FILE",
@@ -231,12 +218,8 @@ class TestAuthenticate:
 
     def test_authenticate_file_not_found(self):
         """Test authenticate when auth file not found."""
-        with patch(
-            "src.infrastructure.audible_client.audible.Authenticator"
-        ) as mock_auth_class:
-            mock_auth_class.from_file = MagicMock(
-                side_effect=FileNotFoundError("Not found")
-            )
+        with patch("src.infrastructure.audible_client.audible.Authenticator") as mock_auth_class:
+            mock_auth_class.from_file = MagicMock(side_effect=FileNotFoundError("Not found"))
             with patch(
                 "src.infrastructure.audible_client.Config.AUTH_FILE",
                 "/missing/auth.json",
@@ -247,19 +230,13 @@ class TestAuthenticate:
 
     def test_authenticate_logs_file_not_found_error(self):
         """Test that authenticate logs FileNotFoundError."""
-        with patch(
-            "src.infrastructure.audible_client.audible.Authenticator"
-        ) as mock_auth_class:
-            mock_auth_class.from_file = MagicMock(
-                side_effect=FileNotFoundError("Not found")
-            )
+        with patch("src.infrastructure.audible_client.audible.Authenticator") as mock_auth_class:
+            mock_auth_class.from_file = MagicMock(side_effect=FileNotFoundError("Not found"))
             with patch(
                 "src.infrastructure.audible_client.Config.AUTH_FILE",
                 "/missing/auth.json",
             ):
-                with patch(
-                    "src.infrastructure.audible_client.logger.error"
-                ) as mock_logger:
+                with patch("src.infrastructure.audible_client.logger.error") as mock_logger:
                     with pytest.raises(FileNotFoundError):
                         authenticate()
 
@@ -267,9 +244,7 @@ class TestAuthenticate:
 
     def test_authenticate_general_exception(self):
         """Test authenticate with general exception."""
-        with patch(
-            "src.infrastructure.audible_client.audible.Authenticator"
-        ) as mock_auth_class:
+        with patch("src.infrastructure.audible_client.audible.Authenticator") as mock_auth_class:
             mock_auth_class.from_file = MagicMock(side_effect=Exception("Auth failed"))
             with patch(
                 "src.infrastructure.audible_client.Config.AUTH_FILE",
@@ -281,17 +256,13 @@ class TestAuthenticate:
 
     def test_authenticate_logs_general_error(self):
         """Test that authenticate logs general exceptions."""
-        with patch(
-            "src.infrastructure.audible_client.audible.Authenticator"
-        ) as mock_auth_class:
+        with patch("src.infrastructure.audible_client.audible.Authenticator") as mock_auth_class:
             mock_auth_class.from_file = MagicMock(side_effect=Exception("Auth failed"))
             with patch(
                 "src.infrastructure.audible_client.Config.AUTH_FILE",
                 "/path/to/auth.json",
             ):
-                with patch(
-                    "src.infrastructure.audible_client.logger.error"
-                ) as mock_logger:
+                with patch("src.infrastructure.audible_client.logger.error") as mock_logger:
                     with pytest.raises(Exception):
                         authenticate()
 
@@ -301,9 +272,7 @@ class TestAuthenticate:
         """Test that authenticate returns AsyncAudibleClient instance."""
         mock_auth = MagicMock()
 
-        with patch(
-            "src.infrastructure.audible_client.audible.Authenticator"
-        ) as mock_auth_class:
+        with patch("src.infrastructure.audible_client.audible.Authenticator") as mock_auth_class:
             mock_auth_class.from_file = MagicMock(return_value=mock_auth)
             with patch(
                 "src.infrastructure.audible_client.Config.AUTH_FILE",
@@ -333,9 +302,7 @@ class TestAsyncAudibleClientIntegration:
                 )
 
                 async with AsyncAudibleClient(auth) as client:
-                    with patch(
-                        "src.infrastructure.audible_client.sync_get_library"
-                    ) as mock_sync:
+                    with patch("src.infrastructure.audible_client.sync_get_library") as mock_sync:
                         mock_sync.return_value = library_data
                         library = await client.get_library()
 
@@ -348,9 +315,7 @@ class TestAsyncAudibleClientIntegration:
 
         with patch("src.infrastructure.audible_client.audible.Client"):
             with patch("asyncio.get_event_loop") as mock_loop:
-                mock_loop.return_value.run_in_executor = AsyncMock(
-                    return_value=mock_audible_client
-                )
+                mock_loop.return_value.run_in_executor = AsyncMock(return_value=mock_audible_client)
 
                 try:
                     async with AsyncAudibleClient(auth):

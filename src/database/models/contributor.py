@@ -2,14 +2,14 @@
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, String, Text, Integer, ForeignKey, DateTime
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from src.database.models.base import Base, get_current_timestamp
 
 if TYPE_CHECKING:
-    from src.database.models.book import Book
+    pass
 
 
 class Contributor(Base):
@@ -28,7 +28,12 @@ class Contributor(Base):
     description = Column(Text, nullable=True)
     url = Column(String(1000), nullable=True)
     created_at = Column(DateTime(timezone=True), default=get_current_timestamp, nullable=False)
-    updated_at = Column(DateTime(timezone=True), default=get_current_timestamp, onupdate=get_current_timestamp, nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=get_current_timestamp,
+        onupdate=get_current_timestamp,
+        nullable=False,
+    )
 
     # Relationships
     book_contributors = relationship(
@@ -52,8 +57,15 @@ class BookContributor(Base):
         primary_key=True,
         server_default="uuid_generate_v4()",
     )
-    asin = Column(String(10), ForeignKey("books.asin", ondelete="CASCADE"), nullable=False, index=True)
-    contributor_id = Column(UUID(as_uuid=True), ForeignKey("contributors.contributor_id", ondelete="CASCADE"), nullable=False, index=True)
+    asin = Column(
+        String(10), ForeignKey("books.asin", ondelete="CASCADE"), nullable=False, index=True
+    )
+    contributor_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("contributors.contributor_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     role = Column(String(50), nullable=False)
     sequence_number = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default="CURRENT_TIMESTAMP", nullable=False)

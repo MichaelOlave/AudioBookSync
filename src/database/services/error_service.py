@@ -1,12 +1,12 @@
 """Error logging database service layer using SQLAlchemy ORM."""
 
-from typing import Optional, List
 from datetime import datetime, timezone
+from typing import List, Optional
 from uuid import UUID
 
-from sqlalchemy import select, and_
-from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models.error import ErrorLog
 
@@ -75,9 +75,7 @@ async def get_error_by_id(db: AsyncSession, error_id: UUID) -> Optional[ErrorLog
         ErrorLog object if found, None otherwise
     """
     try:
-        result = await db.execute(
-            select(ErrorLog).where(ErrorLog.error_id == error_id)
-        )
+        result = await db.execute(select(ErrorLog).where(ErrorLog.error_id == error_id))
         return result.scalar_one_or_none()
     except Exception as e:
         logger.error(f"Failed to get error: {e}")
@@ -105,7 +103,7 @@ async def get_errors_by_user(
     try:
         query = select(ErrorLog).where(ErrorLog.user_id == user_id)
         if unresolved_only:
-            query = query.where(ErrorLog.resolved == False)
+            query = query.where(~ErrorLog.resolved)
         query = query.order_by(ErrorLog.timestamp.desc()).limit(limit)
 
         result = await db.execute(query)
@@ -219,7 +217,7 @@ async def get_unresolved_errors(
     try:
         result = await db.execute(
             select(ErrorLog)
-            .where(ErrorLog.resolved == False)
+            .where(~ErrorLog.resolved)
             .order_by(ErrorLog.timestamp.desc())
             .limit(limit)
         )
@@ -307,7 +305,9 @@ async def get_recent_errors(
         List of recent ErrorLog objects
     """
     try:
-        cutoff_time = datetime.now(timezone.utc).replace(hour=datetime.now(timezone.utc).hour - hours)
+        cutoff_time = datetime.now(timezone.utc).replace(
+            hour=datetime.now(timezone.utc).hour - hours
+        )
         result = await db.execute(
             select(ErrorLog)
             .where(ErrorLog.timestamp >= cutoff_time)
@@ -411,7 +411,7 @@ async def clean_old_resolved_errors(
         result = await db.execute(
             select(ErrorLog).where(
                 and_(
-                    ErrorLog.resolved == True,
+                    ErrorLog.resolved,
                     ErrorLog.resolved_at < cutoff_time,
                 )
             )

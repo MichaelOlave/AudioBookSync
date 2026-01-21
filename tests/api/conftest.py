@@ -1,15 +1,17 @@
 """Pytest configuration and fixtures for API tests."""
 
+from datetime import datetime, timedelta
+from uuid import uuid4
+
 import pytest
 from fastapi.testclient import TestClient
-from datetime import timedelta, datetime
-import uuid
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.main import app
 from src.api.security.auth import create_access_token, create_refresh_token
 from src.api.security.password import hash_password
-from src.database.db_users import user_ops
-from src.database.db_books import book_ops
+from src.database.services import book_service, user_service
+from tests.factories import BookFactory, UserFactory
 
 
 @pytest.fixture
@@ -31,7 +33,7 @@ def test_user_data():
 @pytest.fixture
 def test_user_id():
     """Generate a test user ID."""
-    return str(uuid.uuid4())
+    return str(uuid4())
 
 
 @pytest.fixture
@@ -116,7 +118,45 @@ def test_sync_data():
     }
 
 
-# Database fixtures (cleanup after tests)
+# ============================================================================
+# ORM-Based Database Fixtures
+# ============================================================================
+
+
+@pytest.fixture
+async def test_user_in_db(db_session: AsyncSession, test_user_id: str):
+    """Create a real test user in database using ORM.
+
+    For use in async tests that need a real database user.
+    """
+    user = await UserFactory.create(
+        db=db_session,
+        username="testuser",
+        email="testuser@example.com",
+    )
+    await db_session.commit()
+    return user
+
+
+@pytest.fixture
+async def test_book_in_db(db_session: AsyncSession, test_user_in_db):
+    """Create a real test book in database using ORM.
+
+    For use in async tests that need a real database book.
+    """
+    book = await BookFactory.create(
+        db=db_session,
+        user_id=str(test_user_in_db.user_id),
+        asin="B084L6Z6M3",
+        title="Becoming",
+        author="Michelle Obama",
+        narrator="Michelle Obama",
+    )
+    await db_session.commit()
+    return book
+
+
+# Database cleanup fixtures (cleanup after tests)
 
 
 @pytest.fixture(autouse=True)
@@ -127,98 +167,66 @@ def cleanup_test_data():
     # For now, tests use in-memory database or mocked operations
 
 
-# Alternative fixtures with mocked database operations
+# ============================================================================
+# Legacy Fixtures with Mocked Database Operations (for backward compatibility)
+# ============================================================================
 
 
 @pytest.fixture
 def mock_user_ops(monkeypatch):
-    """Mock user database operations."""
+    """Mock user ORM service for tests.
 
-    def mock_get_user_by_username(username):
-        return None
+    NOTE: This is a legacy fixture. For new tests, use test_user_in_db with
+    async tests, or implement service mocking directly.
+    """
+    from unittest.mock import AsyncMock
 
-    def mock_get_user_by_email(email):
-        return None
+    mock_get_user_by_username = AsyncMock(return_value=None)
+    mock_get_user_by_email = AsyncMock(return_value=None)
+    mock_get_user_by_id = AsyncMock(return_value=None)
 
-    def mock_create_user_with_password(username, email, password_hash, **kwargs):
-        return str(uuid.uuid4())
+    monkeypatch.setattr(user_service, "get_user_by_username", mock_get_user_by_username)
+    monkeypatch.setattr(user_service, "get_user_by_email", mock_get_user_by_email)
+    monkeypatch.setattr(user_service, "get_user_by_id", mock_get_user_by_id)
 
-    def mock_get_user_by_id(user_id):
-        return {
-            "user_id": user_id,
-            "username": "testuser",
-            "email": "testuser@example.com",
-            "password_hash": hash_password("TestPassword123!"),
-            "is_active": True,
-            "created_at": datetime.now(),
-            "updated_at": datetime.now(),
-        }
-
-    monkeypatch.setattr(user_ops, "get_user_by_username", mock_get_user_by_username)
-    monkeypatch.setattr(user_ops, "get_user_by_email", mock_get_user_by_email)
-    monkeypatch.setattr(
-        user_ops, "create_user_with_password", mock_create_user_with_password
-    )
-    monkeypatch.setattr(user_ops, "get_user_by_id", mock_get_user_by_id)
-
-    return user_ops
+    return user_service
 
 
 @pytest.fixture
 def mock_book_ops(monkeypatch, test_user_id):
-    """Mock book database operations."""
+    """Mock book ORM service for tests.
+
+    NOTE: This is a legacy fixture. For new tests, use test_book_in_db with
+    async tests, or implement service mocking directly.
+    """
+    from unittest.mock import AsyncMock, MagicMock
 
     now = datetime.now()
 
-    def mock_get_user_books(user_id):
-        if user_id == test_user_id:
-            return [
-                {
-                    "asin": "B084L6Z6M3",
-                    "title": "Becoming",
-                    "author": "Michelle Obama",
-                    "user_id": user_id,
-                    "purchase_date": "2023-01-15",
-                    "runtime_min": 1440,
-                    "rating": 4.8,
-                    "is_downloaded": True,
-                    "is_decrypted": True,
-                    "download_path": "/audiobooks/downloaded/B084L6Z6M3.m4b",
-                    "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
-                    "created_at": now,
-                    "updated_at": now,
-                }
-            ]
-        return []
+    # Create mock book ORM object
+    mock_book = MagicMock()
+    mock_book.asin = "B084L6Z6M3"
+    mock_book.title = "Becoming"
+    mock_book.author = "Michelle Obama"
+    mock_book.user_id = test_user_id
+    mock_book.purchase_date = "2023-01-15"
+    mock_book.runtime_min = 1440
+    mock_book.rating = 4.8
+    mock_book.is_downloaded = True
+    mock_book.is_decrypted = True
+    mock_book.download_path = "/audiobooks/downloaded/B084L6Z6M3.m4b"
+    mock_book.decrypted_path = "/audiobooks/decrypted/B084L6Z6M3.m4a"
+    mock_book.created_at = now
+    mock_book.updated_at = now
 
-    def mock_get_book_by_asin(asin):
-        if asin == "B084L6Z6M3":
-            return {
-                "asin": asin,
-                "title": "Becoming",
-                "author": "Michelle Obama",
-                "user_id": test_user_id,
-                "purchase_date": "2023-01-15",
-                "runtime_min": 1440,
-                "rating": 4.8,
-                "is_downloaded": True,
-                "is_decrypted": True,
-                "download_path": "/audiobooks/downloaded/B084L6Z6M3.m4b",
-                "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
-                "created_at": now,
-                "updated_at": now,
-            }
-        return None
+    mock_get_books_by_user = AsyncMock(return_value=[mock_book])
+    mock_get_book_by_asin = AsyncMock(return_value=mock_book)
+    mock_add_book = AsyncMock(return_value=True)
+    mock_delete_book = AsyncMock(return_value=True)
 
-    def mock_add_book(asin, user_id, title, **kwargs):
-        return True
+    monkeypatch.setattr(book_service, "get_books_by_user", mock_get_books_by_user)
+    monkeypatch.setattr(book_service, "get_book_by_asin", mock_get_book_by_asin)
+    monkeypatch.setattr(book_service, "add_book", mock_add_book)
+    monkeypatch.setattr(book_service, "delete_book", mock_delete_book)
 
-    def mock_remove_book(asin):
-        return True
-
-    monkeypatch.setattr(book_ops, "get_user_books", mock_get_user_books)
-    monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
-    monkeypatch.setattr(book_ops, "add_book", mock_add_book)
-    monkeypatch.setattr(book_ops, "remove_book", mock_remove_book)
-
-    return book_ops
+    return book_service

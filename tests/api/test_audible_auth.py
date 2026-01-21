@@ -84,8 +84,8 @@ class TestAudibleAuthCallback:
 
     def test_auth_callback_success(self, authenticated_client, monkeypatch, test_user_id):
         """Test successful auth callback."""
-        from src.infrastructure.audible_client import AudibleClient
         from src.database.db_users import user_ops
+        from src.infrastructure.audible_client import AudibleClient
 
         def mock_get_auth_token(auth_code):
             return {
@@ -98,9 +98,7 @@ class TestAudibleAuthCallback:
             return True
 
         monkeypatch.setattr(AudibleClient, "get_auth_token", mock_get_auth_token)
-        monkeypatch.setattr(
-            user_ops, "store_audible_credentials", mock_store_audible_credentials
-        )
+        monkeypatch.setattr(user_ops, "store_audible_credentials", mock_store_audible_credentials)
 
         response = authenticated_client.post(
             "/api/v1/audible/auth/callback",
@@ -191,8 +189,8 @@ class TestAudibleTokenRefresh:
 
     def test_refresh_audible_token(self, authenticated_client, monkeypatch, test_user_id):
         """Test refreshing Audible token."""
-        from src.infrastructure.audible_client import AudibleClient
         from src.database.db_users import user_ops
+        from src.infrastructure.audible_client import AudibleClient
 
         def mock_refresh_token(refresh_token):
             return {
@@ -254,8 +252,8 @@ class TestAudibleAuthSessionManagement:
 
     def test_verify_credentials(self, authenticated_client, monkeypatch, test_user_id):
         """Test verifying stored Audible credentials."""
-        from src.infrastructure.audible_client import AudibleClient
         from src.database.db_users import user_ops
+        from src.infrastructure.audible_client import AudibleClient
 
         def mock_verify_credentials(access_token):
             # Simulate API call to verify token
@@ -302,9 +300,7 @@ class TestAudibleAuthSessionManagement:
         def mock_clear_audible_credentials(user_id):
             return True
 
-        monkeypatch.setattr(
-            user_ops, "clear_audible_credentials", mock_clear_audible_credentials
-        )
+        monkeypatch.setattr(user_ops, "clear_audible_credentials", mock_clear_audible_credentials)
 
         response = authenticated_client.post("/api/v1/audible/auth/revoke")
 
@@ -325,9 +321,7 @@ class TestMultiLocaleSupport:
         def mock_get_supported_locales():
             return ["US", "GB", "CA", "AU", "FR", "DE"]
 
-        monkeypatch.setattr(
-            AudibleClient, "get_supported_locales", mock_get_supported_locales
-        )
+        monkeypatch.setattr(AudibleClient, "get_supported_locales", mock_get_supported_locales)
 
         response = authenticated_client.get("/api/v1/audible/locales")
 

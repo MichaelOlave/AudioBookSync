@@ -1,6 +1,6 @@
 """Sync history database operations."""
 
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional
 
 from loguru import logger
 
@@ -14,9 +14,7 @@ class SyncOperations:
     # Allow tests and callers to override the pool; default to shared singleton.
     db_pool = _db_pool
 
-    def create_sync_history(
-        self, user_id: str, sync_type: str = "full"
-    ) -> Optional[str]:
+    def create_sync_history(self, user_id: str, sync_type: str = "full") -> Optional[str]:
         """
         Create a sync history entry.
 
@@ -192,9 +190,7 @@ class SyncOperations:
                 )
                 results = cursor.fetchall()
                 sync_history = [dict(row) for row in results]
-                logger.debug(
-                    f"Retrieved {len(sync_history)} sync records for user {user_id}"
-                )
+                logger.debug(f"Retrieved {len(sync_history)} sync records for user {user_id}")
                 return sync_history
         except Exception as e:
             logger.error(f"Failed to get sync history for user {user_id}: {e}")

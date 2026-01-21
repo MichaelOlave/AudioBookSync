@@ -108,12 +108,8 @@ class TestDatabaseOperations:
         # Should be able to call operations through unified interface
         assert hasattr(ops.users, "create_user") or hasattr(ops, "users")
         assert hasattr(ops.books, "add_book") or hasattr(ops, "books")
-        assert hasattr(ops.downloads, "create_download_status") or hasattr(
-            ops, "downloads"
-        )
-        assert hasattr(ops.decryptions, "create_decryption_status") or hasattr(
-            ops, "decryptions"
-        )
+        assert hasattr(ops.downloads, "create_download_status") or hasattr(ops, "downloads")
+        assert hasattr(ops.decryptions, "create_decryption_status") or hasattr(ops, "decryptions")
         assert hasattr(ops.syncs, "create_sync_history") or hasattr(ops, "syncs")
         assert hasattr(ops.errors, "log_error") or hasattr(ops, "errors")
 

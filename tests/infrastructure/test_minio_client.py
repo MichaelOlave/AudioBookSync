@@ -1,7 +1,6 @@
 """Tests for MinIOClient wrapper."""
 
 import hashlib
-from pathlib import Path
 from unittest.mock import MagicMock, Mock, call, patch
 
 import pytest
@@ -80,7 +79,7 @@ class TestMinIOClientFileUpload:
         test_file.write_bytes(test_content)
 
         # Calculate expected SHA256
-        expected_sha256 = hashlib.sha256(test_content).hexdigest()
+        hashlib.sha256(test_content).hexdigest()
         file_size = len(test_content)
 
         # Mock successful upload
@@ -94,9 +93,7 @@ class TestMinIOClientFileUpload:
         mock_minio_client.stat_object.return_value = mock_stat
 
         # Upload file
-        result = minio_client.upload_file(
-            str(test_file), "user-123", "downloaded/B001ABC123.aax"
-        )
+        result = minio_client.upload_file(str(test_file), "user-123", "downloaded/B001ABC123.aax")
 
         # Verify upload was called
         assert result is True
@@ -132,9 +129,7 @@ class TestMinIOClientFileUpload:
 
         # Mock time.sleep to verify delays
         with patch("src.infrastructure.minio_client.time.sleep") as mock_sleep:
-            result = minio_client.upload_file(
-                str(test_file), "user-123", "downloaded/test.aax"
-            )
+            result = minio_client.upload_file(str(test_file), "user-123", "downloaded/test.aax")
 
             # Should succeed after retries
             assert result is True
@@ -146,9 +141,7 @@ class TestMinIOClientFileUpload:
             assert mock_sleep.call_count == 2
             mock_sleep.assert_has_calls([call(1), call(2)])
 
-    def test_upload_failure_after_max_retries(
-        self, minio_client, mock_minio_client, temp_dir
-    ):
+    def test_upload_failure_after_max_retries(self, minio_client, mock_minio_client, temp_dir):
         """Test upload returns False after exhausting all retries."""
         # Create test file
         test_file = temp_dir / "test_book.aax"
@@ -159,9 +152,7 @@ class TestMinIOClientFileUpload:
 
         # Mock time.sleep
         with patch("src.infrastructure.minio_client.time.sleep"):
-            result = minio_client.upload_file(
-                str(test_file), "user-123", "downloaded/test.aax"
-            )
+            result = minio_client.upload_file(str(test_file), "user-123", "downloaded/test.aax")
 
             # Should fail after all retries
             assert result is False
@@ -182,9 +173,7 @@ class TestMinIOClientFileDownload:
         mock_minio_client.fget_object.return_value = MagicMock()
 
         # Download file
-        result = minio_client.download_file(
-            "user-123", "decrypted/test_book.m4b", str(destination)
-        )
+        result = minio_client.download_file("user-123", "decrypted/test_book.m4b", str(destination))
 
         # Verify download was successful
         assert result is True
@@ -208,9 +197,7 @@ class TestMinIOClientFileDownload:
         mock_minio_client.fget_object.side_effect = error
 
         # Download should return False
-        result = minio_client.download_file(
-            "user-123", "decrypted/missing.m4b", str(destination)
-        )
+        result = minio_client.download_file("user-123", "decrypted/missing.m4b", str(destination))
         assert result is False
 
 
@@ -283,9 +270,7 @@ class TestMinIOClientFileMetadata:
         assert metadata["content_type"] == "audio/mp4"
         assert metadata["last_modified"] == "2024-01-01T12:00:00Z"
 
-        mock_minio_client.stat_object.assert_called_once_with(
-            "user-123", "decrypted/book.m4b"
-        )
+        mock_minio_client.stat_object.assert_called_once_with("user-123", "decrypted/book.m4b")
 
     def test_get_metadata_missing_file(self, minio_client, mock_minio_client):
         """Test get_file_metadata returns None for missing files."""

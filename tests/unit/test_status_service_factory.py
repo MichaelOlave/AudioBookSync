@@ -4,18 +4,15 @@ Tests verify that the factory correctly generates service functions with proper
 signatures and behavior patterns.
 """
 
-import pytest
 import inspect
-from typing import List, Optional, Callable
-from uuid import UUID
 
-from src.database.models.download import DownloadStatus
+
 from src.database.models.decryption import DecryptionStatus
+from src.database.models.download import DownloadStatus
 from src.database.services.status_service_factory import (
     StatusServiceConfig,
     StatusServiceFactory,
 )
-
 
 # ============================================================================
 # CONFIGURATION TESTS

@@ -1,7 +1,7 @@
 """Tests for database metadata operations."""
 
+
 import pytest
-from datetime import date
 
 
 @pytest.mark.skip(reason="Database operations not yet implemented")
@@ -32,9 +32,7 @@ class TestContributorsOperations:
                 "role": "author",
             }
 
-        monkeypatch.setattr(
-            contributor_ops, "get_contributor_by_id", mock_get_contributor_by_id
-        )
+        monkeypatch.setattr(contributor_ops, "get_contributor_by_id", mock_get_contributor_by_id)
 
         result = contributor_ops.get_contributor_by_id("contrib-1")
         assert result["name"] == "Test Author"
@@ -63,9 +61,7 @@ class TestContributorsOperations:
                 {"contributor_id": "2", "name": "Narrator Name", "role": "narrator"},
             ]
 
-        monkeypatch.setattr(
-            contributor_ops, "get_book_contributors", mock_get_book_contributors
-        )
+        monkeypatch.setattr(contributor_ops, "get_book_contributors", mock_get_book_contributors)
 
         result = contributor_ops.get_book_contributors("B084L6Z6M3")
         assert len(result) == 2
@@ -142,9 +138,7 @@ class TestMediaInfoOperations:
                 {"asin": "B084L6Z6M4", "codec": codec},
             ]
 
-        monkeypatch.setattr(
-            media_info_ops, "get_books_by_codec", mock_get_books_by_codec
-        )
+        monkeypatch.setattr(media_info_ops, "get_books_by_codec", mock_get_books_by_codec)
 
         result = media_info_ops.get_books_by_codec("aac")
         assert len(result) == 2
@@ -161,9 +155,7 @@ class TestReadingProgressOperations:
         def mock_create_reading_progress(user_id, asin):
             return True
 
-        monkeypatch.setattr(
-            progress_ops, "create_reading_progress", mock_create_reading_progress
-        )
+        monkeypatch.setattr(progress_ops, "create_reading_progress", mock_create_reading_progress)
 
         result = progress_ops.create_reading_progress("user-1", "B084L6Z6M3")
         assert result is True
@@ -175,9 +167,7 @@ class TestReadingProgressOperations:
         def mock_update_reading_progress(user_id, asin, position_ms):
             return True
 
-        monkeypatch.setattr(
-            progress_ops, "update_reading_progress", mock_update_reading_progress
-        )
+        monkeypatch.setattr(progress_ops, "update_reading_progress", mock_update_reading_progress)
 
         result = progress_ops.update_reading_progress("user-1", "B084L6Z6M3", 3600000)
         assert result is True
@@ -195,9 +185,7 @@ class TestReadingProgressOperations:
                 "completed": False,
             }
 
-        monkeypatch.setattr(
-            progress_ops, "get_reading_progress", mock_get_reading_progress
-        )
+        monkeypatch.setattr(progress_ops, "get_reading_progress", mock_get_reading_progress)
 
         result = progress_ops.get_reading_progress("user-1", "B084L6Z6M3")
         assert result["position_ms"] == 3600000
@@ -225,9 +213,7 @@ class TestReadingProgressOperations:
                 {"asin": "B084L6Z6M4", "position_ms": 7200000},
             ]
 
-        monkeypatch.setattr(
-            progress_ops, "get_currently_reading", mock_get_currently_reading
-        )
+        monkeypatch.setattr(progress_ops, "get_currently_reading", mock_get_currently_reading)
 
         result = progress_ops.get_currently_reading("user-1")
         assert len(result) == 2
@@ -244,9 +230,7 @@ class TestBookAvailabilityOperations:
         def mock_add_book_availability(asin, **fields):
             return True
 
-        monkeypatch.setattr(
-            availability_ops, "add_book_availability", mock_add_book_availability
-        )
+        monkeypatch.setattr(availability_ops, "add_book_availability", mock_add_book_availability)
 
         result = availability_ops.add_book_availability(
             "B084L6Z6M3",
@@ -309,9 +293,7 @@ class TestCompanionMaterialsOperations:
         def mock_add_companion_material(asin, file_type, file_path):
             return True
 
-        monkeypatch.setattr(
-            materials_ops, "add_companion_material", mock_add_companion_material
-        )
+        monkeypatch.setattr(materials_ops, "add_companion_material", mock_add_companion_material)
 
         result = materials_ops.add_companion_material(
             "B084L6Z6M3",
@@ -330,9 +312,7 @@ class TestCompanionMaterialsOperations:
                 {"file_type": "txt", "file_path": "/materials/transcript.txt"},
             ]
 
-        monkeypatch.setattr(
-            materials_ops, "get_companion_materials", mock_get_companion_materials
-        )
+        monkeypatch.setattr(materials_ops, "get_companion_materials", mock_get_companion_materials)
 
         result = materials_ops.get_companion_materials("B084L6Z6M3")
         assert len(result) == 2
@@ -403,9 +383,7 @@ class TestMetadataJSONOperations:
                 {"asin": "B084L6Z6M4"},
             ]
 
-        monkeypatch.setattr(
-            metadata_ops, "query_by_metadata", mock_query_by_metadata
-        )
+        monkeypatch.setattr(metadata_ops, "query_by_metadata", mock_query_by_metadata)
 
         result = metadata_ops.query_by_metadata("series", "Becoming")
         assert len(result) >= 0
@@ -435,9 +413,7 @@ class TestMetadataViews:
                 "reading_progress": {"position_ms": 0, "completed": False},
             }
 
-        monkeypatch.setattr(
-            book_ops, "get_book_with_all_metadata", mock_get_book_with_all_metadata
-        )
+        monkeypatch.setattr(book_ops, "get_book_with_all_metadata", mock_get_book_with_all_metadata)
 
         result = book_ops.get_book_with_all_metadata("B084L6Z6M3")
         assert result["asin"] == "B084L6Z6M3"
@@ -457,9 +433,7 @@ class TestMetadataIndexing:
         def mock_search_books_by_author(author_name):
             return [{"asin": "B084L6Z6M3"}, {"asin": "B084L6Z6M4"}]
 
-        monkeypatch.setattr(
-            contributor_ops, "search_books_by_author", mock_search_books_by_author
-        )
+        monkeypatch.setattr(contributor_ops, "search_books_by_author", mock_search_books_by_author)
 
         result = contributor_ops.search_books_by_author("Michelle Obama")
         assert len(result) > 0
@@ -485,9 +459,7 @@ class TestMetadataIndexing:
         def mock_search_by_series(series_name):
             return [{"asin": "B084L6Z6M3"}, {"asin": "B084L6Z6M4"}]
 
-        monkeypatch.setattr(
-            metadata_ops, "search_by_series", mock_search_by_series
-        )
+        monkeypatch.setattr(metadata_ops, "search_by_series", mock_search_by_series)
 
         result = metadata_ops.search_by_series("Some Series")
         assert len(result) >= 0

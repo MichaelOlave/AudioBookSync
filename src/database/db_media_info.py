@@ -1,6 +1,7 @@
 """Database operations for media information (audio technical details)."""
 
 from typing import Dict, Optional
+
 from loguru import logger
 
 from .db_pool import db_pool as _db_pool

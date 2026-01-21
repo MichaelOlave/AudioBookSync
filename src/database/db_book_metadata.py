@@ -1,7 +1,8 @@
 """Database operations for flexible book metadata stored as JSON."""
 
-from typing import Dict, Optional, Any
 import json
+from typing import Any, Dict, Optional
+
 from loguru import logger
 
 from .db_pool import db_pool as _db_pool
@@ -78,11 +79,7 @@ class BookMetadataOperations:
                         claim_code_url,
                         parent_asin,
                         sku,
-                        (
-                            json.dumps(rating_distribution)
-                            if rating_distribution
-                            else None
-                        ),
+                        (json.dumps(rating_distribution) if rating_distribution else None),
                         json.dumps(custom_metadata) if custom_metadata else None,
                     ),
                 )
@@ -251,9 +248,7 @@ class BookMetadataOperations:
             logger.error(f"Failed to set rating distribution: {e}")
             return False
 
-    def add_badge(
-        self, asin: str, badge_name: str, badge_info: Optional[Dict] = None
-    ) -> bool:
+    def add_badge(self, asin: str, badge_name: str, badge_info: Optional[Dict] = None) -> bool:
         """
         Add a content badge for a book.
 

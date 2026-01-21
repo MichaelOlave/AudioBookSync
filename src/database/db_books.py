@@ -122,12 +122,12 @@ class BookOperations:
                 return False
 
             # Import metadata operations modules
-            from .db_contributors import contributor_ops
             from .db_book_contributors import book_contributor_ops
-            from .db_media_info import media_info_ops
-            from .db_reading_progress import reading_progress_ops
             from .db_book_metadata import book_metadata_ops
             from .db_companion_materials import companion_material_ops
+            from .db_contributors import contributor_ops
+            from .db_media_info import media_info_ops
+            from .db_reading_progress import reading_progress_ops
 
             # 2. Add contributors (authors, narrators, editors)
             contributors_data = (

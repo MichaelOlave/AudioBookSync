@@ -1,15 +1,14 @@
 """Companion material model for SQLAlchemy ORM."""
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, String, Text, Integer, BigInteger, ForeignKey, DateTime
+from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
 
-from src.database.models.base import Base, get_current_timestamp
+from src.database.models.base import Base
 
 if TYPE_CHECKING:
-    from src.database.models.book import Book
+    pass
 
 
 class CompanionMaterial(Base):
@@ -22,7 +21,9 @@ class CompanionMaterial(Base):
         primary_key=True,
         server_default="uuid_generate_v4()",
     )
-    asin = Column(String(10), ForeignKey("books.asin", ondelete="CASCADE"), nullable=False, index=True)
+    asin = Column(
+        String(10), ForeignKey("books.asin", ondelete="CASCADE"), nullable=False, index=True
+    )
     material_type = Column(String(50), nullable=False, index=True)
     title = Column(String(500), nullable=True)
     url = Column(String(1000), nullable=False)

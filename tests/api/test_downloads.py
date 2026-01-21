@@ -1,9 +1,10 @@
 """Tests for download endpoints."""
 
-import pytest
-from fastapi import status
 import uuid
 from datetime import datetime
+
+import pytest
+from fastapi import status
 
 
 @pytest.fixture
@@ -34,9 +35,7 @@ class TestTriggerDownload:
         def mock_create_download_status(asin, status="pending"):
             return test_download_id
 
-        monkeypatch.setattr(
-            download_ops, "create_download_status", mock_create_download_status
-        )
+        monkeypatch.setattr(download_ops, "create_download_status", mock_create_download_status)
 
         response = authenticated_client.post(
             "/api/v1/downloads/",
@@ -291,6 +290,7 @@ class TestDownloadStatuses:
         valid_statuses = ["pending", "downloading", "completed", "failed", "cancelled"]
 
         for status_value in valid_statuses:
+
             def mock_get_user_downloads(user_id, status=None, limit=10, offset=0):
                 if status == status_value:
                     return [
@@ -305,12 +305,8 @@ class TestDownloadStatuses:
             def mock_count_user_downloads(user_id, status=None):
                 return 1 if status == status_value else 0
 
-            monkeypatch.setattr(
-                download_ops, "get_user_downloads", mock_get_user_downloads
-            )
-            monkeypatch.setattr(
-                download_ops, "count_user_downloads", mock_count_user_downloads
-            )
+            monkeypatch.setattr(download_ops, "get_user_downloads", mock_get_user_downloads)
+            monkeypatch.setattr(download_ops, "count_user_downloads", mock_count_user_downloads)
 
             response = authenticated_client.get(f"/api/v1/downloads/?status={status_value}")
 
@@ -370,9 +366,8 @@ class TestDownloadMinIOIntegration:
     @pytest.mark.asyncio
     async def test_download_book_uploads_to_minio_when_enabled(self, monkeypatch):
         """Test that download_book uploads to MinIO after successful download."""
-        from src.operations.downloader import download_book
-        from src.infrastructure.storage_service import StorageService
         from src.core.config import Config
+        from src.infrastructure.storage_service import StorageService
 
         # Mock successful download
         async def mock_validate_book(book):
@@ -384,22 +379,23 @@ class TestDownloadMinIOIntegration:
         upload_called = []
 
         def mock_save_file(user_id, file_path, file_type, asin=None, title=None):
-            upload_called.append({
-                "user_id": user_id,
-                "file_type": file_type,
-                "asin": asin,
-            })
+            upload_called.append(
+                {
+                    "user_id": user_id,
+                    "file_type": file_type,
+                    "asin": asin,
+                }
+            )
             return (True, f"downloaded/{asin}.aax")
 
         # Temporarily enable MinIO
-        original_minio_setting = Config.USE_MINIO_STORAGE
+        Config.USE_MINIO_STORAGE
         monkeypatch.setattr(Config, "USE_MINIO_STORAGE", True)
 
         # Mock subprocess for audible download
-        import asyncio
 
         async def mock_create_subprocess_exec(*args, **kwargs):
-            mock_process = type('Process', (), {})()
+            mock_process = type("Process", (), {})()
             mock_process.returncode = 0
             mock_process.communicate = lambda: (b"Downloaded: B001ABC.aax", b"")
             return mock_process
@@ -440,7 +436,6 @@ class TestDownloadMinIOIntegration:
         """Test that download_book handles MinIO upload failures gracefully."""
         # If MinIO upload fails, download should still succeed
         # This is a non-critical operation
-        pass
 
     @pytest.mark.asyncio
     async def test_download_book_backward_compatibility_minio_disabled(self, monkeypatch):
@@ -452,4 +447,3 @@ class TestDownloadMinIOIntegration:
 
         # Download should work without MinIO
         # (No object_key should be created)
-        pass

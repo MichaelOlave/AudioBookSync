@@ -26,11 +26,7 @@ def normalize_filename(filename: str) -> str:
             prev_is_alnum = bool(result_chars and result_chars[-1].isalnum())
             next_char = filename[index + 1] if index + 1 < length else ""
             next_is_digit = next_char.isdigit()
-            if (
-                prev_is_alnum
-                and next_is_digit
-                and (not result_chars or result_chars[-1] != " ")
-            ):
+            if prev_is_alnum and next_is_digit and (not result_chars or result_chars[-1] != " "):
                 result_chars.append(" ")
 
     return "".join(result_chars).strip()

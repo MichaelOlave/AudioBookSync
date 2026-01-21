@@ -1,9 +1,6 @@
 """Tests for BackgroundTaskService."""
 
-import pytest
-from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime
-
 
 class TestBackgroundTaskService:
     """Tests for background task execution service."""
@@ -15,11 +12,13 @@ class TestBackgroundTaskService:
         execution_log = []
 
         async def mock_execute_async(operation_type, user_id, params):
-            execution_log.append({
-                "operation": operation_type,
-                "user": user_id,
-                "params": params,
-            })
+            execution_log.append(
+                {
+                    "operation": operation_type,
+                    "user": user_id,
+                    "params": params,
+                }
+            )
             return {"status": "success", "sync_id": "sync-123"}
 
         # Test that service can be instantiated
@@ -52,10 +51,12 @@ class TestBackgroundTaskService:
         progress_updates = []
 
         def mock_progress_callback(progress_percent, message):
-            progress_updates.append({
-                "percent": progress_percent,
-                "message": message,
-            })
+            progress_updates.append(
+                {
+                    "percent": progress_percent,
+                    "message": message,
+                }
+            )
 
         service = BackgroundTaskService()
         assert hasattr(service, "execute_sync_operation")
@@ -76,11 +77,13 @@ class TestBackgroundTaskService:
         log_entries = []
 
         def mock_update_sync_status(sync_id, status, notes=None):
-            log_entries.append({
-                "sync_id": sync_id,
-                "status": status,
-                "notes": notes,
-            })
+            log_entries.append(
+                {
+                    "sync_id": sync_id,
+                    "status": status,
+                    "notes": notes,
+                }
+            )
             return True
 
         monkeypatch.setattr(sync_ops, "update_sync_status", mock_update_sync_status)
@@ -120,7 +123,6 @@ class TestBackgroundTaskService:
         # Service should support monitoring
         assert service is not None
 
-
 class TestSyncOperationFlow:
     """Tests for complete sync operation flow."""
 
@@ -131,10 +133,12 @@ class TestSyncOperationFlow:
         created_syncs = []
 
         def mock_create_sync_history(user_id, sync_type):
-            created_syncs.append({
-                "user_id": user_id,
-                "sync_type": sync_type,
-            })
+            created_syncs.append(
+                {
+                    "user_id": user_id,
+                    "sync_type": sync_type,
+                }
+            )
             return "sync-123"
 
         monkeypatch.setattr(sync_ops, "create_sync_history", mock_create_sync_history)
@@ -144,16 +148,17 @@ class TestSyncOperationFlow:
 
     def test_sync_operation_updates_progress(self, monkeypatch):
         """Test sync updates progress during execution."""
-        from src.database.db_sync import sync_ops
 
         progress_records = []
 
         def mock_record_progress(sync_id, books_found, books_added, books_downloaded):
-            progress_records.append({
-                "sync_id": sync_id,
-                "books_found": books_found,
-                "books_added": books_added,
-            })
+            progress_records.append(
+                {
+                    "sync_id": sync_id,
+                    "books_found": books_found,
+                    "books_added": books_added,
+                }
+            )
 
         # Verify progress recording capability
         assert len(progress_records) == 0
@@ -165,12 +170,14 @@ class TestSyncOperationFlow:
         completion_records = []
 
         def mock_update_sync_status(sync_id, status, **kwargs):
-            completion_records.append({
-                "sync_id": sync_id,
-                "status": status,
-                "duration": kwargs.get("duration_seconds"),
-                "books_decrypted": kwargs.get("books_decrypted"),
-            })
+            completion_records.append(
+                {
+                    "sync_id": sync_id,
+                    "status": status,
+                    "duration": kwargs.get("duration_seconds"),
+                    "books_decrypted": kwargs.get("books_decrypted"),
+                }
+            )
 
         monkeypatch.setattr(sync_ops, "update_sync_status", mock_update_sync_status)
 
@@ -179,13 +186,11 @@ class TestSyncOperationFlow:
 
     def test_sync_operation_handles_partial_failure(self, monkeypatch):
         """Test sync that partially succeeds records errors."""
-        from src.database.db_sync import sync_ops
 
         def mock_record_error(sync_id, error_message, error_details):
             return True
 
         # Verify error recording capability
-
 
 class TestDownloadOperationFlow:
     """Tests for complete download operation flow."""
@@ -197,33 +202,33 @@ class TestDownloadOperationFlow:
         created_downloads = []
 
         def mock_create_download_status(asin, status="pending"):
-            created_downloads.append({
-                "asin": asin,
-                "status": status,
-            })
+            created_downloads.append(
+                {
+                    "asin": asin,
+                    "status": status,
+                }
+            )
             return "download-123"
 
-        monkeypatch.setattr(
-            download_ops, "create_download_status", mock_create_download_status
-        )
+        monkeypatch.setattr(download_ops, "create_download_status", mock_create_download_status)
 
         # Verify download creation logic
         assert len(created_downloads) == 0
 
     def test_download_operation_updates_progress(self, monkeypatch):
         """Test download updates progress percentage."""
-        from src.database.db_downloads import download_ops
 
         progress_updates = []
 
         def mock_update_download_progress(download_id, progress_percent):
-            progress_updates.append({
-                "download_id": download_id,
-                "progress": progress_percent,
-            })
+            progress_updates.append(
+                {
+                    "download_id": download_id,
+                    "progress": progress_percent,
+                }
+            )
 
         # Verify progress update capability
-
 
 class TestDecryptOperationFlow:
     """Tests for complete decrypt operation flow."""
@@ -235,11 +240,13 @@ class TestDecryptOperationFlow:
         created_decrypts = []
 
         def mock_create_decryption_status(asin, download_id, status="pending"):
-            created_decrypts.append({
-                "asin": asin,
-                "download_id": download_id,
-                "status": status,
-            })
+            created_decrypts.append(
+                {
+                    "asin": asin,
+                    "download_id": download_id,
+                    "status": status,
+                }
+            )
             return "decrypt-123"
 
         monkeypatch.setattr(
@@ -262,12 +269,9 @@ class TestDecryptOperationFlow:
                 "updated_at": datetime.now(),
             }
 
-        monkeypatch.setattr(
-            download_ops, "get_download_by_asin", mock_get_download_by_asin
-        )
+        monkeypatch.setattr(download_ops, "get_download_by_asin", mock_get_download_by_asin)
 
         # Verify prerequisite checking
-
 
 class TestServiceErrorRecovery:
     """Tests for service error handling and recovery."""

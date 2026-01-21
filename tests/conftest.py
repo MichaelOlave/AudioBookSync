@@ -1,11 +1,17 @@
 """Pytest configuration and shared fixtures for all tests."""
 
 import asyncio
+import os
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
+
+from src.database.models.base import Base
+from src.database.services import book_service, sync_service, user_service
 
 
 @pytest.fixture(scope="session")
@@ -15,6 +21,54 @@ def event_loop():
     asyncio.set_event_loop(loop)
     yield loop
     loop.close()
+
+
+@pytest.fixture(scope="session")
+async def test_async_engine():
+    """Create async test database engine.
+
+    Uses postgresql+asyncpg with a test database.
+    """
+    # Get test database URL - use separate test database
+    test_db_url = os.getenv(
+        "TEST_DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost/audibooksync_test"
+    )
+
+    engine = create_async_engine(
+        test_db_url,
+        echo=False,
+        future=True,
+        poolclass=NullPool,  # No connection pooling for tests
+    )
+
+    # Create all tables
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    yield engine
+
+    # Drop all tables after tests
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+
+    await engine.dispose()
+
+
+@pytest.fixture
+async def db_session(test_async_engine):
+    """Create async database session for each test.
+
+    Provides a fresh session for each test and rolls back after completion.
+    """
+    async_session = async_sessionmaker(
+        test_async_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async with async_session() as session:
+        yield session
+        await session.rollback()  # Clean up after test
 
 
 @pytest.fixture
@@ -135,7 +189,69 @@ def mock_subprocess_result():
     return result
 
 
+# ============================================================================
+# Async ORM Test Factories (using real database)
+# ============================================================================
+
+
+@pytest.fixture
+async def test_user(db_session, sample_user_data):
+    """Create a test user in the database using ORM.
+
+    Returns the created User ORM object.
+    """
+    user = await user_service.create_user(
+        db=db_session,
+        username=sample_user_data["username"],
+        email=sample_user_data["email"],
+        auth_file_path=sample_user_data["auth_file_path"],
+        activation_bytes=sample_user_data["activation_bytes"],
+    )
+    await db_session.commit()
+    return user
+
+
+@pytest.fixture
+async def test_book(db_session, test_user, sample_book_data):
+    """Create a test book in the database using ORM.
+
+    Returns the created Book ORM object.
+    """
+    success = await book_service.add_book(
+        db=db_session,
+        asin=sample_book_data["asin"],
+        user_id=str(test_user.user_id),
+        title=sample_book_data["title"],
+        author=sample_book_data["author"],
+        runtime_min=sample_book_data["runtime_min"],
+        purchase_date=sample_book_data["purchase_date"],
+    )
+    if success:
+        await db_session.commit()
+        return await book_service.get_book_by_asin(db=db_session, asin=sample_book_data["asin"])
+    return None
+
+
+@pytest.fixture
+async def test_sync(db_session, test_user, sample_sync_data):
+    """Create a test sync record in the database using ORM.
+
+    Returns the created SyncHistory ORM object.
+    """
+    sync_history = await sync_service.create_sync_history(
+        db=db_session,
+        user_id=test_user.user_id,
+        sync_type=sample_sync_data["sync_type"],
+    )
+    await db_session.commit()
+    return sync_history
+
+
+# ============================================================================
 # Marks for test organization
+# ============================================================================
+
+
 def pytest_configure(config):
     """Register custom markers."""
     config.addinivalue_line("markers", "asyncio: mark test as async")

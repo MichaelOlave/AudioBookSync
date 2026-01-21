@@ -1,21 +1,21 @@
 """Book management endpoints."""
 
 from fastapi import APIRouter, Depends, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...database.services import book_service
 from ...database.engine import get_db_session
 from ...database.models.user import User
-from ..security.auth import get_current_user
-from ..schemas.book import BookBase, BookResponse
-from ..schemas.common import MessageResponse
+from ...database.services import book_service
 from ..middleware.error_handler import (
-    ResourceNotFoundError,
     AuthorizationError,
     InternalServerError,
+    ResourceNotFoundError,
     handle_route_errors,
 )
+from ..schemas.book import BookBase, BookResponse
+from ..schemas.common import MessageResponse
+from ..security.auth import get_current_user
 from ..utils.auth_utils import get_user_id
 
 router = APIRouter()
@@ -148,9 +148,7 @@ async def delete_book(
 
     # Verify ownership
     if str(book.user_id) != user_id:
-        logger.warning(
-            f"Unauthorized delete attempt for book {asin} by user {user_id}"
-        )
+        logger.warning(f"Unauthorized delete attempt for book {asin} by user {user_id}")
         raise AuthorizationError("Not authorized to delete this book")
 
     # Delete the book

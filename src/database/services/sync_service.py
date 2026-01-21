@@ -1,12 +1,12 @@
 """Sync history database service layer using SQLAlchemy ORM."""
 
-from typing import Optional, List
 from datetime import datetime, timezone
+from typing import List, Optional
 from uuid import UUID
 
-from sqlalchemy import select, and_
-from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models.sync import SyncHistory
 
@@ -58,9 +58,7 @@ async def get_sync_by_id(db: AsyncSession, sync_id: UUID) -> Optional[SyncHistor
         SyncHistory object if found, None otherwise
     """
     try:
-        result = await db.execute(
-            select(SyncHistory).where(SyncHistory.sync_id == sync_id)
-        )
+        result = await db.execute(select(SyncHistory).where(SyncHistory.sync_id == sync_id))
         return result.scalar_one_or_none()
     except Exception as e:
         logger.error(f"Failed to get sync history: {e}")

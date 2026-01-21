@@ -1,7 +1,8 @@
 """Common/shared Pydantic schemas for API responses."""
 
-from typing import Generic, TypeVar, List, Optional
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Generic, List, Optional, TypeVar
+
+from pydantic import BaseModel, ConfigDict, Field
 
 T = TypeVar("T")  # Generic type for pagination
 

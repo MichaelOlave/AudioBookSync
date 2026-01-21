@@ -5,6 +5,7 @@ exception handlers, routers, and lifespan management.
 """
 
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
@@ -15,21 +16,20 @@ from ..database.engine import engine as db_engine
 from .middleware.error_handler import add_exception_handlers
 from .middleware.logging import LoggingMiddleware
 from .routers import (
-    auth,
     audible_auth,
-    library,
+    auth,
     books,
-    sync,
-    downloads,
     decryptions,
+    downloads,
     errors,
     files,
-    websocket,
+    library,
     settings,
+    sync,
     users,
+    websocket,
 )
 from .schemas.common import HealthResponse
-
 
 # ============================================================================
 # LIFESPAN MANAGEMENT

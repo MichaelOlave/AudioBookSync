@@ -4,9 +4,11 @@ from unittest.mock import patch
 
 import pytest
 
-from src.infrastructure.file_utils import (ensure_directory,
-                                           file_exists_in_directory,
-                                           normalize_filename)
+from src.infrastructure.file_utils import (
+    ensure_directory,
+    file_exists_in_directory,
+    normalize_filename,
+)
 
 
 @pytest.mark.unit

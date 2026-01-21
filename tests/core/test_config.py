@@ -155,9 +155,11 @@ class TestConfigEnsureDirectories:
         assert not decrypted_dir.exists()
         assert not log_dir.exists()
 
-        with patch.object(Config, "DOWNLOAD_DIR", str(download_dir)), patch.object(
-            Config, "DECRYPTED_DIR", str(decrypted_dir)
-        ), patch.object(Config, "LOG_DIR", str(log_dir)):
+        with (
+            patch.object(Config, "DOWNLOAD_DIR", str(download_dir)),
+            patch.object(Config, "DECRYPTED_DIR", str(decrypted_dir)),
+            patch.object(Config, "LOG_DIR", str(log_dir)),
+        ):
             Config.ensure_directories()
 
         assert download_dir.exists()
@@ -174,9 +176,11 @@ class TestConfigEnsureDirectories:
         decrypted_dir.mkdir(parents=True, exist_ok=True)
         log_dir.mkdir(parents=True, exist_ok=True)
 
-        with patch.object(Config, "DOWNLOAD_DIR", str(download_dir)), patch.object(
-            Config, "DECRYPTED_DIR", str(decrypted_dir)
-        ), patch.object(Config, "LOG_DIR", str(log_dir)):
+        with (
+            patch.object(Config, "DOWNLOAD_DIR", str(download_dir)),
+            patch.object(Config, "DECRYPTED_DIR", str(decrypted_dir)),
+            patch.object(Config, "LOG_DIR", str(log_dir)),
+        ):
             Config.ensure_directories()
 
         assert download_dir.exists()
@@ -189,9 +193,11 @@ class TestConfigEnsureDirectories:
 
         assert not nested_dir.exists()
 
-        with patch.object(Config, "DOWNLOAD_DIR", str(nested_dir)), patch.object(
-            Config, "DECRYPTED_DIR", str(temp_dir / "d")
-        ), patch.object(Config, "LOG_DIR", str(temp_dir / "e")):
+        with (
+            patch.object(Config, "DOWNLOAD_DIR", str(nested_dir)),
+            patch.object(Config, "DECRYPTED_DIR", str(temp_dir / "d")),
+            patch.object(Config, "LOG_DIR", str(temp_dir / "e")),
+        ):
             Config.ensure_directories()
 
         assert nested_dir.exists()
@@ -200,9 +206,11 @@ class TestConfigEnsureDirectories:
         """Test that ensure_directories can be called multiple times safely."""
         download_dir = temp_dir / "downloads"
 
-        with patch.object(Config, "DOWNLOAD_DIR", str(download_dir)), patch.object(
-            Config, "DECRYPTED_DIR", str(temp_dir / "d")
-        ), patch.object(Config, "LOG_DIR", str(temp_dir / "e")):
+        with (
+            patch.object(Config, "DOWNLOAD_DIR", str(download_dir)),
+            patch.object(Config, "DECRYPTED_DIR", str(temp_dir / "d")),
+            patch.object(Config, "LOG_DIR", str(temp_dir / "e")),
+        ):
             Config.ensure_directories()
             assert download_dir.exists()
             Config.ensure_directories()
@@ -223,9 +231,7 @@ class TestConfigAudibleAPI:
             importlib.reload(src.core.config)
             from src.core.config import Config as ConfigReloaded
 
-            assert (
-                ConfigReloaded.AUDIBLE_RESPONSE_GROUPS == "product_desc, product_attrs"
-            )
+            assert ConfigReloaded.AUDIBLE_RESPONSE_GROUPS == "product_desc, product_attrs"
 
     def test_default_sort_by(self):
         """Test default AUDIBLE_SORT_BY value."""

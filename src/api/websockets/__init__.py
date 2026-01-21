@@ -1,7 +1,7 @@
 """WebSocket handlers and utilities."""
 
-from .manager import ws_manager, ConnectionManager
-from .events import EventType, SyncStartedEvent, SyncProgressEvent, SyncCompletedEvent
+from .events import EventType, SyncCompletedEvent, SyncProgressEvent, SyncStartedEvent
+from .manager import ConnectionManager, ws_manager
 
 __all__ = [
     "ws_manager",

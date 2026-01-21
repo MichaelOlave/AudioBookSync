@@ -1,18 +1,18 @@
 """JWT token creation, validation, and dependency injection for FastAPI."""
 
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-import uuid
 
-from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.config import Config
-from ...database.services import user_service
 from ...database.engine import get_db_session
+from ...database.services import user_service
 
 # OAuth2 scheme for automatic Swagger documentation
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -40,9 +40,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(
-            minutes=Config.ACCESS_TOKEN_EXPIRE_MINUTES
-        )
+        expire = datetime.now(timezone.utc) + timedelta(minutes=Config.ACCESS_TOKEN_EXPIRE_MINUTES)
 
     # Add standard JWT claims
     to_encode.update(

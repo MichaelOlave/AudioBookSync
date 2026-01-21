@@ -1,20 +1,30 @@
 """Sync operation endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
-from loguru import logger
 from datetime import datetime, timezone
+from uuid import UUID
 
-from ...database.db_sync import sync_ops
-from ..security.auth import get_current_user
-from ..schemas.sync import (
-    SyncCreate,
-    SyncResponse,
-    SyncHistoryList,
-    SyncAcceptedResponse,
+from fastapi import APIRouter, BackgroundTasks, Depends, status
+from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ...database.engine import get_db_session
+from ...database.services import sync_service
+from ..middleware.error_handler import (
+    AuthenticationError,
+    AuthorizationError,
+    InternalServerError,
+    ResourceNotFoundError,
+    handle_route_errors,
 )
-from ..middleware.error_handler import ResourceNotFoundError, AuthorizationError, InternalServerError, AuthenticationError, handle_route_errors
-from ..utils.generic_handlers import get_paginated_list, get_pagination_params
+from ..schemas.sync import (
+    SyncAcceptedResponse,
+    SyncCreate,
+    SyncHistoryList,
+    SyncResponse,
+)
+from ..security.auth import get_current_user
 from ..utils.auth_utils import get_user_id
+from ..utils.generic_handlers import get_paginated_list, get_pagination_params
 
 router = APIRouter()
 
@@ -38,6 +48,7 @@ async def trigger_sync(
     sync_data: SyncCreate,
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
 ) -> SyncAcceptedResponse:
     """
     Trigger a new library sync operation.
@@ -50,6 +61,7 @@ async def trigger_sync(
         sync_data: Sync parameters (sync_type)
         background_tasks: FastAPI background tasks queue
         current_user: Current authenticated user (from JWT token)
+        db: Database session
 
     Returns:
         SyncAcceptedResponse: Sync ID and initial status (202 Accepted)
@@ -63,19 +75,21 @@ async def trigger_sync(
     user_id = get_user_id(current_user)
     if not user_id:
         raise AuthenticationError("Invalid user authentication")
-    logger.info(
-        f"Sync triggered for user {user_id} with type: {sync_data.sync_type}"
-    )
+    logger.info(f"Sync triggered for user {user_id} with type: {sync_data.sync_type}")
 
-    # Create sync history entry
-    sync_id = sync_ops.create_sync_history(
-        user_id=user_id,
+    # Create sync history entry using ORM
+    sync_history = await sync_service.create_sync_history(
+        db=db,
+        user_id=UUID(user_id),
         sync_type=sync_data.sync_type,
     )
+    await db.commit()
 
-    if not sync_id:
+    if not sync_history:
         logger.error(f"Failed to create sync record for user {user_id}")
         raise InternalServerError(f"Failed to create sync record for user {user_id}")
+
+    sync_id = str(sync_history.sync_id)
 
     # Queue background sync task
     from ..services.background_service import BackgroundTaskService
@@ -111,6 +125,7 @@ async def get_sync_history(
     current_user: dict = Depends(get_current_user),
     page: int = _sync_page,
     page_size: int = _sync_page_size,
+    db: AsyncSession = Depends(get_db_session),
 ) -> SyncHistoryList:
     """
     Get user's sync history with pagination.
@@ -121,6 +136,7 @@ async def get_sync_history(
         current_user: Current authenticated user (from JWT token)
         page: Page number for pagination (default: 1)
         page_size: Items per page (default: 10, max: 50)
+        db: Database session
 
     Returns:
         SyncHistoryList: Paginated list of sync records
@@ -132,8 +148,10 @@ async def get_sync_history(
     if not user_id:
         raise AuthenticationError("Invalid user authentication")
 
-    def get_syncs(**kwargs):
-        return sync_ops.get_user_sync_history(kwargs["user_id"], limit=1000)
+    async def get_syncs(**kwargs):
+        return await sync_service.get_syncs_by_user(
+            db=db, user_id=UUID(kwargs["user_id"]), limit=1000
+        )
 
     result = await get_paginated_list(
         get_items_func=get_syncs,
@@ -164,6 +182,7 @@ async def get_sync_history(
 async def get_sync_status(
     sync_id: str,
     current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
 ) -> SyncResponse:
     """
     Get detailed status of a specific sync operation.
@@ -189,7 +208,7 @@ async def get_sync_status(
     logger.info(f"Fetching sync status: {sync_id} for user: {user_id}")
 
     # Get sync by ID
-    sync = sync_ops.get_sync_by_id(sync_id)
+    sync = await sync_service.get_sync_by_id(db, UUID(sync_id))
 
     if not sync:
         logger.warning(f"Sync not found: {sync_id}")
@@ -197,9 +216,7 @@ async def get_sync_status(
 
     # Verify ownership
     if sync.get("user_id") != user_id:
-        logger.warning(
-            f"Unauthorized access attempt to sync {sync_id} by user {user_id}"
-        )
+        logger.warning(f"Unauthorized access attempt to sync {sync_id} by user {user_id}")
         raise AuthorizationError("Not authorized to access this sync")
 
     logger.info(f"Retrieved sync details: {sync_id}")

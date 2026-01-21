@@ -5,12 +5,13 @@ Provides reusable handlers for paginated list endpoints and other common pattern
 """
 
 import inspect
-from typing import Callable, List, Optional, TypeVar, Generic, Type, Any, Union
+from typing import Callable, Optional, Type, TypeVar, Union
+
 from fastapi import Query
 from loguru import logger
 
-from .pagination import calculate_pages, validate_page, paginate_list
-from ..middleware.error_handler import ResourceNotFoundError, AuthorizationError
+from ..middleware.error_handler import AuthorizationError
+from .pagination import calculate_pages, paginate_list, validate_page
 
 T = TypeVar("T")
 ResponseT = TypeVar("ResponseT")
@@ -34,9 +35,7 @@ def verify_book_ownership(book: Union[dict, object], user_id: str, asin: str) ->
     book_user_id = book.get("user_id") if isinstance(book, dict) else str(book.user_id)
 
     if book_user_id != user_id:
-        logger.warning(
-            f"Unauthorized access attempt to audiobook {asin} by user {user_id}"
-        )
+        logger.warning(f"Unauthorized access attempt to audiobook {asin} by user {user_id}")
         raise AuthorizationError("Not authorized to access this book")
 
 
@@ -175,9 +174,7 @@ async def get_paginated_list(
         response_items = items
     else:
         # In-memory pagination: slice the items
-        response_items, validated_page, pages = paginate_list(
-            items, validated_page, page_size
-        )
+        response_items, validated_page, pages = paginate_list(items, validated_page, page_size)
 
     # Convert to response objects
     try:

@@ -7,25 +7,23 @@ Run with:
     pytest tests/integration_test_new_services.py -v
 """
 
-import pytest
 import asyncio
-from uuid import uuid4
+
+import pytest
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.api.main import create_app
-from src.database.engine import get_db_session
+from src.core.config import Config
 from src.database.models import Base
 from src.database.services import (
-    user_service,
     book_service,
     download_service,
-    sync_service,
     error_service,
     metadata_service,
+    sync_service,
+    user_service,
 )
-from src.core.config import Config
-
 
 # ============================================================================
 # TEST FIXTURES
@@ -347,9 +345,7 @@ async def test_download_workflow(test_db_session):
     await test_db_session.commit()
 
     # Verify
-    updated = await download_service.get_download_by_id(
-        test_db_session, download.download_id
-    )
+    updated = await download_service.get_download_by_id(test_db_session, download.download_id)
     assert updated.status == "completed"
     assert updated.download_path == "/path/to/file.aax"
 

@@ -1,30 +1,30 @@
 """Tests for audiobook file streaming endpoints."""
 
-import pytest
-from fastapi import status
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-from datetime import datetime
+
+import pytest
+from fastapi import status
+
+from tests.factories import BookFactory
 
 
 class TestStreamAudiobook:
     """Tests for stream audiobook endpoint."""
 
-    def test_stream_audiobook_success(self, authenticated_client, monkeypatch):
-        """Test successful audiobook streaming."""
-        from src.database.db_books import book_ops
-
-        def mock_get_book_by_asin(asin):
-            return {
-                "asin": asin,
-                "title": "Test Book",
-                "user_id": authenticated_client.user_id,
-                "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
-                "created_at": datetime.now(),
-                "updated_at": datetime.now(),
-            }
-
-        monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
+    @pytest.mark.asyncio
+    async def test_stream_audiobook_success(
+        self, authenticated_client, db_session, test_user_in_db
+    ):
+        """Test successful audiobook streaming with real database."""
+        # Create a book in the database
+        await BookFactory.create(
+            db=db_session,
+            user_id=str(test_user_in_db.user_id),
+            asin="B084L6Z6M3",
+            title="Test Book",
+        )
+        await db_session.commit()
 
         # Mock file existence and size
         mock_path = MagicMock(spec=Path)
@@ -37,21 +37,19 @@ class TestStreamAudiobook:
         assert response.status_code == status.HTTP_200_OK
         assert response.headers["Accept-Ranges"] == "bytes"
 
-    def test_stream_audiobook_with_range(self, authenticated_client, monkeypatch):
-        """Test audiobook streaming with Range header."""
-        from src.database.db_books import book_ops
-
-        def mock_get_book_by_asin(asin):
-            return {
-                "asin": asin,
-                "title": "Test Book",
-                "user_id": authenticated_client.user_id,
-                "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
-                "created_at": datetime.now(),
-                "updated_at": datetime.now(),
-            }
-
-        monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
+    @pytest.mark.asyncio
+    async def test_stream_audiobook_with_range(
+        self, authenticated_client, db_session, test_user_in_db
+    ):
+        """Test audiobook streaming with Range header using real database."""
+        # Create a book in the database
+        await BookFactory.create(
+            db=db_session,
+            user_id=str(test_user_in_db.user_id),
+            asin="B084L6Z6M3",
+            title="Test Book",
+        )
+        await db_session.commit()
 
         # Mock file
         mock_path = MagicMock(spec=Path)
@@ -68,54 +66,48 @@ class TestStreamAudiobook:
         assert "Content-Range" in response.headers
         assert "bytes 0-1023/1024000" in response.headers["Content-Range"]
 
-    def test_stream_audiobook_not_found(self, authenticated_client, monkeypatch):
+    def test_stream_audiobook_not_found(self, authenticated_client):
         """Test streaming non-existent audiobook."""
-        from src.database.db_books import book_ops
-
-        def mock_get_book_by_asin(asin):
-            return None
-
-        monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
-
         response = authenticated_client.get("/api/v1/files/audiobook/NOTEXIST")
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_stream_audiobook_unauthorized(self, authenticated_client, monkeypatch):
-        """Test streaming another user's audiobook."""
-        from src.database.db_books import book_ops
+    @pytest.mark.asyncio
+    async def test_stream_audiobook_unauthorized(self, authenticated_client, db_session):
+        """Test streaming another user's audiobook with real database."""
+        from tests.factories import UserFactory
 
-        def mock_get_book_by_asin(asin):
-            return {
-                "asin": asin,
-                "title": "Test Book",
-                "user_id": "different-user-id",  # Different user
-                "created_at": datetime.now(),
-                "updated_at": datetime.now(),
-            }
+        # Create another user with a book
+        other_user = await UserFactory.create(
+            db=db_session, username="otheruser", email="other@example.com"
+        )
 
-        monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
+        await BookFactory.create(
+            db=db_session, user_id=str(other_user.user_id), asin="B084L6Z6M3", title="Test Book"
+        )
+        await db_session.commit()
 
         response = authenticated_client.get("/api/v1/files/audiobook/B084L6Z6M3")
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_stream_audiobook_file_not_available(self, authenticated_client, monkeypatch):
-        """Test streaming when decrypted file is not available."""
-        from src.database.db_books import book_ops
-
-        def mock_get_book_by_asin(asin):
-            return {
-                "asin": asin,
-                "title": "Test Book",
-                "user_id": authenticated_client.user_id,
-                "decrypted_path": None,  # No decrypted path
-            }
-
-        monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
+    @pytest.mark.asyncio
+    async def test_stream_audiobook_file_not_available(
+        self, authenticated_client, db_session, test_user_in_db
+    ):
+        """Test streaming when decrypted file is not available with real database."""
+        # Create a book without decrypted_path
+        await BookFactory.create(
+            db=db_session,
+            user_id=str(test_user_in_db.user_id),
+            asin="B084L6Z6M3",
+            title="Test Book",
+        )
+        await db_session.commit()
 
         response = authenticated_client.get("/api/v1/files/audiobook/B084L6Z6M3")
 
+        # Should return 404 since file is not available
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_stream_audiobook_unauthenticated(self, client):
@@ -124,21 +116,19 @@ class TestStreamAudiobook:
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_stream_audiobook_invalid_range(self, authenticated_client, monkeypatch):
-        """Test streaming with invalid Range header."""
-        from src.database.db_books import book_ops
-
-        def mock_get_book_by_asin(asin):
-            return {
-                "asin": asin,
-                "title": "Test Book",
-                "user_id": authenticated_client.user_id,
-                "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
-                "created_at": datetime.now(),
-                "updated_at": datetime.now(),
-            }
-
-        monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
+    @pytest.mark.asyncio
+    async def test_stream_audiobook_invalid_range(
+        self, authenticated_client, db_session, test_user_in_db
+    ):
+        """Test streaming with invalid Range header using real database."""
+        # Create a book in the database
+        await BookFactory.create(
+            db=db_session,
+            user_id=str(test_user_in_db.user_id),
+            asin="B084L6Z6M3",
+            title="Test Book",
+        )
+        await db_session.commit()
 
         # Mock file
         mock_path = MagicMock(spec=Path)
@@ -158,24 +148,22 @@ class TestStreamAudiobook:
 class TestStreamAudiobookMinIO:
     """Tests for MinIO streaming integration."""
 
-    def test_stream_audiobook_minio_with_object_key(self, authenticated_client, monkeypatch):
-        """Test streaming from MinIO when object_key exists."""
-        from src.database.db_books import book_ops
-
-        def mock_get_book_by_asin(asin):
-            return {
-                "asin": asin,
-                "title": "Test Book",
-                "user_id": authenticated_client.user_id,
-                "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
-                "created_at": datetime.now(),
-                "updated_at": datetime.now(),
-            }
+    @pytest.mark.asyncio
+    async def test_stream_audiobook_minio_with_object_key(
+        self, authenticated_client, db_session, test_user_in_db
+    ):
+        """Test streaming from MinIO when object_key exists using real database."""
+        # Create a book in the database
+        await BookFactory.create(
+            db=db_session,
+            user_id=str(test_user_in_db.user_id),
+            asin="B084L6Z6M3",
+            title="Test Book",
+        )
+        await db_session.commit()
 
         def mock_get_object_key_for_asin(user_id, asin):
             return "decrypted/test-book.m4b"
-
-        monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
 
         # Mock StorageService
         mock_storage_service = MagicMock()
@@ -187,26 +175,22 @@ class TestStreamAudiobookMinIO:
 
         assert response.status_code == status.HTTP_200_OK
 
-    def test_stream_audiobook_fallback_to_filesystem_when_no_object_key(
-        self, authenticated_client, monkeypatch
+    @pytest.mark.asyncio
+    async def test_stream_audiobook_fallback_to_filesystem_when_no_object_key(
+        self, authenticated_client, db_session, test_user_in_db
     ):
-        """Test fallback to filesystem streaming when object_key is NULL."""
-        from src.database.db_books import book_ops
-
-        def mock_get_book_by_asin(asin):
-            return {
-                "asin": asin,
-                "title": "Test Book",
-                "user_id": authenticated_client.user_id,
-                "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
-                "created_at": datetime.now(),
-                "updated_at": datetime.now(),
-            }
+        """Test fallback to filesystem streaming when object_key is NULL using real database."""
+        # Create a book in the database
+        await BookFactory.create(
+            db=db_session,
+            user_id=str(test_user_in_db.user_id),
+            asin="B084L6Z6M3",
+            title="Test Book",
+        )
+        await db_session.commit()
 
         def mock_get_object_key_for_asin(user_id, asin):
             return None  # No object_key, should use filesystem
-
-        monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
 
         # Mock file
         mock_path = MagicMock(spec=Path)
@@ -220,26 +204,22 @@ class TestStreamAudiobookMinIO:
         assert response.status_code == status.HTTP_200_OK
         assert response.headers["Accept-Ranges"] == "bytes"
 
-    def test_stream_audiobook_minio_with_range_header(
-        self, authenticated_client, monkeypatch
+    @pytest.mark.asyncio
+    async def test_stream_audiobook_minio_with_range_header(
+        self, authenticated_client, db_session, test_user_in_db
     ):
-        """Test HTTP Range requests work with MinIO streaming."""
-        from src.database.db_books import book_ops
-
-        def mock_get_book_by_asin(asin):
-            return {
-                "asin": asin,
-                "title": "Test Book",
-                "user_id": authenticated_client.user_id,
-                "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
-                "created_at": datetime.now(),
-                "updated_at": datetime.now(),
-            }
+        """Test HTTP Range requests work with MinIO streaming using real database."""
+        # Create a book in the database
+        await BookFactory.create(
+            db=db_session,
+            user_id=str(test_user_in_db.user_id),
+            asin="B084L6Z6M3",
+            title="Test Book",
+        )
+        await db_session.commit()
 
         def mock_get_object_key_for_asin(user_id, asin):
             return "decrypted/test-book.m4b"
-
-        monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
 
         # Mock StorageService to return Range request data
         mock_storage_service = MagicMock()
@@ -262,26 +242,22 @@ class TestStreamAudiobookMinIO:
         assert "Content-Range" in response.headers
         assert "Accept-Ranges" in response.headers
 
-    def test_stream_audiobook_minio_fallback_on_empty_response(
-        self, authenticated_client, monkeypatch
+    @pytest.mark.asyncio
+    async def test_stream_audiobook_minio_fallback_on_empty_response(
+        self, authenticated_client, db_session, test_user_in_db
     ):
-        """Test fallback to filesystem when MinIO streaming returns empty."""
-        from src.database.db_books import book_ops
-
-        def mock_get_book_by_asin(asin):
-            return {
-                "asin": asin,
-                "title": "Test Book",
-                "user_id": authenticated_client.user_id,
-                "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
-                "created_at": datetime.now(),
-                "updated_at": datetime.now(),
-            }
+        """Test fallback to filesystem when MinIO streaming returns empty using real database."""
+        # Create a book in the database
+        await BookFactory.create(
+            db=db_session,
+            user_id=str(test_user_in_db.user_id),
+            asin="B084L6Z6M3",
+            title="Test Book",
+        )
+        await db_session.commit()
 
         def mock_get_object_key_for_asin(user_id, asin):
             return "decrypted/test-book.m4b"
-
-        monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
 
         # Mock StorageService to fail (return empty bytes)
         mock_storage_service = MagicMock()
@@ -299,23 +275,20 @@ class TestStreamAudiobookMinIO:
 
         assert response.status_code == status.HTTP_200_OK
 
-    def test_stream_audiobook_user_ownership_enforced(
-        self, authenticated_client, monkeypatch
-    ):
-        """Test user ownership verification still enforced with MinIO streaming."""
-        from src.database.db_books import book_ops
+    @pytest.mark.asyncio
+    async def test_stream_audiobook_user_ownership_enforced(self, authenticated_client, db_session):
+        """Test user ownership verification still enforced with MinIO streaming using real database."""
+        from tests.factories import UserFactory
 
-        def mock_get_book_by_asin(asin):
-            return {
-                "asin": asin,
-                "title": "Test Book",
-                "user_id": "different-user-id",
-                "decrypted_path": "/audiobooks/decrypted/B084L6Z6M3.m4a",
-                "created_at": datetime.now(),
-                "updated_at": datetime.now(),
-            }
+        # Create another user with a book
+        other_user = await UserFactory.create(
+            db=db_session, username="otheruser", email="other@example.com"
+        )
 
-        monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
+        await BookFactory.create(
+            db=db_session, user_id=str(other_user.user_id), asin="B084L6Z6M3", title="Test Book"
+        )
+        await db_session.commit()
 
         response = authenticated_client.get("/api/v1/files/audiobook/B084L6Z6M3")
 

@@ -4,8 +4,11 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.operations.library_sync import (get_user, create_user, process_book,
-                                         sync_library)
+from src.operations.library_sync import (
+    get_or_create_user,
+    process_book,
+    sync_library,
+)
 
 
 @pytest.mark.asyncio
@@ -56,9 +59,7 @@ class TestGetOrCreateUser:
                 "src.operations.library_sync.user_ops.create_user",
                 return_value="user-456",
             ) as mock_create:
-                with patch(
-                    "src.operations.library_sync.Config.AUTH_FILE", "/path/to/auth.json"
-                ):
+                with patch("src.operations.library_sync.Config.AUTH_FILE", "/path/to/auth.json"):
                     with patch(
                         "src.operations.library_sync.Config.ACTIVATION_BYTES",
                         "test_bytes",
@@ -76,9 +77,7 @@ class TestGetOrCreateUser:
             "src.operations.library_sync.user_ops.get_user_by_username",
             return_value=None,
         ):
-            with patch(
-                "src.operations.library_sync.user_ops.create_user", return_value=None
-            ):
+            with patch("src.operations.library_sync.user_ops.create_user", return_value=None):
                 with pytest.raises(RuntimeError):
                     await get_or_create_user("failuser")
 
@@ -172,9 +171,7 @@ class TestSyncLibrary:
         mock_library_manager.get_missing_books = AsyncMock(return_value=[])
         mock_library_manager.complete_sync = AsyncMock(return_value=True)
 
-        with patch(
-            "src.operations.library_sync.Config.ensure_directories"
-        ) as mock_ensure:
+        with patch("src.operations.library_sync.Config.ensure_directories") as mock_ensure:
             with patch(
                 "src.operations.library_sync.get_or_create_user",
                 new_callable=AsyncMock,
@@ -296,9 +293,7 @@ class TestSyncLibrary:
 
     async def test_sync_library_handles_exception(self):
         """Test sync_library handles exceptions."""
-        with patch(
-            "src.operations.library_sync.Config.ensure_directories"
-        ) as mock_ensure:
+        with patch("src.operations.library_sync.Config.ensure_directories") as mock_ensure:
             mock_ensure.side_effect = Exception("Config error")
             with patch("src.operations.library_sync.logger.error"):
                 await sync_library()

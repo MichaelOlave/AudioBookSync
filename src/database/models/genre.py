@@ -2,14 +2,14 @@
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from src.database.models.base import Base
 
 if TYPE_CHECKING:
-    from src.database.models.book import Book
+    pass
 
 
 class Genre(Base):
@@ -19,7 +19,9 @@ class Genre(Base):
 
     genre_id = Column(Integer, primary_key=True, autoincrement=True)
     genre_name = Column(String(100), unique=True, nullable=False, index=True)
-    parent_genre_id = Column(Integer, ForeignKey("genres.genre_id", ondelete="SET NULL"), nullable=True, index=True)
+    parent_genre_id = Column(
+        Integer, ForeignKey("genres.genre_id", ondelete="SET NULL"), nullable=True, index=True
+    )
     description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default="CURRENT_TIMESTAMP")
 
@@ -41,8 +43,12 @@ class BookGenre(Base):
         primary_key=True,
         server_default="uuid_generate_v4()",
     )
-    asin = Column(String(10), ForeignKey("books.asin", ondelete="CASCADE"), nullable=False, index=True)
-    genre_id = Column(Integer, ForeignKey("genres.genre_id", ondelete="CASCADE"), nullable=False, index=True)
+    asin = Column(
+        String(10), ForeignKey("books.asin", ondelete="CASCADE"), nullable=False, index=True
+    )
+    genre_id = Column(
+        Integer, ForeignKey("genres.genre_id", ondelete="CASCADE"), nullable=False, index=True
+    )
     created_at = Column(DateTime(timezone=True), server_default="CURRENT_TIMESTAMP")
 
     # Relationships

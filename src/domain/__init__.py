@@ -5,7 +5,7 @@ the business entities and contracts used throughout the application.
 """
 
 from .book import Book
-from .progress import safe_progress_callback, ProgressCallback
+from .progress import ProgressCallback, safe_progress_callback
 
 __all__ = [
     "Book",

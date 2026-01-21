@@ -1,7 +1,8 @@
 """Database operations for user reading progress tracking."""
 
-from typing import Dict, List, Optional, Any
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 from loguru import logger
 
 from .db_pool import db_pool as _db_pool
@@ -202,9 +203,7 @@ class ReadingProgressOperations:
             logger.error(f"Failed to get in-progress books: {e}")
             return []
 
-    def get_finished_books(
-        self, user_id: str, limit: Optional[int] = None
-    ) -> List[Dict]:
+    def get_finished_books(self, user_id: str, limit: Optional[int] = None) -> List[Dict]:
         """
         Get all books finished by a user.
 

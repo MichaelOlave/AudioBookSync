@@ -92,8 +92,8 @@ class TestLogin:
 
     def test_login_success(self, client, test_user_data, monkeypatch):
         """Test successful login."""
-        from src.database.db_users import user_ops
         from src.api.security.password import hash_password
+        from src.database.db_users import user_ops
 
         user = {
             "user_id": "test-user-123",
@@ -146,8 +146,8 @@ class TestLogin:
 
     def test_login_invalid_password(self, client, test_user_data, monkeypatch):
         """Test login with wrong password."""
-        from src.database.db_users import user_ops
         from src.api.security.password import hash_password
+        from src.database.db_users import user_ops
 
         user = {
             "user_id": "test-user-123",
@@ -177,8 +177,8 @@ class TestLogin:
 
     def test_login_inactive_user(self, client, test_user_data, monkeypatch):
         """Test login with inactive user."""
-        from src.database.db_users import user_ops
         from src.api.security.password import hash_password
+        from src.database.db_users import user_ops
 
         user = {
             "user_id": "test-user-123",
@@ -248,7 +248,6 @@ class TestRefresh:
 
     def test_refresh_expired_token(self, client, monkeypatch):
         """Test refresh with expired token."""
-        from src.api.security.auth import decode_token
 
         def mock_decode_token(token):
             raise Exception("Token expired")
@@ -432,6 +431,7 @@ class TestTokenExpiration:
     def test_access_token_with_correct_expiration(self, test_user_with_tokens):
         """Verify access token has correct expiration time."""
         from datetime import datetime
+
         import jwt
 
         token = test_user_with_tokens["access_token"]
@@ -444,7 +444,6 @@ class TestTokenExpiration:
         assert "exp" in decoded
         exp_time = datetime.fromtimestamp(decoded["exp"])
         # Should be approximately 30 minutes from now
-        from datetime import timedelta
 
         now = datetime.utcnow()
         diff = exp_time - now
@@ -454,6 +453,7 @@ class TestTokenExpiration:
     def test_refresh_token_with_correct_expiration(self, test_user_with_tokens):
         """Verify refresh token has correct expiration time."""
         from datetime import datetime
+
         import jwt
 
         token = test_user_with_tokens["refresh_token"]
@@ -466,7 +466,6 @@ class TestTokenExpiration:
         assert "exp" in decoded
         exp_time = datetime.fromtimestamp(decoded["exp"])
         # Should be approximately 7 days from now
-        from datetime import timedelta
 
         now = datetime.utcnow()
         diff = exp_time - now

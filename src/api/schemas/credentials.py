@@ -1,7 +1,8 @@
 """Audible authentication credentials schemas."""
 
-from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from typing import Any, Dict, Optional
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class AuthSessionData(BaseModel):
@@ -32,9 +33,7 @@ class AudibleAuthJsonRequest(BaseModel):
     activation_bytes: Optional[str] = Field(
         default=None,
         description="DRM activation bytes (hex string)",
-        json_schema_extra={
-            "example": "1f2e3d4c5b6a7988"
-        },
+        json_schema_extra={"example": "1f2e3d4c5b6a7988"},
     )
 
     @field_validator("auth_json")
@@ -53,19 +52,13 @@ class AudibleCredentialsRequest(BaseModel):
 
     auth_file_path: Optional[str] = Field(
         default=None,
-        description=(
-            "Path to Audible auth JSON file (usually auth.json) - DEPRECATED"
-        ),
-        json_schema_extra={
-            "example": "/path/to/auth.json"
-        },
+        description=("Path to Audible auth JSON file (usually auth.json) - DEPRECATED"),
+        json_schema_extra={"example": "/path/to/auth.json"},
     )
     activation_bytes: Optional[str] = Field(
         default=None,
         description="DRM activation bytes (hex string)",
-        json_schema_extra={
-            "example": "1f2e3d4c5b6a7988"
-        },
+        json_schema_extra={"example": "1f2e3d4c5b6a7988"},
     )
 
 

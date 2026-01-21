@@ -12,25 +12,18 @@ These tests focus on realistic usage patterns and critical features required
 for the MinIO migration to be production-ready.
 """
 
-import asyncio
 import hashlib
 import os
 import tempfile
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch, call
 import uuid
-from datetime import datetime
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.core.config import Config
-from src.database.db_migrations import migration_ops
 from src.database.db_downloads import download_ops
-from src.database.db_decryptions import decryption_ops
-from src.database.db_books import book_ops
-from src.database.db_pool import db_pool
+from src.database.db_migrations import migration_ops
 from src.infrastructure.storage_service import StorageService
-from src.infrastructure.minio_client import MinIOClient
 
 
 @pytest.fixture
@@ -40,6 +33,7 @@ def temp_test_dir():
     yield temp_dir
     # Cleanup
     import shutil
+
     shutil.rmtree(temp_dir, ignore_errors=True)
 
 
@@ -104,11 +98,7 @@ class TestFullMigrationEndToEndWorkflow:
         def mock_create_migration_record(asin, user_id, file_type, source_path):
             return migration_id
 
-        monkeypatch.setattr(
-            migration_ops,
-            "create_migration_record",
-            mock_create_migration_record
-        )
+        monkeypatch.setattr(migration_ops, "create_migration_record", mock_create_migration_record)
 
         # Create migration record
         created_id = migration_ops.create_migration_record(
@@ -119,10 +109,7 @@ class TestFullMigrationEndToEndWorkflow:
         # Step 3: Mock MinIO upload
         mock_minio = MagicMock()
         mock_minio.upload_file.return_value = True
-        mock_minio.get_file_metadata.return_value = {
-            "size": file_size,
-            "checksum": source_checksum
-        }
+        mock_minio.get_file_metadata.return_value = {"size": file_size, "checksum": source_checksum}
 
         storage_service = StorageService(minio_client=mock_minio)
 
@@ -136,7 +123,7 @@ class TestFullMigrationEndToEndWorkflow:
         with patch.object(
             storage_service.minio_client,
             "get_file_metadata",
-            return_value={"size": file_size, "checksum": source_checksum}
+            return_value={"size": file_size, "checksum": source_checksum},
         ):
             # Step 5: Verify upload (checksum and size)
             metadata = storage_service.minio_client.get_file_metadata(
@@ -149,11 +136,7 @@ class TestFullMigrationEndToEndWorkflow:
         def mock_update_object_key(download_id, object_key):
             return True
 
-        monkeypatch.setattr(
-            download_ops,
-            "update_download_object_key",
-            mock_update_object_key
-        )
+        monkeypatch.setattr(download_ops, "update_download_object_key", mock_update_object_key)
 
         db_updated = download_ops.update_download_object_key(download_id, object_key)
         assert db_updated, "Database should be updated with object_key"
@@ -167,7 +150,7 @@ class TestFullMigrationEndToEndWorkflow:
         with patch.object(
             storage_service.minio_client,
             "stream_file",
-            return_value=b"test audiobook content " * 100
+            return_value=b"test audiobook content " * 100,
         ):
             chunk = storage_service.stream_file(
                 test_user_id, object_key, test_file_path, offset=0, length=1024
@@ -186,7 +169,7 @@ class TestFullMigrationEndToEndWorkflow:
         mock_minio.upload_file.return_value = True
         mock_minio.get_file_metadata.return_value = {
             "size": file_size,
-            "checksum": source_checksum  # Matching checksum
+            "checksum": source_checksum,  # Matching checksum
         }
 
         storage_service = StorageService(minio_client=mock_minio)
@@ -195,7 +178,7 @@ class TestFullMigrationEndToEndWorkflow:
         with patch.object(
             storage_service.minio_client,
             "get_file_metadata",
-            return_value={"size": file_size, "checksum": source_checksum}
+            return_value={"size": file_size, "checksum": source_checksum},
         ):
             metadata = storage_service.minio_client.get_file_metadata(
                 f"user-{test_user_id}", f"downloaded/{test_asin}.aax"
@@ -267,13 +250,9 @@ class TestDualReadFallbackScenario:
 
         # With object_key present, should try MinIO first
         with patch.object(
-            storage_service.minio_client,
-            "download_file",
-            return_value=test_file_path
+            storage_service.minio_client, "download_file", return_value=test_file_path
         ):
-            result = storage_service.get_file(
-                test_user_id, object_key, test_file_path
-            )
+            result = storage_service.get_file(test_user_id, object_key, test_file_path)
             # MinIO would be tried first
             assert result is not None
 
@@ -291,7 +270,7 @@ class TestConcurrentMigrationWithLocking:
     ):
         """Test that concurrent migrations are prevented by database locks."""
         migration_id_1 = str(uuid.uuid4())
-        migration_id_2 = str(uuid.uuid4())
+        str(uuid.uuid4())
         lock_acquired = {"instance_1": False, "instance_2": False}
 
         def mock_acquire_migration_lock(asin, file_type):
@@ -309,16 +288,8 @@ class TestConcurrentMigrationWithLocking:
                 lock_acquired["instance_1"] = False
             return True
 
-        monkeypatch.setattr(
-            migration_ops,
-            "acquire_migration_lock",
-            mock_acquire_migration_lock
-        )
-        monkeypatch.setattr(
-            migration_ops,
-            "release_migration_lock",
-            mock_release_migration_lock
-        )
+        monkeypatch.setattr(migration_ops, "acquire_migration_lock", mock_acquire_migration_lock)
+        monkeypatch.setattr(migration_ops, "release_migration_lock", mock_release_migration_lock)
 
         # First instance acquires lock
         lock_1 = migration_ops.acquire_migration_lock(test_asin, "downloaded")
@@ -331,9 +302,7 @@ class TestConcurrentMigrationWithLocking:
         # First instance releases lock
         migration_ops.release_migration_lock(lock_1)
 
-    def test_concurrent_lock_contention_simulation(
-        self, test_user_id, test_asin, monkeypatch
-    ):
+    def test_concurrent_lock_contention_simulation(self, test_user_id, test_asin, monkeypatch):
         """Test that concurrent lock attempts are properly serialized."""
         acquired_locks = []
         lock_order = []
@@ -351,16 +320,8 @@ class TestConcurrentMigrationWithLocking:
             lock_order.append("release")
             return True
 
-        monkeypatch.setattr(
-            migration_ops,
-            "acquire_migration_lock",
-            mock_acquire_lock
-        )
-        monkeypatch.setattr(
-            migration_ops,
-            "release_migration_lock",
-            mock_release_lock
-        )
+        monkeypatch.setattr(migration_ops, "acquire_migration_lock", mock_acquire_lock)
+        monkeypatch.setattr(migration_ops, "release_migration_lock", mock_release_lock)
 
         # Simulate concurrent access
         lock_1 = migration_ops.acquire_migration_lock(test_asin, "downloaded")
@@ -380,32 +341,20 @@ class TestRollbackScenarioWithHighFailureRate:
     - Verify migrations are stopped
     """
 
-    def test_failure_rate_calculation(
-        self, test_user_id, test_asin, monkeypatch
-    ):
+    def test_failure_rate_calculation(self, test_user_id, test_asin, monkeypatch):
         """Test calculation of failure rate during migration."""
         # Test at exactly 10% failure (should trigger rollback)
-        stats_10_percent = {
-            "processed": 100,
-            "succeeded": 90,
-            "failed": 10
-        }
+        stats_10_percent = {"processed": 100, "succeeded": 90, "failed": 10}
         failure_rate_10 = stats_10_percent["failed"] / stats_10_percent["processed"]
         threshold = Config.MIGRATION_FAILURE_THRESHOLD
         assert failure_rate_10 >= threshold, "10% should trigger rollback"
 
         # Test below 10% (should continue)
-        stats_9_percent = {
-            "processed": 100,
-            "succeeded": 91,
-            "failed": 9
-        }
+        stats_9_percent = {"processed": 100, "succeeded": 91, "failed": 9}
         failure_rate_9 = stats_9_percent["failed"] / stats_9_percent["processed"]
         assert failure_rate_9 < threshold, "9% should not trigger rollback"
 
-    def test_rollback_stops_further_migrations(
-        self, test_user_id, monkeypatch
-    ):
+    def test_rollback_stops_further_migrations(self, test_user_id, monkeypatch):
         """Test that rollback stops further migration processing."""
         pending_migrations = [
             {"migration_id": str(uuid.uuid4()), "status": "pending"},
@@ -420,11 +369,7 @@ class TestRollbackScenarioWithHighFailureRate:
             """Update status in database."""
             return status == "rolled_back"
 
-        monkeypatch.setattr(
-            migration_ops,
-            "get_pending_migrations",
-            mock_get_pending_migrations
-        )
+        monkeypatch.setattr(migration_ops, "get_pending_migrations", mock_get_pending_migrations)
 
         # Get pending migrations before rollback
         pending_before = mock_get_pending_migrations()
@@ -432,14 +377,10 @@ class TestRollbackScenarioWithHighFailureRate:
 
         # Simulate rollback: update all pending to rolled_back
         for migration in pending_before:
-            updated = mock_update_migration_status(
-                migration["migration_id"], "rolled_back"
-            )
+            updated = mock_update_migration_status(migration["migration_id"], "rolled_back")
             assert updated, "Should update to rolled_back status"
 
-    def test_high_failure_rate_prevents_further_processing(
-        self, monkeypatch
-    ):
+    def test_high_failure_rate_prevents_further_processing(self, monkeypatch):
         """Test that high failure rate prevents further migrations."""
         failure_rate = 0.15  # 15% failure rate
         threshold = Config.MIGRATION_FAILURE_THRESHOLD  # Default: 0.10
@@ -465,7 +406,7 @@ class TestHTTPRangeRequestStreaming:
         self, test_user_id, test_asin, test_file_path, monkeypatch
     ):
         """Test that MinIO streaming supports HTTP Range requests."""
-        file_size = os.path.getsize(test_file_path)
+        os.path.getsize(test_file_path)
         object_key = f"downloaded/{test_asin}.aax"
 
         # Mock MinIO streaming with range support
@@ -475,11 +416,7 @@ class TestHTTPRangeRequestStreaming:
         storage_service = StorageService(minio_client=mock_minio)
 
         # Stream with Range: bytes=0-1023
-        with patch.object(
-            storage_service.minio_client,
-            "stream_file",
-            return_value=b"x" * 1024
-        ):
+        with patch.object(storage_service.minio_client, "stream_file", return_value=b"x" * 1024):
             chunk = storage_service.stream_file(
                 test_user_id, object_key, test_file_path, offset=0, length=1024
             )
@@ -497,20 +434,19 @@ class TestHTTPRangeRequestStreaming:
 
         # Test multiple range requests
         test_ranges = [
-            (0, 1024),      # First 1KB
-            (1024, 1024),   # Second 1KB
-            (2048, 2048),   # Next 2KB
+            (0, 1024),  # First 1KB
+            (1024, 1024),  # Second 1KB
+            (2048, 2048),  # Next 2KB
         ]
 
         with patch.object(
             storage_service.minio_client,
             "stream_file",
-            side_effect=lambda *args, **kwargs: b"x" * kwargs.get("length", 1024)
+            side_effect=lambda *args, **kwargs: b"x" * kwargs.get("length", 1024),
         ):
             for offset, length in test_ranges:
                 chunk = storage_service.stream_file(
-                    test_user_id, object_key, test_file_path,
-                    offset=offset, length=length
+                    test_user_id, object_key, test_file_path, offset=offset, length=length
                 )
                 assert len(chunk) == length, f"Chunk at offset {offset} should be {length} bytes"
 
@@ -521,7 +457,7 @@ class TestHTTPRangeRequestStreaming:
         # This test verifies the HTTP layer would return 206 for partial content
         # When the streaming endpoint gets a Range header
         file_size = os.path.getsize(test_file_path)
-        object_key = f"downloaded/{test_asin}.aax"
+        f"downloaded/{test_asin}.aax"
 
         # Range request info
         range_start = 0
@@ -545,9 +481,7 @@ class TestSecurityAndAccessControl:
     - File ownership checks still enforced
     """
 
-    def test_user_cannot_access_other_users_bucket(
-        self, test_user_id, monkeypatch
-    ):
+    def test_user_cannot_access_other_users_bucket(self, test_user_id, monkeypatch):
         """Test that users cannot access other users' MinIO buckets."""
         other_user_id = str(uuid.uuid4())
         object_key = "downloaded/B001ABC123.aax"
@@ -560,13 +494,9 @@ class TestSecurityAndAccessControl:
 
         # Attempt to access other user's bucket should fail
         with patch.object(
-            storage_service.minio_client,
-            "file_exists",
-            return_value=False  # User cannot access
+            storage_service.minio_client, "file_exists", return_value=False  # User cannot access
         ):
-            exists = storage_service.minio_client.file_exists(
-                f"user-{other_user_id}", object_key
-            )
+            exists = storage_service.minio_client.file_exists(f"user-{other_user_id}", object_key)
             assert not exists, "Should not be able to access other user's files"
 
 
@@ -579,9 +509,7 @@ class TestMigrationProgressTracking:
     - WebSocket events are broadcast
     """
 
-    def test_migration_progress_callbacks(
-        self, test_asin, monkeypatch
-    ):
+    def test_migration_progress_callbacks(self, test_asin, monkeypatch):
         """Test that progress callbacks are invoked during migration."""
         progress_events = []
 
@@ -594,11 +522,7 @@ class TestMigrationProgressTracking:
             mock_progress_callback("status_update", {"status": status})
             return True
 
-        monkeypatch.setattr(
-            migration_ops,
-            "update_migration_status",
-            mock_update_migration_status
-        )
+        monkeypatch.setattr(migration_ops, "update_migration_status", mock_update_migration_status)
 
         # Simulate migration progress
         for status in ["pending", "uploading", "verifying", "completed"]:
@@ -608,9 +532,7 @@ class TestMigrationProgressTracking:
         assert progress_events[0]["data"]["status"] == "pending"
         assert progress_events[-1]["data"]["status"] == "completed"
 
-    def test_migration_status_database_updates(
-        self, test_asin, monkeypatch
-    ):
+    def test_migration_status_database_updates(self, test_asin, monkeypatch):
         """Test that migration status is correctly updated in database."""
         migration_id = str(uuid.uuid4())
         status_updates = []
@@ -620,11 +542,7 @@ class TestMigrationProgressTracking:
             status_updates.append(status)
             return True
 
-        monkeypatch.setattr(
-            migration_ops,
-            "update_migration_status",
-            mock_update_status
-        )
+        monkeypatch.setattr(migration_ops, "update_migration_status", mock_update_status)
 
         # Simulate migration status progression
         for status in ["uploading", "verifying", "completed"]:
@@ -642,20 +560,15 @@ class TestErrorHandlingAndRecovery:
     - Invalid data is handled gracefully
     """
 
-    def test_migration_error_logging(
-        self, test_asin, monkeypatch
-    ):
+    def test_migration_error_logging(self, test_asin, monkeypatch):
         """Test that migration errors are logged properly."""
         from src.database.db_errors import error_ops
+
         logged_errors = []
 
         def mock_log_error(user_id, asin, severity, message, context=None):
             """Mock error logging."""
-            logged_errors.append({
-                "asin": asin,
-                "severity": severity,
-                "message": message
-            })
+            logged_errors.append({"asin": asin, "severity": severity, "message": message})
 
         monkeypatch.setattr(error_ops, "log_error", mock_log_error)
 
@@ -665,7 +578,7 @@ class TestErrorHandlingAndRecovery:
             asin=test_asin,
             severity="error",
             message="MinIO upload failed",
-            context={"reason": "connection timeout"}
+            context={"reason": "connection timeout"},
         )
 
         assert len(logged_errors) == 1
@@ -736,7 +649,7 @@ class TestCleanupAfterSuccessfulMigration:
         mock_minio.upload_file.return_value = True
         mock_minio.get_file_metadata.return_value = {
             "size": os.path.getsize(test_file_path),
-            "checksum": calculate_sha256(test_file_path)
+            "checksum": calculate_sha256(test_file_path),
         }
 
         storage_service = StorageService(minio_client=mock_minio)
@@ -751,14 +664,11 @@ class TestCleanupAfterSuccessfulMigration:
 
         assert not os.path.exists(test_file_path), "File should be deleted after migration"
 
-    def test_orphaned_object_identification(
-        self, test_user_id, monkeypatch
-    ):
+    def test_orphaned_object_identification(self, test_user_id, monkeypatch):
         """Test that orphaned MinIO objects are properly identified."""
-        from src.operations.cleanup_orphaned_files import identify_orphaned_objects
 
         # Mock MinIO bucket listing
-        mock_minio = MagicMock()
+        MagicMock()
         orphaned_objects = [
             {"bucket": f"user-{test_user_id}", "object_key": "orphaned/file1.aax", "size": 1024},
             {"bucket": f"user-{test_user_id}", "object_key": "orphaned/file2.m4b", "size": 2048},

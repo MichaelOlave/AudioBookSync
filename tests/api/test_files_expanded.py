@@ -1,9 +1,8 @@
 """Expanded tests for file streaming endpoints with Range request support."""
 
-import pytest
-from fastapi import status
-import os
 from datetime import datetime
+
+from fastapi import status
 
 
 class TestFileStreamingBasics:
@@ -175,7 +174,7 @@ class TestRangeRequests:
 
         response = authenticated_client.get(
             "/api/v1/files/audiobook/B084L6Z6M3",
-            headers={"Range": f"bytes={file_size-1024}-"},
+            headers={"Range": f"bytes={file_size - 1024}-"},
         )
 
         # Should support Range requests
@@ -291,10 +290,7 @@ class TestFileStreamingHeaders:
 
         # Should support Range requests
         if response.status_code == status.HTTP_200_OK:
-            assert (
-                "accept-ranges" in response.headers
-                or "Accept-Ranges" in response.headers
-            )
+            assert "accept-ranges" in response.headers or "Accept-Ranges" in response.headers
 
     def test_streaming_response_has_content_length(self, authenticated_client, monkeypatch):
         """Test that streaming response includes Content-Length header."""
@@ -335,9 +331,7 @@ class TestPathTraversalProtection:
         monkeypatch.setattr(book_ops, "get_book_by_asin", mock_get_book_by_asin)
 
         # Try path traversal attack
-        response = authenticated_client.get(
-            "/api/v1/files/audiobook/../../../../etc/passwd"
-        )
+        response = authenticated_client.get("/api/v1/files/audiobook/../../../../etc/passwd")
 
         # Should be blocked
         assert response.status_code == status.HTTP_404_NOT_FOUND

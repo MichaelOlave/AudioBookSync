@@ -24,31 +24,28 @@ Usage:
     router = factory.create_router()
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Callable, Optional, Type, Dict
-from uuid import UUID
 from contextvars import ContextVar
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, Optional, Type
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, status, BackgroundTasks, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
+from loguru import logger
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from loguru import logger
 
 from ...database.engine import get_db_session
 from ...database.models.user import User
-from ..security.auth import get_current_user
 from ..middleware.error_handler import (
+    AudioBookSyncException,
     ResourceNotFoundError,
     handle_route_errors,
-    AudioBookSyncException,
 )
+from ..security.auth import get_current_user
 from ..utils.generic_handlers import get_paginated_list
 
-
 # Context variable for storing validation data between pre-flight validation and param building
-_validation_context: ContextVar[Dict[str, Any]] = ContextVar(
-    "validation_context", default={}
-)
+_validation_context: ContextVar[Dict[str, Any]] = ContextVar("validation_context", default={})
 
 
 @dataclass
@@ -119,9 +116,7 @@ class RouterConfig:
         if not self.creation_method_name:
             self.creation_method_name = f"create_{self.operation_name}_status"
         if not self.get_by_id_method_name:
-            self.get_by_id_method_name = (
-                f"get_{self.operation_name}_by_id_for_user"
-            )
+            self.get_by_id_method_name = f"get_{self.operation_name}_by_id_for_user"
         if not self.get_items_method_name:
             self.get_items_method_name = f"get_{self.operation_name}s_by_user"
         if not self.count_items_method_name:
@@ -185,7 +180,9 @@ class StatusRouterFactory:
             summary=self.config.trigger_summary,
             description=f"Initiate a background {self.config.operation_name} for a specific book",
             responses={
-                202: {"description": f"{self.config.operation_name.title()} initiated successfully"},
+                202: {
+                    "description": f"{self.config.operation_name.title()} initiated successfully"
+                },
                 400: {"description": "Invalid book data"},
                 401: {"description": "Not authenticated"},
             },
@@ -199,7 +196,9 @@ class StatusRouterFactory:
             summary=self.config.list_summary,
             description=f"Get paginated list of {self.config.operation_name_plural} for the current user",
             responses={
-                200: {"description": f"{self.config.operation_name_plural.title()} retrieved successfully"},
+                200: {
+                    "description": f"{self.config.operation_name_plural.title()} retrieved successfully"
+                },
                 401: {"description": "Not authenticated"},
             },
         )
@@ -212,7 +211,9 @@ class StatusRouterFactory:
             summary=self.config.get_status_summary,
             description=f"Get detailed status of a specific {self.config.operation_name}",
             responses={
-                200: {"description": f"{self.config.operation_name.title()} status retrieved successfully"},
+                200: {
+                    "description": f"{self.config.operation_name.title()} status retrieved successfully"
+                },
                 401: {"description": "Not authenticated"},
                 403: {"description": "Not authorized to access this operation"},
                 404: {"description": f"{self.config.operation_name.title()} not found"},
@@ -274,9 +275,7 @@ class StatusRouterFactory:
             operation = await creation_method(**creation_params)
 
             if not operation:
-                logger.error(
-                    f"Failed to create {operation_name} record for {operation_data.asin}"
-                )
+                logger.error(f"Failed to create {operation_name} record for {operation_data.asin}")
                 raise creation_failure_error(
                     f"Failed to create {operation_name} record for {operation_data.asin}"
                 )
@@ -291,9 +290,7 @@ class StatusRouterFactory:
                 book=operation_data.dict(),
             )
 
-            logger.info(
-                f"{operation_name.title()} queued: {getattr(operation, id_field)}"
-            )
+            logger.info(f"{operation_name.title()} queued: {getattr(operation, id_field)}")
 
             # Return response
             return self.config.response_schema(
@@ -318,12 +315,8 @@ class StatusRouterFactory:
         Returns:
             Async callable for FastAPI route handler
         """
-        get_items_method = getattr(
-            self.config.service_module, self.config.get_items_method_name
-        )
-        count_method = getattr(
-            self.config.service_module, self.config.count_items_method_name
-        )
+        get_items_method = getattr(self.config.service_module, self.config.get_items_method_name)
+        count_method = getattr(self.config.service_module, self.config.count_items_method_name)
         operation_name_plural = self.config.operation_name_plural
 
         @handle_route_errors(f"list {operation_name_plural}")
@@ -384,9 +377,7 @@ class StatusRouterFactory:
         Returns:
             Async callable for FastAPI route handler
         """
-        get_by_id_method = getattr(
-            self.config.service_module, self.config.get_by_id_method_name
-        )
+        get_by_id_method = getattr(self.config.service_module, self.config.get_by_id_method_name)
         operation_name = self.config.operation_name
         id_field = self.config.id_field
 
@@ -397,8 +388,7 @@ class StatusRouterFactory:
             db: AsyncSession = Depends(get_db_session),
         ) -> self.config.response_schema:
             logger.info(
-                f"Fetching {operation_name} status: {id_param} "
-                f"for user {current_user.user_id}"
+                f"Fetching {operation_name} status: {id_param} " f"for user {current_user.user_id}"
             )
 
             # Get operation by ID with user authorization check
@@ -412,9 +402,7 @@ class StatusRouterFactory:
                 logger.warning(
                     f"{operation_name.title()} not found or user not authorized: {id_param}"
                 )
-                raise ResourceNotFoundError(
-                    f"{operation_name.title()} '{id_param}' not found"
-                )
+                raise ResourceNotFoundError(f"{operation_name.title()} '{id_param}' not found")
 
             logger.info(f"Retrieved {operation_name} details: {id_param}")
             return self.config.response_schema.from_orm(operation)

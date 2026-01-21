@@ -1,15 +1,14 @@
 """Book availability model for SQLAlchemy ORM."""
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, String, Boolean, ForeignKey, DateTime
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
 
 from src.database.models.base import Base, get_current_timestamp
 
 if TYPE_CHECKING:
-    from src.database.models.book import Book
+    pass
 
 
 class BookAvailability(Base):
@@ -22,7 +21,13 @@ class BookAvailability(Base):
         primary_key=True,
         server_default="uuid_generate_v4()",
     )
-    asin = Column(String(10), ForeignKey("books.asin", ondelete="CASCADE"), unique=True, nullable=False, index=True)
+    asin = Column(
+        String(10),
+        ForeignKey("books.asin", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
     is_playable = Column(Boolean, default=True, nullable=False)
     is_returnable = Column(Boolean, default=True, nullable=False)
     is_removable = Column(Boolean, default=True, nullable=False)
@@ -31,7 +36,12 @@ class BookAvailability(Base):
     license_status = Column(String(50), nullable=True, index=True)
     expires_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=get_current_timestamp, nullable=False)
-    updated_at = Column(DateTime(timezone=True), default=get_current_timestamp, onupdate=get_current_timestamp, nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=get_current_timestamp,
+        onupdate=get_current_timestamp,
+        nullable=False,
+    )
 
     def __repr__(self) -> str:
         return f"<BookAvailability(availability_id={self.availability_id}, asin={self.asin}, status={self.license_status})>"

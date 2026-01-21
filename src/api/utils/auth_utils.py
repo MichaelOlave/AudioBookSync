@@ -1,6 +1,7 @@
 """Authentication-related utility functions."""
 
-from typing import Optional, Any, Union
+from typing import Any, Optional
+
 from loguru import logger
 
 

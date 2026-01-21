@@ -31,13 +31,13 @@ Phase 2 (future): Consolidate actual implementation
   - Remove old individual modules
 """
 
-from ..database.db_books import book_ops as _book_ops
-from ..database.db_book_metadata import book_metadata_ops as _metadata_ops
-from ..database.db_contributors import contributor_ops as _contributor_ops
-from ..database.db_book_contributors import book_contributor_ops as _book_contributor_ops
-from ..database.db_media_info import media_info_ops as _media_info_ops
 from ..database.db_book_availability import book_availability_ops as _availability_ops
+from ..database.db_book_contributors import book_contributor_ops as _book_contributor_ops
+from ..database.db_book_metadata import book_metadata_ops as _metadata_ops
+from ..database.db_books import book_ops as _book_ops
 from ..database.db_companion_materials import companion_material_ops as _companion_ops
+from ..database.db_contributors import contributor_ops as _contributor_ops
+from ..database.db_media_info import media_info_ops as _media_info_ops
 
 
 class BookOperations:
@@ -142,9 +142,7 @@ class BookOperations:
 
     def create_or_update_availability(self, asin: str, **availability_fields) -> bool:
         """Create or update book availability info (from db_book_availability)."""
-        return _availability_ops.create_or_update_availability(
-            asin=asin, **availability_fields
-        )
+        return _availability_ops.create_or_update_availability(asin=asin, **availability_fields)
 
     def get_availability(self, asin: str):
         """Get availability info for a book (from db_book_availability)."""

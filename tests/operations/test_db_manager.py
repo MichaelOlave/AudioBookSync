@@ -48,9 +48,7 @@ class TestLibraryManagerAddBook:
 
     async def test_add_book_calls_book_ops(self, sample_book_data):
         """Test that add_book calls book_ops.add_book."""
-        with patch(
-            "src.operations.db_manager.book_ops.add_book", return_value=True
-        ) as mock_add:
+        with patch("src.operations.db_manager.book_ops.add_book", return_value=True) as mock_add:
             with patch("src.operations.db_manager.logger.info"):
                 manager = LibraryManager("user-123")
                 await manager.add_book(
@@ -86,9 +84,7 @@ class TestLibraryManagerAddBook:
 
     async def test_add_book_with_all_fields(self, sample_book_data):
         """Test add_book with all optional fields."""
-        with patch(
-            "src.operations.db_manager.book_ops.add_book", return_value=True
-        ) as mock_add:
+        with patch("src.operations.db_manager.book_ops.add_book", return_value=True) as mock_add:
             with patch("src.operations.db_manager.logger.info"):
                 manager = LibraryManager("user-123")
                 await manager.add_book(
@@ -119,9 +115,7 @@ class TestLibraryManagerRemoveBook:
 
     async def test_remove_book_failure(self):
         """Test remove_book failure."""
-        with patch(
-            "src.operations.db_manager.book_ops.remove_book", return_value=False
-        ):
+        with patch("src.operations.db_manager.book_ops.remove_book", return_value=False):
             with patch("src.operations.db_manager.logger.error"):
                 manager = LibraryManager("user-123")
                 result = await manager.remove_book("B001")
@@ -150,9 +144,7 @@ class TestLibraryManagerGetUserBooks:
         """Test successful book retrieval."""
         mock_books = [sample_book_data]
 
-        with patch(
-            "src.operations.db_manager.book_ops.get_user_books", return_value=mock_books
-        ):
+        with patch("src.operations.db_manager.book_ops.get_user_books", return_value=mock_books):
             with patch("src.operations.db_manager.logger.info"):
                 manager = LibraryManager("user-123")
                 result = await manager.get_user_books()
@@ -161,9 +153,7 @@ class TestLibraryManagerGetUserBooks:
 
     async def test_get_user_books_empty(self):
         """Test get_user_books with no books."""
-        with patch(
-            "src.operations.db_manager.book_ops.get_user_books", return_value=[]
-        ):
+        with patch("src.operations.db_manager.book_ops.get_user_books", return_value=[]):
             with patch("src.operations.db_manager.logger.info"):
                 manager = LibraryManager("user-123")
                 result = await manager.get_user_books()
@@ -255,9 +245,7 @@ class TestLibraryManagerBookExists:
 
     async def test_book_exists_false(self):
         """Test book_exists returns False when not found."""
-        with patch(
-            "src.operations.db_manager.book_ops.get_book_by_asin", return_value=None
-        ):
+        with patch("src.operations.db_manager.book_ops.get_book_by_asin", return_value=None):
             manager = LibraryManager("user-123")
             result = await manager.book_exists("B001")
 
@@ -308,9 +296,7 @@ class TestLibraryManagerCreateSync:
 
     async def test_create_sync_failure(self):
         """Test create_sync failure."""
-        with patch(
-            "src.operations.db_manager.sync_ops.create_sync_history", return_value=None
-        ):
+        with patch("src.operations.db_manager.sync_ops.create_sync_history", return_value=None):
             with patch("src.operations.db_manager.logger.error"):
                 manager = LibraryManager("user-123")
                 result = await manager.create_sync("full")
@@ -398,9 +384,7 @@ class TestLibraryManagerLogError:
 
     async def test_log_error_success(self):
         """Test successful error logging."""
-        with patch(
-            "src.operations.db_manager.db_ops.errors.log_error", return_value=True
-        ):
+        with patch("src.operations.db_manager.db_ops.errors.log_error", return_value=True):
             manager = LibraryManager("user-123")
             result = await manager.log_error(
                 error_type="download_error", error_message="Test error"
@@ -423,9 +407,7 @@ class TestLibraryManagerLogError:
 
     async def test_log_error_failure(self):
         """Test log_error failure."""
-        with patch(
-            "src.operations.db_manager.db_ops.errors.log_error", return_value=False
-        ):
+        with patch("src.operations.db_manager.db_ops.errors.log_error", return_value=False):
             manager = LibraryManager("user-123")
             result = await manager.log_error(
                 error_type="download_error", error_message="Test error"

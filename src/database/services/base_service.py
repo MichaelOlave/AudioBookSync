@@ -1,8 +1,8 @@
 """Helper functions for common CRUD operations with SQLAlchemy ORM."""
 
-from typing import Optional, Type, TypeVar, Callable, Any, Dict
-from loguru import logger
+from typing import Any, Callable, Dict, Optional, Type, TypeVar
 
+from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,9 +29,7 @@ async def get_by_id(
     """
     try:
         id_attr = getattr(model, id_column)
-        result = await db.execute(
-            select(model).where(id_attr == entity_id)
-        )
+        result = await db.execute(select(model).where(id_attr == entity_id))
         return result.scalar_one_or_none()
     except Exception as e:
         logger.error(f"Failed to get {model.__name__} by {id_column}: {e}")
@@ -69,9 +67,7 @@ async def update_entity(
             if hasattr(entity, field):
                 setattr(entity, field, value)
             else:
-                logger.warning(
-                    f"Field '{field}' does not exist on {entity_name}"
-                )
+                logger.warning(f"Field '{field}' does not exist on {entity_name}")
 
         await db.flush()
 

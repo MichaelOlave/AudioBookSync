@@ -1,10 +1,5 @@
 """Tests for SyncService."""
 
-import pytest
-from unittest.mock import Mock, AsyncMock
-from datetime import datetime
-
-
 class TestSyncService:
     """Tests for sync service."""
 
@@ -39,13 +34,15 @@ class TestSyncService:
         completions = []
 
         def mock_update_sync_status(sync_id, status, **kwargs):
-            completions.append({
-                "sync_id": sync_id,
-                "status": status,
-                "duration": kwargs.get("duration_seconds"),
-                "books_found": kwargs.get("books_found"),
-                "books_added": kwargs.get("books_added"),
-            })
+            completions.append(
+                {
+                    "sync_id": sync_id,
+                    "status": status,
+                    "duration": kwargs.get("duration_seconds"),
+                    "books_found": kwargs.get("books_found"),
+                    "books_added": kwargs.get("books_added"),
+                }
+            )
 
         monkeypatch.setattr(sync_ops, "update_sync_status", mock_update_sync_status)
 
@@ -60,17 +57,18 @@ class TestSyncService:
         failures = []
 
         def mock_update_sync_status(sync_id, status, **kwargs):
-            failures.append({
-                "sync_id": sync_id,
-                "status": status,
-                "notes": kwargs.get("notes"),
-            })
+            failures.append(
+                {
+                    "sync_id": sync_id,
+                    "status": status,
+                    "notes": kwargs.get("notes"),
+                }
+            )
 
         monkeypatch.setattr(sync_ops, "update_sync_status", mock_update_sync_status)
 
         service = SyncService()
         assert hasattr(service, "fail_sync")
-
 
 class TestSyncProgressBroadcasting:
     """Tests for broadcasting sync progress via WebSocket."""
@@ -78,7 +76,6 @@ class TestSyncProgressBroadcasting:
     def test_broadcast_sync_started(self, monkeypatch):
         """Test WebSocket broadcast when sync starts."""
         from src.api.services.sync_service import SyncService
-        from src.api.websockets.manager import ConnectionManager
 
         broadcasts = []
 
@@ -117,7 +114,6 @@ class TestSyncProgressBroadcasting:
         # Verify service structure
         assert service is not None
 
-
 class TestSyncDownloadIntegration:
     """Tests for sync triggering downloads."""
 
@@ -132,9 +128,7 @@ class TestSyncDownloadIntegration:
             download_triggers.append({"asin": asin, "status": status})
             return f"download-{asin}"
 
-        monkeypatch.setattr(
-            download_ops, "create_download_status", mock_create_download_status
-        )
+        monkeypatch.setattr(download_ops, "create_download_status", mock_create_download_status)
 
         service = SyncService()
         assert hasattr(service, "start_sync")
@@ -153,7 +147,6 @@ class TestSyncDownloadIntegration:
 
         service = SyncService()
         assert hasattr(service, "start_sync")
-
 
 class TestSyncRetryLogic:
     """Tests for sync retry logic."""
@@ -179,7 +172,6 @@ class TestSyncRetryLogic:
         service = SyncService()
         assert service is not None
 
-
 class TestSyncMetadataIntegration:
     """Tests for metadata integration during sync."""
 
@@ -191,9 +183,7 @@ class TestSyncMetadataIntegration:
         def mock_add_book_with_metadata(asin, user_id, title, book_data, **kwargs):
             return True
 
-        monkeypatch.setattr(
-            book_ops, "add_book_with_metadata", mock_add_book_with_metadata
-        )
+        monkeypatch.setattr(book_ops, "add_book_with_metadata", mock_add_book_with_metadata)
 
         service = SyncService()
         assert hasattr(service, "start_sync")
@@ -209,9 +199,7 @@ class TestSyncMetadataIntegration:
             contributors_added.append({"name": name, "role": role})
             return f"contributor-{len(contributors_added)}"
 
-        monkeypatch.setattr(
-            contributor_ops, "add_contributor", mock_add_contributor
-        )
+        monkeypatch.setattr(contributor_ops, "add_contributor", mock_add_contributor)
 
         service = SyncService()
         assert hasattr(service, "start_sync")
@@ -224,17 +212,18 @@ class TestSyncMetadataIntegration:
         media_records = []
 
         def mock_add_media_info(asin, codec, bitrate, sample_rate):
-            media_records.append({
-                "asin": asin,
-                "codec": codec,
-                "bitrate": bitrate,
-            })
+            media_records.append(
+                {
+                    "asin": asin,
+                    "codec": codec,
+                    "bitrate": bitrate,
+                }
+            )
 
         monkeypatch.setattr(media_info_ops, "add_media_info", mock_add_media_info)
 
         service = SyncService()
         assert service is not None
-
 
 class TestSyncUserIsolation:
     """Tests for user isolation in sync operations."""
@@ -244,15 +233,11 @@ class TestSyncUserIsolation:
         from src.api.services.sync_service import SyncService
         from src.integrations.audible_client import AudibleClient
 
-        synced_users = []
-
         def mock_get_audible_library(access_token, region):
             # Verify this is called with correct user's token
             return {"books": []}
 
-        monkeypatch.setattr(
-            AudibleClient, "get_audible_library", mock_get_audible_library
-        )
+        monkeypatch.setattr(AudibleClient, "get_audible_library", mock_get_audible_library)
 
         service = SyncService()
         assert hasattr(service, "start_sync")
@@ -272,7 +257,6 @@ class TestSyncUserIsolation:
 
         service = SyncService()
         assert service is not None
-
 
 class TestSyncStatistics:
     """Tests for sync statistics and reporting."""

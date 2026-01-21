@@ -27,20 +27,21 @@ for migration information.
 # Old imports (preserved for backward compatibility)
 from .database import DatabaseOperations, db_ops
 from .db_books import BookOperations, book_ops
-from .db_decryptions import DecryptionOperations, decryption_ops
-from .db_downloads import DownloadOperations, download_ops
-from .db_errors import ErrorOperations, error_ops
-from .db_pool import DatabasePool, db_pool
-from .db_sync import SyncOperations, sync_ops
-from .db_users import UserOperations, user_ops
 
 # New consolidated modules (preferred)
 from .db_books_consolidated import BookOperations as BookOperationsConsolidated
 from .db_books_consolidated import book_ops as book_ops_consolidated
-from .db_operations_consolidated import OperationTracking, operation_tracking_ops
-from .db_operations_consolidated import download_ops as download_ops_new
+from .db_decryptions import DecryptionOperations, decryption_ops
+from .db_downloads import DownloadOperations, download_ops
+from .db_errors import ErrorOperations, error_ops
+from .db_operations_consolidated import OperationTracking
 from .db_operations_consolidated import decryption_ops as decryption_ops_new
+from .db_operations_consolidated import download_ops as download_ops_new
+from .db_operations_consolidated import operation_tracking_ops
 from .db_operations_consolidated import sync_ops as sync_ops_new
+from .db_pool import DatabasePool, db_pool
+from .db_sync import SyncOperations, sync_ops
+from .db_users import UserOperations, user_ops
 
 __all__ = [
     # Infrastructure

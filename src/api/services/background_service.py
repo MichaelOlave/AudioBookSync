@@ -8,20 +8,19 @@ This service bridges the API layer (which uses dictionaries) with the operations
 - Error handling and logging
 """
 
-import asyncio
-from typing import Callable, Any
 from datetime import datetime, timezone
+from typing import Any, Callable
+from uuid import UUID
+
 from loguru import logger
 
-from ...database.db_downloads import download_ops
-from ...database.db_decryptions import decryption_ops
-from ...database.db_errors import error_ops
-from ...operations.library_sync import sync_library
-from ...operations.downloader import download_book
+from ...database.engine import AsyncSessionLocal
+from ...database.services import decryption_service, download_service, error_service
 from ...operations.decryptor import decrypt_book
-from ..websockets import ws_manager, EventType
+from ...operations.downloader import download_book
+from ...operations.library_sync import sync_library
+from ..websockets import EventType, ws_manager
 from .sync_service import SyncService
-
 
 # ===========================================
 # Operation Executor Pattern (Template Method)
@@ -74,9 +73,7 @@ class OperationExecutor:
             await self._update_status("in_progress")
 
             # Create progress callback
-            progress_callback = await BackgroundTaskService._create_progress_callback(
-                self.user_id
-            )
+            progress_callback = await BackgroundTaskService._create_progress_callback(self.user_id)
 
             # Execute the actual operation (subclass-specific)
             success = await self._execute_operation(book_list, progress_callback)
@@ -122,8 +119,7 @@ class OperationExecutor:
     async def _handle_failure(self, error: str) -> None:
         """Handle failed operation."""
         logger.warning(
-            f"[{self.operation_type.capitalize()} {self.operation_id}] "
-            f"Operation failed"
+            f"[{self.operation_type.capitalize()} {self.operation_id}] " f"Operation failed"
         )
 
         await self._update_status(
@@ -192,18 +188,41 @@ class OperationExecutor:
 
     async def _log_error(self, error: Exception) -> None:
         """Log error to database. Override in subclass if needed."""
-        pass
 
     async def _broadcast_event(self, event_type_key: str, data: dict) -> None:
         """Broadcast WebSocket event."""
         # Map event type key to EventType enum value
         event_type_map = {
-            "download.started": EventType.DOWNLOAD_STARTED.value if hasattr(EventType, 'DOWNLOAD_STARTED') else "download.started",
-            "download.completed": EventType.DOWNLOAD_COMPLETED.value if hasattr(EventType, 'DOWNLOAD_COMPLETED') else "download.completed",
-            "download.failed": EventType.DOWNLOAD_FAILED.value if hasattr(EventType, 'DOWNLOAD_FAILED') else "download.failed",
-            "decrypt.started": EventType.DECRYPT_STARTED.value if hasattr(EventType, 'DECRYPT_STARTED') else "decrypt.started",
-            "decrypt.completed": EventType.DECRYPT_COMPLETED.value if hasattr(EventType, 'DECRYPT_COMPLETED') else "decrypt.completed",
-            "decrypt.failed": EventType.DECRYPT_FAILED.value if hasattr(EventType, 'DECRYPT_FAILED') else "decrypt.failed",
+            "download.started": (
+                EventType.DOWNLOAD_STARTED.value
+                if hasattr(EventType, "DOWNLOAD_STARTED")
+                else "download.started"
+            ),
+            "download.completed": (
+                EventType.DOWNLOAD_COMPLETED.value
+                if hasattr(EventType, "DOWNLOAD_COMPLETED")
+                else "download.completed"
+            ),
+            "download.failed": (
+                EventType.DOWNLOAD_FAILED.value
+                if hasattr(EventType, "DOWNLOAD_FAILED")
+                else "download.failed"
+            ),
+            "decrypt.started": (
+                EventType.DECRYPT_STARTED.value
+                if hasattr(EventType, "DECRYPT_STARTED")
+                else "decrypt.started"
+            ),
+            "decrypt.completed": (
+                EventType.DECRYPT_COMPLETED.value
+                if hasattr(EventType, "DECRYPT_COMPLETED")
+                else "decrypt.completed"
+            ),
+            "decrypt.failed": (
+                EventType.DECRYPT_FAILED.value
+                if hasattr(EventType, "DECRYPT_FAILED")
+                else "decrypt.failed"
+            ),
         }
 
         event_type_value = event_type_map.get(event_type_key, event_type_key)
@@ -230,23 +249,35 @@ class DownloadExecutor(OperationExecutor):
         )
 
     async def _update_status(self, status: str, **kwargs) -> None:
-        """Update download status in database."""
-        download_ops.update_download_status(
-            download_id=self.operation_id,
-            status=status,
-            **kwargs,
-        )
+        """Update download status in database using ORM."""
+        try:
+            async with AsyncSessionLocal() as db:
+                await download_service.update_download_status(
+                    db=db,
+                    download_id=UUID(self.operation_id),
+                    status=status,
+                    **kwargs,
+                )
+                await db.commit()
+        except Exception as e:
+            logger.error(f"Failed to update download status: {e}")
 
     async def _log_error(self, error: Exception) -> None:
-        """Log download error to database."""
-        error_ops.log_error(
-            error_type="download_error",
-            error_message=str(error),
-            user_id=self.user_id,
-            asin=self.asin,
-            severity="error",
-            context={"download_id": self.operation_id},
-        )
+        """Log download error to database using ORM."""
+        try:
+            async with AsyncSessionLocal() as db:
+                await error_service.log_error(
+                    db=db,
+                    error_type="download_error",
+                    error_message=str(error),
+                    user_id=UUID(self.user_id),
+                    asin=self.asin,
+                    severity="error",
+                    error_details={"download_id": self.operation_id},
+                )
+                await db.commit()
+        except Exception as e:
+            logger.error(f"Failed to log download error: {e}")
 
 
 class DecryptExecutor(OperationExecutor):
@@ -264,23 +295,35 @@ class DecryptExecutor(OperationExecutor):
         )
 
     async def _update_status(self, status: str, **kwargs) -> None:
-        """Update decryption status in database."""
-        decryption_ops.update_decryption_status(
-            decryption_id=self.operation_id,
-            status=status,
-            **kwargs,
-        )
+        """Update decryption status in database using ORM."""
+        try:
+            async with AsyncSessionLocal() as db:
+                await decryption_service.update_decryption_status(
+                    db=db,
+                    decryption_id=UUID(self.operation_id),
+                    status=status,
+                    **kwargs,
+                )
+                await db.commit()
+        except Exception as e:
+            logger.error(f"Failed to update decryption status: {e}")
 
     async def _log_error(self, error: Exception) -> None:
-        """Log decryption error to database."""
-        error_ops.log_error(
-            error_type="decryption_error",
-            error_message=str(error),
-            user_id=self.user_id,
-            asin=self.asin,
-            severity="error",
-            context={"decryption_id": self.operation_id},
-        )
+        """Log decryption error to database using ORM."""
+        try:
+            async with AsyncSessionLocal() as db:
+                await error_service.log_error(
+                    db=db,
+                    error_type="decryption_error",
+                    error_message=str(error),
+                    user_id=UUID(self.user_id),
+                    asin=self.asin,
+                    severity="error",
+                    error_details={"decryption_id": self.operation_id},
+                )
+                await db.commit()
+        except Exception as e:
+            logger.error(f"Failed to log decryption error: {e}")
 
 
 class BackgroundTaskService:
@@ -408,9 +451,7 @@ class BackgroundTaskService:
             logger.info(f"[Sync {sync_id}] Starting sync for user {user_id}")
 
             # Create progress callback for broadcasting updates
-            progress_callback = await BackgroundTaskService._create_progress_callback(
-                user_id
-            )
+            progress_callback = await BackgroundTaskService._create_progress_callback(user_id)
 
             # Execute actual library sync
             await sync_library(
@@ -426,15 +467,19 @@ class BackgroundTaskService:
         except Exception as e:
             logger.error(f"[Sync {sync_id}] Sync failed: {e}", exc_info=True)
 
-            # Log error to database
+            # Log error to database using ORM
             try:
-                error_ops.log_error(
-                    error_type="sync_error",
-                    error_message=str(e),
-                    user_id=user_id,
-                    severity="error",
-                    context={"sync_id": sync_id, "sync_type": sync_type},
-                )
+                async with AsyncSessionLocal() as db:
+                    await error_service.log_error(
+                        db=db,
+                        error_type="sync_error",
+                        error_message=str(e),
+                        user_id=UUID(user_id),
+                        sync_id=UUID(sync_id),
+                        severity="error",
+                        error_details={"sync_type": sync_type},
+                    )
+                    await db.commit()
             except Exception as log_err:
                 logger.error(f"Failed to log sync error: {log_err}")
 

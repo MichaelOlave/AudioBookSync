@@ -61,9 +61,7 @@ class TestDecryptBook:
                     ):
                         mock_process = AsyncMock()
                         mock_process.returncode = 0
-                        mock_process.communicate = AsyncMock(
-                            return_value=(b"Success", b"")
-                        )
+                        mock_process.communicate = AsyncMock(return_value=(b"Success", b""))
                         mock_exec.return_value = mock_process
 
                         await decrypt_book(book)
@@ -96,9 +94,7 @@ class TestDecryptBook:
                         ):
                             mock_process = AsyncMock()
                             mock_process.returncode = 0
-                            mock_process.communicate = AsyncMock(
-                                return_value=(b"Success", b"")
-                            )
+                            mock_process.communicate = AsyncMock(return_value=(b"Success", b""))
                             mock_exec.return_value = mock_process
 
                             await decrypt_book(book)
@@ -126,9 +122,7 @@ class TestDecryptBook:
                     ) as mock_validate:
                         mock_process = AsyncMock()
                         mock_process.returncode = 0
-                        mock_process.communicate = AsyncMock(
-                            return_value=(b"Success", b"")
-                        )
+                        mock_process.communicate = AsyncMock(return_value=(b"Success", b""))
                         mock_exec.return_value = mock_process
 
                         await decrypt_book(book)
@@ -156,9 +150,7 @@ class TestDecryptBook:
                         with patch("src.operations.decryptor.logger.error"):
                             mock_process = AsyncMock()
                             mock_process.returncode = 0
-                            mock_process.communicate = AsyncMock(
-                                return_value=(b"Success", b"")
-                            )
+                            mock_process.communicate = AsyncMock(return_value=(b"Success", b""))
                             mock_exec.return_value = mock_process
 
                             result = await decrypt_book(book)
@@ -181,9 +173,7 @@ class TestDecryptBook:
                     with patch("src.operations.decryptor.logger.error"):
                         mock_process = AsyncMock()
                         mock_process.returncode = 1
-                        mock_process.communicate = AsyncMock(
-                            return_value=(b"", b"FFmpeg error")
-                        )
+                        mock_process.communicate = AsyncMock(return_value=(b"", b"FFmpeg error"))
                         mock_exec.return_value = mock_process
 
                         result = await decrypt_book(book)
@@ -195,9 +185,7 @@ class TestDecryptBook:
         book = [sample_book_data["asin"], sample_book_data["title"]]
 
         with patch("src.operations.decryptor.ensure_directory", new_callable=AsyncMock):
-            with patch(
-                "src.operations.decryptor.os.listdir", return_value=["other_file.aax"]
-            ):
+            with patch("src.operations.decryptor.os.listdir", return_value=["other_file.aax"]):
                 with patch("src.operations.decryptor.logger.error"):
                     result = await decrypt_book(book)
 
@@ -238,9 +226,7 @@ class TestDecryptBook:
                         ):
                             mock_process = AsyncMock()
                             mock_process.returncode = 0
-                            mock_process.communicate = AsyncMock(
-                                return_value=(b"Success", b"")
-                            )
+                            mock_process.communicate = AsyncMock(return_value=(b"Success", b""))
                             mock_exec.return_value = mock_process
 
                             await decrypt_book(book)
@@ -270,9 +256,7 @@ class TestDecryptBook:
                     ):
                         mock_process = AsyncMock()
                         mock_process.returncode = 0
-                        mock_process.communicate = AsyncMock(
-                            return_value=(b"Success", b"")
-                        )
+                        mock_process.communicate = AsyncMock(return_value=(b"Success", b""))
                         mock_exec.return_value = mock_process
 
                         await decrypt_book(book)
@@ -299,9 +283,7 @@ class TestDecryptBook:
                     ):
                         mock_process = AsyncMock()
                         mock_process.returncode = 0
-                        mock_process.communicate = AsyncMock(
-                            return_value=(b"Success", b"")
-                        )
+                        mock_process.communicate = AsyncMock(return_value=(b"Success", b""))
                         mock_exec.return_value = mock_process
 
                         await decrypt_book(book)
@@ -333,17 +315,13 @@ class TestDecryptBook:
                         ):
                             mock_process = AsyncMock()
                             mock_process.returncode = 0
-                            mock_process.communicate = AsyncMock(
-                                return_value=(b"Success", b"")
-                            )
+                            mock_process.communicate = AsyncMock(return_value=(b"Success", b""))
                             mock_exec.return_value = mock_process
 
                             await decrypt_book(book)
 
                             call_args = mock_exec.call_args[0]
-                            output_path = [
-                                arg for arg in call_args if ".m4b" in str(arg)
-                            ]
+                            output_path = [arg for arg in call_args if ".m4b" in str(arg)]
                             assert len(output_path) > 0
 
 
@@ -356,9 +334,7 @@ class TestValidateDecryptedBook:
         """Test validate_decrypted_book when file exists."""
         book = [sample_book_data["asin"], sample_book_data["title"]]
 
-        with patch(
-            "src.operations.decryptor.file_exists_in_directory", return_value=True
-        ):
+        with patch("src.operations.decryptor.file_exists_in_directory", return_value=True):
             result = await validate_decrypted_book(book)
 
             assert result is True
@@ -367,9 +343,7 @@ class TestValidateDecryptedBook:
         """Test validate_decrypted_book when file not found."""
         book = [sample_book_data["asin"], sample_book_data["title"]]
 
-        with patch(
-            "src.operations.decryptor.file_exists_in_directory", return_value=False
-        ):
+        with patch("src.operations.decryptor.file_exists_in_directory", return_value=False):
             result = await validate_decrypted_book(book)
 
             assert result is False
@@ -407,9 +381,7 @@ class TestValidateDecryptedBook:
         """Test that validate_decrypted_book logs success."""
         book = [sample_book_data["asin"], sample_book_data["title"]]
 
-        with patch(
-            "src.operations.decryptor.file_exists_in_directory", return_value=True
-        ):
+        with patch("src.operations.decryptor.file_exists_in_directory", return_value=True):
             with patch("src.operations.decryptor.logger.info") as mock_logger:
                 await validate_decrypted_book(book)
 
@@ -420,9 +392,7 @@ class TestValidateDecryptedBook:
         book = [sample_book_data["asin"], sample_book_data["title"]]
 
         with patch("src.operations.decryptor.file_exists_in_directory") as mock_check:
-            with patch(
-                "src.operations.decryptor.Config.DECRYPTED_DIR", "/test/decrypted"
-            ):
+            with patch("src.operations.decryptor.Config.DECRYPTED_DIR", "/test/decrypted"):
                 mock_check.return_value = True
                 await validate_decrypted_book(book)
 

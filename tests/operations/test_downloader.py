@@ -17,9 +17,7 @@ class TestDownloadBook:
         """Test successful book download."""
         book = [sample_book_data["asin"], sample_book_data["title"]]
 
-        with patch(
-            "src.operations.downloader.ensure_directory", new_callable=AsyncMock
-        ):
+        with patch("src.operations.downloader.ensure_directory", new_callable=AsyncMock):
             with patch(
                 "src.operations.downloader.asyncio.create_subprocess_exec",
                 new_callable=AsyncMock,
@@ -44,9 +42,7 @@ class TestDownloadBook:
         """Test that download_book calls audible CLI."""
         book = [sample_book_data["asin"], sample_book_data["title"]]
 
-        with patch(
-            "src.operations.downloader.ensure_directory", new_callable=AsyncMock
-        ):
+        with patch("src.operations.downloader.ensure_directory", new_callable=AsyncMock):
             with patch(
                 "src.operations.downloader.asyncio.create_subprocess_exec",
                 new_callable=AsyncMock,
@@ -58,9 +54,7 @@ class TestDownloadBook:
                 ):
                     mock_process = AsyncMock()
                     mock_process.returncode = 0
-                    mock_process.communicate = AsyncMock(
-                        return_value=(b"Downloaded", b"")
-                    )
+                    mock_process.communicate = AsyncMock(return_value=(b"Downloaded", b""))
                     mock_exec.return_value = mock_process
 
                     await download_book(book)
@@ -74,9 +68,7 @@ class TestDownloadBook:
         """Test that download_book includes ASIN in command."""
         book = [sample_book_data["asin"], sample_book_data["title"]]
 
-        with patch(
-            "src.operations.downloader.ensure_directory", new_callable=AsyncMock
-        ):
+        with patch("src.operations.downloader.ensure_directory", new_callable=AsyncMock):
             with patch(
                 "src.operations.downloader.asyncio.create_subprocess_exec",
                 new_callable=AsyncMock,
@@ -88,9 +80,7 @@ class TestDownloadBook:
                 ):
                     mock_process = AsyncMock()
                     mock_process.returncode = 0
-                    mock_process.communicate = AsyncMock(
-                        return_value=(b"Downloaded", b"")
-                    )
+                    mock_process.communicate = AsyncMock(return_value=(b"Downloaded", b""))
                     mock_exec.return_value = mock_process
 
                     await download_book(book)
@@ -102,9 +92,7 @@ class TestDownloadBook:
         """Test that download_book validates book after download."""
         book = [sample_book_data["asin"], sample_book_data["title"]]
 
-        with patch(
-            "src.operations.downloader.ensure_directory", new_callable=AsyncMock
-        ):
+        with patch("src.operations.downloader.ensure_directory", new_callable=AsyncMock):
             with patch(
                 "src.operations.downloader.asyncio.create_subprocess_exec",
                 new_callable=AsyncMock,
@@ -116,9 +104,7 @@ class TestDownloadBook:
                 ) as mock_validate:
                     mock_process = AsyncMock()
                     mock_process.returncode = 0
-                    mock_process.communicate = AsyncMock(
-                        return_value=(b"Downloaded", b"")
-                    )
+                    mock_process.communicate = AsyncMock(return_value=(b"Downloaded", b""))
                     mock_exec.return_value = mock_process
 
                     await download_book(book)
@@ -129,9 +115,7 @@ class TestDownloadBook:
         """Test download_book returns False when validation fails."""
         book = [sample_book_data["asin"], sample_book_data["title"]]
 
-        with patch(
-            "src.operations.downloader.ensure_directory", new_callable=AsyncMock
-        ):
+        with patch("src.operations.downloader.ensure_directory", new_callable=AsyncMock):
             with patch(
                 "src.operations.downloader.asyncio.create_subprocess_exec",
                 new_callable=AsyncMock,
@@ -143,9 +127,7 @@ class TestDownloadBook:
                 ):
                     mock_process = AsyncMock()
                     mock_process.returncode = 0
-                    mock_process.communicate = AsyncMock(
-                        return_value=(b"Downloaded", b"")
-                    )
+                    mock_process.communicate = AsyncMock(return_value=(b"Downloaded", b""))
                     mock_exec.return_value = mock_process
 
                     result = await download_book(book)
@@ -156,9 +138,7 @@ class TestDownloadBook:
         """Test download_book handles process failure."""
         book = [sample_book_data["asin"], sample_book_data["title"]]
 
-        with patch(
-            "src.operations.downloader.ensure_directory", new_callable=AsyncMock
-        ):
+        with patch("src.operations.downloader.ensure_directory", new_callable=AsyncMock):
             with patch(
                 "src.operations.downloader.asyncio.create_subprocess_exec",
                 new_callable=AsyncMock,
@@ -166,9 +146,7 @@ class TestDownloadBook:
                 with patch("src.operations.downloader.logger.error"):
                     mock_process = AsyncMock()
                     mock_process.returncode = 1
-                    mock_process.communicate = AsyncMock(
-                        return_value=(b"", b"Download failed")
-                    )
+                    mock_process.communicate = AsyncMock(return_value=(b"", b"Download failed"))
                     mock_exec.return_value = mock_process
 
                     result = await download_book(book)
@@ -179,9 +157,7 @@ class TestDownloadBook:
         """Test download_book when no new files downloaded."""
         book = [sample_book_data["asin"], sample_book_data["title"]]
 
-        with patch(
-            "src.operations.downloader.ensure_directory", new_callable=AsyncMock
-        ):
+        with patch("src.operations.downloader.ensure_directory", new_callable=AsyncMock):
             with patch(
                 "src.operations.downloader.asyncio.create_subprocess_exec",
                 new_callable=AsyncMock,
@@ -202,9 +178,7 @@ class TestDownloadBook:
         """Test download_book handles timeout."""
         book = [sample_book_data["asin"], sample_book_data["title"]]
 
-        with patch(
-            "src.operations.downloader.ensure_directory", new_callable=AsyncMock
-        ):
+        with patch("src.operations.downloader.ensure_directory", new_callable=AsyncMock):
             with patch(
                 "src.operations.downloader.asyncio.create_subprocess_exec",
                 new_callable=AsyncMock,
@@ -248,9 +222,7 @@ class TestDownloadBook:
                 ):
                     mock_process = AsyncMock()
                     mock_process.returncode = 0
-                    mock_process.communicate = AsyncMock(
-                        return_value=(b"Downloaded", b"")
-                    )
+                    mock_process.communicate = AsyncMock(return_value=(b"Downloaded", b""))
                     mock_exec.return_value = mock_process
 
                     await download_book(book)
@@ -261,9 +233,7 @@ class TestDownloadBook:
         """Test that download_book includes aax-fallback flag."""
         book = [sample_book_data["asin"], sample_book_data["title"]]
 
-        with patch(
-            "src.operations.downloader.ensure_directory", new_callable=AsyncMock
-        ):
+        with patch("src.operations.downloader.ensure_directory", new_callable=AsyncMock):
             with patch(
                 "src.operations.downloader.asyncio.create_subprocess_exec",
                 new_callable=AsyncMock,
@@ -275,9 +245,7 @@ class TestDownloadBook:
                 ):
                     mock_process = AsyncMock()
                     mock_process.returncode = 0
-                    mock_process.communicate = AsyncMock(
-                        return_value=(b"Downloaded", b"")
-                    )
+                    mock_process.communicate = AsyncMock(return_value=(b"Downloaded", b""))
                     mock_exec.return_value = mock_process
 
                     await download_book(book)
@@ -289,9 +257,7 @@ class TestDownloadBook:
         """Test that download_book includes format flag."""
         book = [sample_book_data["asin"], sample_book_data["title"]]
 
-        with patch(
-            "src.operations.downloader.ensure_directory", new_callable=AsyncMock
-        ):
+        with patch("src.operations.downloader.ensure_directory", new_callable=AsyncMock):
             with patch(
                 "src.operations.downloader.asyncio.create_subprocess_exec",
                 new_callable=AsyncMock,
@@ -303,9 +269,7 @@ class TestDownloadBook:
                 ):
                     mock_process = AsyncMock()
                     mock_process.returncode = 0
-                    mock_process.communicate = AsyncMock(
-                        return_value=(b"Downloaded", b"")
-                    )
+                    mock_process.communicate = AsyncMock(return_value=(b"Downloaded", b""))
                     mock_exec.return_value = mock_process
 
                     await download_book(book)
@@ -323,9 +287,7 @@ class TestValidateBook:
         """Test validate_book with file found by ASIN."""
         book = [sample_book_data["asin"], sample_book_data["title"]]
 
-        with patch(
-            "src.operations.downloader.file_exists_in_directory", return_value=True
-        ):
+        with patch("src.operations.downloader.file_exists_in_directory", return_value=True):
             result = await validate_book(book)
 
             assert result is True
@@ -334,9 +296,7 @@ class TestValidateBook:
         """Test validate_book when file not found."""
         book = [sample_book_data["asin"], sample_book_data["title"]]
 
-        with patch(
-            "src.operations.downloader.file_exists_in_directory", return_value=False
-        ):
+        with patch("src.operations.downloader.file_exists_in_directory", return_value=False):
             result = await validate_book(book)
 
             assert result is False
@@ -374,9 +334,7 @@ class TestValidateBook:
         """Test that validate_book logs when file exists."""
         book = [sample_book_data["asin"], sample_book_data["title"]]
 
-        with patch(
-            "src.operations.downloader.file_exists_in_directory", return_value=True
-        ):
+        with patch("src.operations.downloader.file_exists_in_directory", return_value=True):
             with patch("src.operations.downloader.logger.info") as mock_logger:
                 await validate_book(book)
 

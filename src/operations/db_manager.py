@@ -1,28 +1,30 @@
 """Database operations manager for library management (replaces CSV).
 
-This module provides database-backed library management replacing csv_manager.py.
-It uses the database package for all operations.
+This module provides async ORM-backed library management replacing csv_manager.py.
+It uses the ORM services for all operations.
 """
 
 from typing import Dict, List, Optional
+from uuid import UUID
 
 from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..database import book_ops, db_ops, sync_ops
+from ..database.services import book_service, error_service, sync_service
 
 
 class LibraryManager:
-    """Database-backed library manager for Audible books."""
+    """Async ORM-backed library manager for Audible books."""
 
-    def __init__(self, user_id: str):
+    def __init__(self, db: AsyncSession, user_id: str):
         """Initialize library manager for a specific user.
 
         Args:
+            db: AsyncSession database connection
             user_id: UUID of the user
         """
+        self.db = db
         self.user_id = user_id
-        self.book_ops = book_ops
-        self.sync_ops = sync_ops
 
     async def add_book(
         self,
@@ -47,7 +49,8 @@ class LibraryManager:
             True if successful, False otherwise
         """
         try:
-            success = self.book_ops.add_book(
+            success = await book_service.add_book(
+                db=self.db,
                 asin=asin,
                 user_id=self.user_id,
                 title=title,
@@ -86,7 +89,8 @@ class LibraryManager:
             True if successful, False otherwise
         """
         try:
-            success = self.book_ops.add_book_with_metadata(
+            success = await book_service.add_book_with_metadata(
+                db=self.db,
                 asin=asin,
                 user_id=self.user_id,
                 title=title,
@@ -110,7 +114,7 @@ class LibraryManager:
             True if successful, False otherwise
         """
         try:
-            success = self.book_ops.remove_book(asin)
+            success = await book_service.delete_book(db=self.db, asin=asin)
             if success:
                 logger.info(f"Removed book from library: {asin}")
             return success
@@ -122,12 +126,25 @@ class LibraryManager:
         """Get all books for the user.
 
         Returns:
-            List of book dictionaries
+            List of book dictionaries (ORM objects converted to dicts)
         """
         try:
-            books = self.book_ops.get_user_books(self.user_id)
+            books = await book_service.get_books_by_user(db=self.db, user_id=self.user_id)
             logger.info(f"Retrieved {len(books)} books for user")
-            return books
+            # Convert ORM Book objects to dictionaries
+            return [
+                {
+                    "asin": book.asin,
+                    "title": book.title,
+                    "author": book.author,
+                    "narrator": book.narrator,
+                    "is_downloaded": book.is_downloaded,
+                    "is_decrypted": book.is_decrypted,
+                    "purchase_date": book.purchase_date,
+                    "runtime_min": book.runtime_min,
+                }
+                for book in books
+            ]
         except Exception as e:
             logger.error(f"Failed to get user books: {e}")
             return []
@@ -164,7 +181,7 @@ class LibraryManager:
             True if book exists, False otherwise
         """
         try:
-            book = self.book_ops.get_book_by_asin(asin)
+            book = await book_service.get_book_by_asin(db=self.db, asin=asin)
             return book is not None
         except Exception as e:
             logger.error(f"Failed to check if book exists: {e}")
@@ -180,10 +197,16 @@ class LibraryManager:
             sync_id if successful, None otherwise
         """
         try:
-            sync_id = self.sync_ops.create_sync_history(self.user_id, sync_type)
-            if sync_id:
+            sync_history = await sync_service.create_sync_history(
+                db=self.db,
+                user_id=UUID(self.user_id),
+                sync_type=sync_type,
+            )
+            if sync_history:
+                sync_id = str(sync_history.sync_id)
                 logger.info(f"Created sync record: {sync_id}")
-            return sync_id
+                return sync_id
+            return None
         except Exception as e:
             logger.error(f"Failed to create sync: {e}")
             return None
@@ -213,8 +236,9 @@ class LibraryManager:
             True if successful, False otherwise
         """
         try:
-            success = self.sync_ops.complete_sync_history(
-                sync_id=sync_id,
+            success = await sync_service.update_sync_status(
+                db=self.db,
+                sync_id=UUID(sync_id),
                 status=status,
                 books_found=books_found,
                 books_added=books_added,
@@ -250,28 +274,30 @@ class LibraryManager:
             True if successful, False otherwise
         """
         try:
-            success = db_ops.errors.log_error(
+            error_log = await error_service.log_error(
+                db=self.db,
                 error_type=error_type,
                 error_message=error_message,
-                user_id=self.user_id,
+                user_id=UUID(self.user_id),
                 asin=asin,
                 severity=severity,
-                **kwargs,
+                error_details=kwargs,
             )
-            return success
+            return error_log is not None
         except Exception as e:
             logger.error(f"Failed to log error: {e}")
             return False
 
 
 # Factory function for convenience
-async def get_library_manager(user_id: str) -> LibraryManager:
+async def get_library_manager(db: AsyncSession, user_id: str) -> LibraryManager:
     """Get a library manager instance for a user.
 
     Args:
+        db: AsyncSession database connection
         user_id: UUID of the user
 
     Returns:
         LibraryManager instance
     """
-    return LibraryManager(user_id)
+    return LibraryManager(db=db, user_id=user_id)

@@ -1,20 +1,18 @@
 """Book model for SQLAlchemy ORM."""
 
-from datetime import date
-from decimal import Decimal
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Column,
     Date,
     DateTime,
+    ForeignKey,
+    Integer,
     Numeric,
     String,
     Text,
-    Integer,
-    BigInteger,
-    ForeignKey,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -22,7 +20,7 @@ from sqlalchemy.orm import relationship
 from src.database.models.base import Base, get_current_timestamp
 
 if TYPE_CHECKING:
-    from src.database.models.user import User
+    pass
 
 
 class Book(Base):
@@ -31,7 +29,12 @@ class Book(Base):
     __tablename__ = "books"
 
     asin = Column(String(10), primary_key=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     title = Column(String(500), nullable=False)
     subtitle = Column(String(500), nullable=True)
     author = Column(String(500), nullable=True)
@@ -54,7 +57,12 @@ class Book(Base):
     download_path = Column(String(1000), nullable=True)
     decrypted_path = Column(String(1000), nullable=True)
     created_at = Column(DateTime(timezone=True), default=get_current_timestamp, nullable=False)
-    updated_at = Column(DateTime(timezone=True), default=get_current_timestamp, onupdate=get_current_timestamp, nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=get_current_timestamp,
+        onupdate=get_current_timestamp,
+        nullable=False,
+    )
 
     # Relationships
     user = relationship("User", back_populates="books", lazy="select")

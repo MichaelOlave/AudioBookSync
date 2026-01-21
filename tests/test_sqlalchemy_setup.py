@@ -7,43 +7,38 @@ Run with:
     pytest tests/test_sqlalchemy_setup.py -v
 """
 
-import pytest
-from uuid import UUID
-
+from src.database.engine import engine, get_db_session
 from src.database.models import (
     Base,
-    User,
     Book,
-    DownloadStatus,
+    BookAvailability,
+    BookContributor,
+    BookGenre,
+    BookMetadataJson,
+    CompanionMaterial,
+    Contributor,
     DecryptionStatus,
-    SyncHistory,
+    DownloadStatus,
     ErrorLog,
     Genre,
-    BookGenre,
-    Contributor,
-    BookContributor,
     MediaInfo,
     ReadingProgress,
-    BookAvailability,
-    CompanionMaterial,
-    BookMetadataJson,
+    SyncHistory,
+    User,
 )
 from src.database.services import (
-    user_service,
     book_service,
-    download_service,
     decryption_service,
-    sync_service,
+    download_service,
     error_service,
     metadata_service,
+    sync_service,
+    user_service,
 )
-from src.database.engine import get_db_session, engine
-
 
 # ============================================================================
 # MODEL TESTS
 # ============================================================================
-
 
 class TestModels:
     """Test SQLAlchemy model definitions."""
@@ -147,11 +142,9 @@ class TestModels:
             assert hasattr(model, "__tablename__")
             assert isinstance(model.__tablename__, str)
 
-
 # ============================================================================
 # SERVICE TESTS
 # ============================================================================
-
 
 class TestServices:
     """Test service modules are properly defined."""
@@ -299,11 +292,9 @@ class TestServices:
             assert hasattr(metadata_service, func_name), f"Missing function: {func_name}"
             assert callable(getattr(metadata_service, func_name))
 
-
 # ============================================================================
 # INFRASTRUCTURE TESTS
 # ============================================================================
-
 
 class TestInfrastructure:
     """Test database infrastructure."""
@@ -321,11 +312,9 @@ class TestInfrastructure:
         assert Base is not None
         assert hasattr(Base, "metadata")
 
-
 # ============================================================================
 # INTEGRATION TESTS (no DB required)
 # ============================================================================
-
 
 class TestServiceIntegration:
     """Test that services work together."""
@@ -372,6 +361,5 @@ class TestServiceIntegration:
         for func_name in functions:
             func = getattr(book_service, func_name)
             assert inspect.iscoroutinefunction(func), f"{func_name} is not async"
-
 
 # Run tests with: pytest tests/test_sqlalchemy_setup.py -v

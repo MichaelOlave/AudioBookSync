@@ -1,6 +1,7 @@
 """Database operations for book companion materials (PDFs, images, etc.)."""
 
 from typing import Dict, List, Optional
+
 from loguru import logger
 
 from .db_pool import db_pool as _db_pool

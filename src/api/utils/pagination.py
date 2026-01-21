@@ -5,16 +5,14 @@ Provides helper functions for calculating pagination metadata and slicing items.
 """
 
 import logging
-from typing import List, TypeVar, Generic, Tuple
+from typing import List, Tuple, TypeVar
 
 T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
 
 
-def calculate_pagination(
-    total: int, page: int, page_size: int
-) -> Tuple[int, int, int]:
+def calculate_pagination(total: int, page: int, page_size: int) -> Tuple[int, int, int]:
     """
     Calculate pagination parameters.
 
@@ -36,9 +34,7 @@ def calculate_pagination(
     return page, pages, pages
 
 
-def paginate_list(
-    items: List[T], page: int, page_size: int
-) -> Tuple[List[T], int, int]:
+def paginate_list(items: List[T], page: int, page_size: int) -> Tuple[List[T], int, int]:
     """
     Paginate an in-memory list of items.
 

@@ -1,20 +1,28 @@
 """Authentication endpoints (register, login, refresh tokens)."""
 
-from typing import Dict, Optional
 
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...database.db_users import user_ops
-from ...database.services import user_service
 from ...database.engine import get_db_session
-from ..schemas.auth import UserRegister, Token, RefreshTokenRequest
+from ...database.services import user_service
+from ..middleware.error_handler import (
+    AuthenticationError,
+    AuthorizationError,
+    ConflictError,
+    InternalServerError,
+    handle_route_errors,
+)
+from ..schemas.auth import RefreshTokenRequest, Token, UserRegister
 from ..schemas.user import UserResponse
+from ..security.auth import (
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+)
 from ..security.password import hash_password, verify_password
-from ..security.auth import create_access_token, create_refresh_token, decode_token, get_current_user
-from ..middleware.error_handler import ConflictError, AuthenticationError, InternalServerError, AuthorizationError, handle_route_errors
 
 router = APIRouter()
 
@@ -68,17 +76,13 @@ async def register(
     # Check if username already exists
     existing_user = await user_service.get_user_by_username(db, user_data.username)
     if existing_user:
-        logger.warning(
-            f"Registration failed: Username already exists: {user_data.username}"
-        )
+        logger.warning(f"Registration failed: Username already exists: {user_data.username}")
         raise ConflictError(f"Username '{user_data.username}' is already taken")
 
     # Check if email already exists
     existing_email = await user_service.get_user_by_email(db, user_data.email)
     if existing_email:
-        logger.warning(
-            f"Registration failed: Email already registered: {user_data.email}"
-        )
+        logger.warning(f"Registration failed: Email already registered: {user_data.email}")
         raise ConflictError(f"Email '{user_data.email}' is already registered")
 
     # Hash the password
@@ -97,9 +101,7 @@ async def register(
         raise InternalServerError("Failed to create user")
 
     await db.commit()
-    logger.info(
-        f"User registered successfully: {user_data.username} (ID: {user.user_id})"
-    )
+    logger.info(f"User registered successfully: {user_data.username} (ID: {user.user_id})")
     return UserResponse.from_orm(user)
 
 
@@ -163,9 +165,7 @@ async def login(
     access_token = create_access_token(data={"sub": str(user.user_id)})
     refresh_token = create_refresh_token(data={"sub": str(user.user_id)})
 
-    logger.info(
-        f"User logged in successfully: {form_data.username} (ID: {user.user_id})"
-    )
+    logger.info(f"User logged in successfully: {form_data.username} (ID: {user.user_id})")
 
     return Token(
         access_token=access_token,

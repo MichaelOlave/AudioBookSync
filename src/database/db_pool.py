@@ -25,7 +25,6 @@ class DatabasePool:
 
     def __init__(self):
         """Initialize database pool (lazy initialization on first use)."""
-        pass
 
     def _initialize_pool(self):
         """Create and configure the connection pool from DATABASE_URL."""

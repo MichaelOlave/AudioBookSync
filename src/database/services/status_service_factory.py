@@ -1,13 +1,13 @@
 """Factory for generating generic status service functions for any status model."""
 
-from typing import Optional, List, Dict, Any, Callable, Type
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Any, Callable, Dict, List, Optional, Type
 from uuid import UUID
 
-from sqlalchemy import select, and_, func
-from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models.book import Book
 from src.database.services.base_service import get_by_id, update_entity
@@ -70,12 +70,15 @@ class StatusServiceFactory:
 
     def _create_get_by_id_function(self) -> Callable:
         """Create a function to get entity by ID."""
+
         async def get_by_id_func(db: AsyncSession, entity_id: UUID) -> Optional[Any]:
             return await get_by_id(db, self.model, entity_id, id_column=self.id_column)
+
         return get_by_id_func
 
     def _create_get_by_asin_function(self) -> Callable:
         """Create a function to get all entities for a given ASIN."""
+
         async def get_by_asin_func(db: AsyncSession, asin: str) -> List[Any]:
             try:
                 result = await db.execute(
@@ -87,10 +90,12 @@ class StatusServiceFactory:
             except Exception as e:
                 logger.error(f"Failed to get {self.model_name}s for ASIN: {e}")
                 return []
+
         return get_by_asin_func
 
     def _create_get_latest_function(self) -> Callable:
         """Create a function to get the latest entity for a given ASIN."""
+
         async def get_latest_func(db: AsyncSession, asin: str) -> Optional[Any]:
             try:
                 result = await db.execute(
@@ -103,10 +108,12 @@ class StatusServiceFactory:
             except Exception as e:
                 logger.error(f"Failed to get latest {self.model_name}: {e}")
                 return None
+
         return get_latest_func
 
     def _create_get_pending_function(self) -> Callable:
         """Create a function to get all pending entities."""
+
         async def get_pending_func(db: AsyncSession) -> List[Any]:
             try:
                 result = await db.execute(
@@ -118,10 +125,12 @@ class StatusServiceFactory:
             except Exception as e:
                 logger.error(f"Failed to get pending {self.model_name}s: {e}")
                 return []
+
         return get_pending_func
 
     def _create_get_failed_function(self) -> Callable:
         """Create a function to get all failed entities."""
+
         async def get_failed_func(db: AsyncSession, limit: int = 100) -> List[Any]:
             try:
                 result = await db.execute(
@@ -134,15 +143,14 @@ class StatusServiceFactory:
             except Exception as e:
                 logger.error(f"Failed to get failed {self.model_name}s: {e}")
                 return []
+
         return get_failed_func
 
     def _create_create_function(self) -> Callable:
         """Create a function to create a new entity."""
+
         async def create_func(
-            db: AsyncSession,
-            asin: str,
-            status: Optional[str] = None,
-            **kwargs: Any
+            db: AsyncSession, asin: str, status: Optional[str] = None, **kwargs: Any
         ) -> Optional[Any]:
             try:
                 if status is None:
@@ -158,15 +166,14 @@ class StatusServiceFactory:
             except Exception as e:
                 logger.error(f"Failed to create {self.model_name} status: {e}")
                 return None
+
         return create_func
 
     def _create_update_status_function(self) -> Callable:
         """Create a function to update entity status with timestamp management."""
+
         async def update_status_func(
-            db: AsyncSession,
-            entity_id: UUID,
-            status: str,
-            **kwargs: Any
+            db: AsyncSession, entity_id: UUID, status: str, **kwargs: Any
         ) -> bool:
             try:
                 entity = await get_by_id(db, self.model, entity_id, id_column=self.id_column)
@@ -194,10 +201,12 @@ class StatusServiceFactory:
             except Exception as e:
                 logger.error(f"Failed to update {self.model_name} status: {e}")
                 return False
+
         return update_status_func
 
     def _create_start_function(self) -> Callable:
         """Create a function to mark entity as started."""
+
         async def start_func(db: AsyncSession, entity_id: UUID, **kwargs: Any) -> bool:
             entity = await get_by_id(db, self.model, entity_id, id_column=self.id_column)
             updates: Dict[str, Any] = {
@@ -206,10 +215,12 @@ class StatusServiceFactory:
             }
             updates.update(kwargs)
             return await update_entity(db, entity, updates, entity_id=entity_id)
+
         return start_func
 
     def _create_complete_function(self) -> Callable:
         """Create a function to mark entity as completed."""
+
         async def complete_func(db: AsyncSession, entity_id: UUID, **kwargs: Any) -> bool:
             entity = await get_by_id(db, self.model, entity_id, id_column=self.id_column)
             updates: Dict[str, Any] = {
@@ -218,16 +229,18 @@ class StatusServiceFactory:
             }
             updates.update(kwargs)
             return await update_entity(db, entity, updates, entity_id=entity_id)
+
         return complete_func
 
     def _create_fail_function(self) -> Callable:
         """Create a function to mark entity as failed."""
+
         async def fail_func(
             db: AsyncSession,
             entity_id: UUID,
             error_message: str,
             error_details: Optional[Dict[str, Any]] = None,
-            **kwargs: Any
+            **kwargs: Any,
         ) -> bool:
             entity = await get_by_id(db, self.model, entity_id, id_column=self.id_column)
             updates: Dict[str, Any] = {
@@ -239,10 +252,12 @@ class StatusServiceFactory:
                 updates["error_details"] = error_details
             updates.update(kwargs)
             return await update_entity(db, entity, updates, entity_id=entity_id)
+
         return fail_func
 
     def _create_delete_function(self) -> Callable:
         """Create a function to delete an entity."""
+
         async def delete_func(db: AsyncSession, entity_id: UUID) -> bool:
             try:
                 entity = await get_by_id(db, self.model, entity_id, id_column=self.id_column)
@@ -256,10 +271,12 @@ class StatusServiceFactory:
             except Exception as e:
                 logger.error(f"Failed to delete {self.model_name}: {e}")
                 return False
+
         return delete_func
 
     def _create_get_by_user_function(self) -> Callable:
         """Create a function to get entities for a specific user."""
+
         async def get_by_user_func(
             db: AsyncSession,
             user_id: str,
@@ -268,18 +285,16 @@ class StatusServiceFactory:
             offset: int = 0,
         ) -> List[Any]:
             try:
-                query = select(self.model).join(
-                    Book, self.model.asin == Book.asin
-                ).where(
-                    Book.user_id == user_id
+                query = (
+                    select(self.model)
+                    .join(Book, self.model.asin == Book.asin)
+                    .where(Book.user_id == user_id)
                 )
 
                 if status:
                     query = query.where(self.model.status == status)  # type: ignore
 
-                query = query.order_by(
-                    self.model.created_at.desc()
-                ).limit(limit).offset(offset)
+                query = query.order_by(self.model.created_at.desc()).limit(limit).offset(offset)
 
                 result = await db.execute(query)
                 entities = result.scalars().all()
@@ -288,10 +303,12 @@ class StatusServiceFactory:
             except Exception as e:
                 logger.error(f"Failed to get {self.model_name}s for user {user_id}: {e}")
                 return []
+
         return get_by_user_func
 
     def _create_count_by_user_function(self) -> Callable:
         """Create a function to count entities for a specific user."""
+
         async def count_by_user_func(
             db: AsyncSession,
             user_id: str,
@@ -299,10 +316,10 @@ class StatusServiceFactory:
         ) -> int:
             try:
                 id_attr = getattr(self.model, self.id_column)
-                query = select(func.count(id_attr)).join(
-                    Book, self.model.asin == Book.asin
-                ).where(
-                    Book.user_id == user_id
+                query = (
+                    select(func.count(id_attr))
+                    .join(Book, self.model.asin == Book.asin)
+                    .where(Book.user_id == user_id)
                 )
 
                 if status:
@@ -315,10 +332,12 @@ class StatusServiceFactory:
             except Exception as e:
                 logger.error(f"Failed to count {self.model_name}s for user {user_id}: {e}")
                 return 0
+
         return count_by_user_func
 
     def _create_get_by_id_for_user_function(self) -> Callable:
         """Create a function to get entity by ID and verify user ownership."""
+
         async def get_by_id_for_user_func(
             db: AsyncSession,
             entity_id: UUID,
@@ -331,7 +350,7 @@ class StatusServiceFactory:
                     .where(
                         and_(
                             getattr(self.model, self.id_column) == entity_id,
-                            Book.user_id == user_id
+                            Book.user_id == user_id,
                         )
                     )
                 )
@@ -339,4 +358,5 @@ class StatusServiceFactory:
             except Exception as e:
                 logger.error(f"Failed to get {self.model_name} by ID for user {user_id}: {e}")
                 return None
+
         return get_by_id_for_user_func

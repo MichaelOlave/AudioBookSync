@@ -1,13 +1,13 @@
 """WebSocket endpoints for real-time updates."""
 
-from datetime import datetime, timezone
 import json
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from loguru import logger
 
-from ..websockets import ws_manager
 from ..security.auth import decode_token
+from ..websockets import ws_manager
 
 router = APIRouter()
 
@@ -95,19 +95,19 @@ async def websocket_updates(
                     elif message_type == "heartbeat":
                         # Simple keep-alive
                         logger.debug(f"WebSocket heartbeat from user {user_id}")
-                        pass
 
                     else:
-                        logger.debug(
-                            f"WebSocket message from user {user_id}: type={message_type}"
-                        )
+                        logger.debug(f"WebSocket message from user {user_id}: type={message_type}")
 
                 except json.JSONDecodeError:
                     logger.warning(f"Invalid JSON from WebSocket user {user_id}")
                     await ws_manager.send_to_connection(
                         websocket,
                         "error",
-                        {"error": "Invalid message format", "timestamp": datetime.now(timezone.utc).timestamp()},
+                        {
+                            "error": "Invalid message format",
+                            "timestamp": datetime.now(timezone.utc).timestamp(),
+                        },
                     )
 
         except WebSocketDisconnect:

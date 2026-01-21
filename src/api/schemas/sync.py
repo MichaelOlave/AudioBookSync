@@ -1,8 +1,10 @@
 """Sync-related Pydantic schemas."""
 
-from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field
+
 from .common import PaginatedResponse
 
 
@@ -106,7 +108,7 @@ class SyncResponse(BaseModel):
                 "created_at": "2025-12-20T20:00:00Z",
                 "updated_at": "2025-12-20T20:15:30Z",
             }
-        }
+        },
     )
 
 

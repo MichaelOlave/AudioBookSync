@@ -1,17 +1,15 @@
 """Decryption status model for SQLAlchemy ORM."""
 
-from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, DateTime, String, Text, Integer, ForeignKey, JSON
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from src.database.models.base import Base, get_current_timestamp
 
 if TYPE_CHECKING:
-    from src.database.models.book import Book
-    from src.database.models.download import DownloadStatus
+    pass
 
 
 class DecryptionStatus(Base):
@@ -24,7 +22,9 @@ class DecryptionStatus(Base):
         primary_key=True,
         server_default="uuid_generate_v4()",
     )
-    asin = Column(String(10), ForeignKey("books.asin", ondelete="CASCADE"), nullable=False, index=True)
+    asin = Column(
+        String(10), ForeignKey("books.asin", ondelete="CASCADE"), nullable=False, index=True
+    )
     download_id = Column(
         UUID(as_uuid=True),
         ForeignKey("download_status.download_id", ondelete="SET NULL"),
@@ -40,7 +40,12 @@ class DecryptionStatus(Base):
     error_message = Column(Text, nullable=True)
     error_details = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), default=get_current_timestamp, nullable=False)
-    updated_at = Column(DateTime(timezone=True), default=get_current_timestamp, onupdate=get_current_timestamp, nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=get_current_timestamp,
+        onupdate=get_current_timestamp,
+        nullable=False,
+    )
 
     # Relationships
     book = relationship("Book", back_populates="decryption_status", lazy="select")

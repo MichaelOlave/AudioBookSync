@@ -2,15 +2,13 @@
 
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field, ConfigDict
-from .common import BookActionCreate, PaginatedResponse
 
+from pydantic import BaseModel, ConfigDict, Field
+
+from .common import BookActionCreate, PaginatedResponse
 
 class DownloadCreate(BookActionCreate):
     """Request to initiate a book download."""
-
-    pass
-
 
 class DownloadResponse(BaseModel):
     """Download status response."""
@@ -53,7 +51,7 @@ class DownloadResponse(BaseModel):
     )
 
     model_config = ConfigDict(
-        json_schema_extra = {
+        json_schema_extra={
             "example": {
                 "download_id": "550e8400-e29b-41d4-a716-446655440000",
                 "asin": "B084L6Z6M3",
@@ -63,7 +61,6 @@ class DownloadResponse(BaseModel):
             }
         }
     )
-
 
 DownloadList = PaginatedResponse[DownloadResponse]
 """Type alias for paginated download list response."""

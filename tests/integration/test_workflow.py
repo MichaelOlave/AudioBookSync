@@ -1,9 +1,10 @@
 """Integration tests for complete AudioBookSync workflows."""
 
-import pytest
-from fastapi import status
 import uuid
 from datetime import datetime
+
+import pytest
+from fastapi import status
 
 
 @pytest.fixture
@@ -17,8 +18,8 @@ class TestCompleteUserJourney:
 
     def test_user_registration_and_login(self, client, monkeypatch):
         """Test complete registration and login flow."""
-        from src.database.db_users import user_ops
         from src.api.security.password import hash_password
+        from src.database.db_users import user_ops
 
         user_data = {
             "username": "testuser",
@@ -40,16 +41,14 @@ class TestCompleteUserJourney:
         def mock_get_user_by_id(uid):
             return {
                 "user_id": uid,
-                "username": username,
+                "username": user_data["username"],
                 "password_hash": hash_password(user_data["password"]),
                 "is_active": True,
             }
 
         monkeypatch.setattr(user_ops, "get_user_by_username", mock_get_user_by_username)
         monkeypatch.setattr(user_ops, "get_user_by_email", mock_get_user_by_email)
-        monkeypatch.setattr(
-            user_ops, "create_user_with_password", mock_create_user_with_password
-        )
+        monkeypatch.setattr(user_ops, "create_user_with_password", mock_create_user_with_password)
         monkeypatch.setattr(user_ops, "get_user_by_id", mock_get_user_by_id)
 
         # Step 1: Register user
@@ -120,9 +119,7 @@ class TestCompleteUserJourney:
         assert status_data["sync_id"] == returned_sync_id
         assert status_data["status"] == "in_progress"
 
-    def test_book_management_workflow(
-        self, authenticated_client, monkeypatch, test_user_id
-    ):
+    def test_book_management_workflow(self, authenticated_client, monkeypatch, test_user_id):
         """Test book management workflow."""
         from src.database.db_books import book_ops
 
@@ -181,12 +178,10 @@ class TestCompleteUserJourney:
         assert delete_response.status_code == status.HTTP_200_OK
         assert len(remove_book_called) == 1
 
-    def test_download_decrypt_workflow(
-        self, authenticated_client, monkeypatch, test_user_id
-    ):
+    def test_download_decrypt_workflow(self, authenticated_client, monkeypatch, test_user_id):
         """Test download and decrypt workflow."""
-        from src.database.db_downloads import download_ops
         from src.database.db_decryptions import decryption_ops
+        from src.database.db_downloads import download_ops
 
         asin = "B084L6Z6M3"
         download_id = str(uuid.uuid4())
@@ -219,12 +214,8 @@ class TestCompleteUserJourney:
                 "updated_at": datetime.now(),
             }
 
-        monkeypatch.setattr(
-            download_ops, "create_download_status", mock_create_download_status
-        )
-        monkeypatch.setattr(
-            download_ops, "get_download_by_asin", mock_get_download_by_asin
-        )
+        monkeypatch.setattr(download_ops, "create_download_status", mock_create_download_status)
+        monkeypatch.setattr(download_ops, "get_download_by_asin", mock_get_download_by_asin)
         monkeypatch.setattr(
             decryption_ops, "create_decryption_status", mock_create_decryption_status
         )

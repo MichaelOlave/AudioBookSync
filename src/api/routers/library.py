@@ -1,20 +1,29 @@
 """User library endpoints."""
 
-import audible
 import json
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from loguru import logger
-from typing import Dict, Any
+from typing import Any, Dict
 
-from ...database.services import book_service, user_service
+import audible
+from fastapi import APIRouter, Depends, Query
+from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from ...database.engine import get_db_session
 from ...database.models.user import User
+from ...database.services import book_service, user_service
+from ..middleware.error_handler import (
+    AuthorizationError,
+    ResourceNotFoundError,
+    handle_route_errors,
+)
+from ..schemas.book import BookList, BookResponse
 from ..security.auth import get_current_user
-from ..schemas.book import BookResponse, BookList
-from ..middleware.error_handler import ResourceNotFoundError, AuthorizationError, handle_route_errors
-from ..utils.generic_handlers import get_paginated_list, get_pagination_params, verify_book_ownership
 from ..utils.auth_utils import get_user_id
+from ..utils.generic_handlers import (
+    get_paginated_list,
+    get_pagination_params,
+    verify_book_ownership,
+)
 
 router = APIRouter()
 
@@ -56,6 +65,7 @@ async def get_library(
     Example:
         GET /api/v1/library?page=1&page_size=50
     """
+
     async def get_books(**kwargs):
         return await book_service.get_books_by_user(kwargs["db"], kwargs["user_id"])
 
@@ -130,7 +140,9 @@ async def fetch_audible_library(
 
     if not user or not user.audible_auth_json:
         logger.error(f"No Audible credentials found for user {user_id}")
-        raise AuthorizationError("Audible credentials not configured. Please authenticate with Audible first.")
+        raise AuthorizationError(
+            "Audible credentials not configured. Please authenticate with Audible first."
+        )
 
     auth_data = json.loads(user.audible_auth_json)
 
@@ -145,19 +157,12 @@ async def fetch_audible_library(
             "library",
             num_results=num_results,
             page=page,
-            response_groups=(
-                "product_desc,"
-                "product_attrs,"
-                "media,"
-                "rating"
-            ),
+            response_groups=("product_desc," "product_attrs," "media," "rating"),
             sort_by="-PurchaseDate",
         )
 
     items = library_response.get("items", [])
-    logger.info(
-        f"Successfully fetched {len(items)} books from Audible for user {user_id}"
-    )
+    logger.info(f"Successfully fetched {len(items)} books from Audible for user {user_id}")
 
     return {
         "items": items,

@@ -1,7 +1,7 @@
 """User database operations."""
 
-from typing import Dict, Optional
 import json
+from typing import Dict, Optional
 
 import psycopg2
 from loguru import logger
@@ -196,9 +196,7 @@ class UserOperations:
                             user_id_value = None
 
                 user_id = str(user_id_value) if user_id_value is not None else None
-                logger.info(
-                    f"Created user with password: {username} " f"(ID: {user_id})"
-                )
+                logger.info(f"Created user with password: {username} " f"(ID: {user_id})")
                 return user_id
         except psycopg2.IntegrityError as e:
             logger.error(f"User creation failed (duplicate): {e}")
@@ -359,9 +357,7 @@ class UserOperations:
                 logger.info(f"Cleared Audible authentication for user: {user_id}")
                 return True
         except Exception as e:
-            logger.error(
-                f"Failed to clear Audible authentication for user {user_id}: {e}"
-            )
+            logger.error(f"Failed to clear Audible authentication for user {user_id}: {e}")
             return False
 
     def get_audible_auth_json(self, user_id: str) -> Optional[Dict]:
@@ -390,9 +386,7 @@ class UserOperations:
                     return None
 
                 auth_json_str = (
-                    result.get("audible_auth_json")
-                    if isinstance(result, dict)
-                    else result[0]
+                    result.get("audible_auth_json") if isinstance(result, dict) else result[0]
                 )
 
                 if auth_json_str:

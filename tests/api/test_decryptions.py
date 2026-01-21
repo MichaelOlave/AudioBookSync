@@ -1,9 +1,10 @@
 """Tests for decryption endpoints."""
 
-import pytest
-from fastapi import status
 import uuid
 from datetime import datetime
+
+import pytest
+from fastapi import status
 
 
 @pytest.fixture
@@ -30,8 +31,8 @@ class TestTriggerDecryption:
         self, authenticated_client, monkeypatch, test_decryption_id
     ):
         """Test successful decryption trigger."""
-        from src.database.db_downloads import download_ops
         from src.database.db_decryptions import decryption_ops
+        from src.database.db_downloads import download_ops
 
         def mock_get_download_by_asin(asin):
             return {
@@ -122,8 +123,8 @@ class TestTriggerDecryption:
         self, authenticated_client, monkeypatch, test_decryption_id
     ):
         """Test decryption trigger with specific output format."""
-        from src.database.db_downloads import download_ops
         from src.database.db_decryptions import decryption_ops
+        from src.database.db_downloads import download_ops
 
         def mock_get_download_by_asin(asin):
             return {
@@ -134,7 +135,9 @@ class TestTriggerDecryption:
                 "updated_at": datetime.now(),
             }
 
-        def mock_create_decryption_status(asin, download_id=None, status="pending", output_format="m4b"):
+        def mock_create_decryption_status(
+            asin, download_id=None, status="pending", output_format="m4b"
+        ):
             # Verify output format is captured
             assert output_format in ["m4b", "mp3", "flac", "aac"]
             return test_decryption_id
@@ -179,12 +182,8 @@ class TestGetDecryptions:
         def mock_count_user_decryptions(user_id, status=None):
             return 1
 
-        monkeypatch.setattr(
-            decryption_ops, "get_user_decryptions", mock_get_user_decryptions
-        )
-        monkeypatch.setattr(
-            decryption_ops, "count_user_decryptions", mock_count_user_decryptions
-        )
+        monkeypatch.setattr(decryption_ops, "get_user_decryptions", mock_get_user_decryptions)
+        monkeypatch.setattr(decryption_ops, "count_user_decryptions", mock_count_user_decryptions)
 
         response = authenticated_client.get("/api/v1/decryptions/")
 
@@ -210,12 +209,8 @@ class TestGetDecryptions:
         def mock_count_user_decryptions(user_id, status=None):
             return 0
 
-        monkeypatch.setattr(
-            decryption_ops, "get_user_decryptions", mock_get_user_decryptions
-        )
-        monkeypatch.setattr(
-            decryption_ops, "count_user_decryptions", mock_count_user_decryptions
-        )
+        monkeypatch.setattr(decryption_ops, "get_user_decryptions", mock_get_user_decryptions)
+        monkeypatch.setattr(decryption_ops, "count_user_decryptions", mock_count_user_decryptions)
 
         response = authenticated_client.get("/api/v1/decryptions/")
 
@@ -242,12 +237,8 @@ class TestGetDecryptions:
         def mock_count_user_decryptions(user_id, status=None):
             return 1 if status == "completed" else 0
 
-        monkeypatch.setattr(
-            decryption_ops, "get_user_decryptions", mock_get_user_decryptions
-        )
-        monkeypatch.setattr(
-            decryption_ops, "count_user_decryptions", mock_count_user_decryptions
-        )
+        monkeypatch.setattr(decryption_ops, "get_user_decryptions", mock_get_user_decryptions)
+        monkeypatch.setattr(decryption_ops, "count_user_decryptions", mock_count_user_decryptions)
 
         response = authenticated_client.get("/api/v1/decryptions/?status=completed")
 
@@ -267,12 +258,8 @@ class TestGetDecryptions:
         def mock_count_user_decryptions(user_id, status=None):
             return 50
 
-        monkeypatch.setattr(
-            decryption_ops, "get_user_decryptions", mock_get_user_decryptions
-        )
-        monkeypatch.setattr(
-            decryption_ops, "count_user_decryptions", mock_count_user_decryptions
-        )
+        monkeypatch.setattr(decryption_ops, "get_user_decryptions", mock_get_user_decryptions)
+        monkeypatch.setattr(decryption_ops, "count_user_decryptions", mock_count_user_decryptions)
 
         response = authenticated_client.get("/api/v1/decryptions/?page=1&page_size=10")
 
@@ -302,9 +289,7 @@ class TestGetDecryptionStatus:
                 "updated_at": datetime.now(),
             }
 
-        monkeypatch.setattr(
-            decryption_ops, "get_decryption_by_id", mock_get_decryption_by_id
-        )
+        monkeypatch.setattr(decryption_ops, "get_decryption_by_id", mock_get_decryption_by_id)
 
         response = authenticated_client.get(f"/api/v1/decryptions/{test_decryption_id}")
 
@@ -328,9 +313,7 @@ class TestGetDecryptionStatus:
         def mock_get_decryption_by_id(decryption_id):
             return None
 
-        monkeypatch.setattr(
-            decryption_ops, "get_decryption_by_id", mock_get_decryption_by_id
-        )
+        monkeypatch.setattr(decryption_ops, "get_decryption_by_id", mock_get_decryption_by_id)
 
         response = authenticated_client.get(f"/api/v1/decryptions/{test_decryption_id}")
 
@@ -352,9 +335,7 @@ class TestGetDecryptionStatus:
                 "updated_at": datetime.now(),
             }
 
-        monkeypatch.setattr(
-            decryption_ops, "get_decryption_by_id", mock_get_decryption_by_id
-        )
+        monkeypatch.setattr(decryption_ops, "get_decryption_by_id", mock_get_decryption_by_id)
 
         response = authenticated_client.get(f"/api/v1/decryptions/{test_decryption_id}")
 
@@ -371,6 +352,7 @@ class TestDecryptionStatuses:
         valid_statuses = ["pending", "decrypting", "completed", "failed", "cancelled"]
 
         for status_value in valid_statuses:
+
             def mock_get_user_decryptions(user_id, status=None, limit=10, offset=0):
                 if status == status_value:
                     return [
@@ -385,16 +367,12 @@ class TestDecryptionStatuses:
             def mock_count_user_decryptions(user_id, status=None):
                 return 1 if status == status_value else 0
 
-            monkeypatch.setattr(
-                decryption_ops, "get_user_decryptions", mock_get_user_decryptions
-            )
+            monkeypatch.setattr(decryption_ops, "get_user_decryptions", mock_get_user_decryptions)
             monkeypatch.setattr(
                 decryption_ops, "count_user_decryptions", mock_count_user_decryptions
             )
 
-            response = authenticated_client.get(
-                f"/api/v1/decryptions/?status={status_value}"
-            )
+            response = authenticated_client.get(f"/api/v1/decryptions/?status={status_value}")
 
             # Should accept valid status values
             assert response.status_code in [
@@ -434,12 +412,8 @@ class TestDecryptionUserIsolation:
         def mock_count_user_decryptions(user_id, status=None):
             return 1
 
-        monkeypatch.setattr(
-            decryption_ops, "get_user_decryptions", mock_get_user_decryptions
-        )
-        monkeypatch.setattr(
-            decryption_ops, "count_user_decryptions", mock_count_user_decryptions
-        )
+        monkeypatch.setattr(decryption_ops, "get_user_decryptions", mock_get_user_decryptions)
+        monkeypatch.setattr(decryption_ops, "count_user_decryptions", mock_count_user_decryptions)
 
         response = authenticated_client.get("/api/v1/decryptions/")
 
@@ -456,9 +430,8 @@ class TestDecryptionMinIOIntegration:
     @pytest.mark.asyncio
     async def test_decrypt_book_uploads_to_minio_when_enabled(self, monkeypatch):
         """Test that decrypt_book uploads to MinIO after successful decryption."""
-        from src.operations.decryptor import decrypt_book
-        from src.infrastructure.storage_service import StorageService
         from src.core.config import Config
+        from src.infrastructure.storage_service import StorageService
 
         # Mock successful decryption
         async def mock_validate_decrypted_book(book):
@@ -472,22 +445,23 @@ class TestDecryptionMinIOIntegration:
         upload_called = []
 
         def mock_save_file(user_id, file_path, file_type, asin=None, title=None):
-            upload_called.append({
-                "user_id": user_id,
-                "file_type": file_type,
-                "title": title,
-            })
+            upload_called.append(
+                {
+                    "user_id": user_id,
+                    "file_type": file_type,
+                    "title": title,
+                }
+            )
             return (True, f"decrypted/{title}.m4b")
 
         # Temporarily enable MinIO
-        original_minio_setting = Config.USE_MINIO_STORAGE
+        Config.USE_MINIO_STORAGE
         monkeypatch.setattr(Config, "USE_MINIO_STORAGE", True)
 
         # Mock subprocess for FFmpeg decryption
-        import asyncio
 
         async def mock_create_subprocess_exec(*args, **kwargs):
-            mock_process = type('Process', (), {})()
+            mock_process = type("Process", (), {})()
             mock_process.returncode = 0
             mock_process.communicate = lambda: (b"Converted successfully", b"")
             return mock_process
@@ -528,7 +502,6 @@ class TestDecryptionMinIOIntegration:
         """Test that decrypt_book handles MinIO upload failures gracefully."""
         # If MinIO upload fails, decryption should still succeed
         # This is a non-critical operation
-        pass
 
     @pytest.mark.asyncio
     async def test_decrypt_book_backward_compatibility_minio_disabled(self, monkeypatch):
@@ -540,4 +513,3 @@ class TestDecryptionMinIOIntegration:
 
         # Decryption should work without MinIO
         # (No object_key should be created)
-        pass

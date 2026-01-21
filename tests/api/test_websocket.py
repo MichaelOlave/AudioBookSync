@@ -1,7 +1,6 @@
 """Tests for WebSocket endpoints."""
 
 import pytest
-from fastapi.testclient import TestClient
 
 
 class TestWebSocketUpdates:
@@ -18,9 +17,7 @@ class TestWebSocketUpdates:
         """Test WebSocket with invalid token."""
         with pytest.raises(Exception):
             # Should fail with invalid token
-            with client.websocket_connect(
-                "/api/v1/ws/updates?token=invalid-token"
-            ) as websocket:
+            with client.websocket_connect("/api/v1/ws/updates?token=invalid-token") as websocket:
                 pass
 
     def test_websocket_valid_connection(self, client, test_user_with_tokens):
@@ -35,7 +32,7 @@ class TestWebSocketUpdates:
                 # Should receive pong
                 data = websocket.receive_json(timeout=5)
                 assert data["type"] == "pong"
-        except Exception as e:
+        except Exception:
             # WebSocket might not work in test environment, but connection attempt is valid
             pass
 
@@ -47,7 +44,7 @@ class TestWebSocketUpdates:
             ) as websocket:
                 # Connection opens and closes gracefully
                 pass
-        except Exception as e:
+        except Exception:
             # Expected in test environment
             pass
 
@@ -60,7 +57,7 @@ class TestWebSocketUpdates:
                 # Send heartbeat
                 websocket.send_json({"type": "heartbeat"})
                 # Should not receive immediate error
-        except Exception as e:
+        except Exception:
             # WebSocket in test might have limitations
             pass
 
@@ -85,7 +82,7 @@ class TestWebSocketEvents:
                         "books_found": 50,
                     }
                 )
-        except Exception as e:
+        except Exception:
             pass
 
     def test_websocket_download_event(self, client, test_user_with_tokens):
@@ -104,7 +101,7 @@ class TestWebSocketEvents:
                         "progress_percent": 50,
                     }
                 )
-        except Exception as e:
+        except Exception:
             pass
 
     def test_websocket_decrypt_event(self, client, test_user_with_tokens):
@@ -123,7 +120,7 @@ class TestWebSocketEvents:
                         "progress_percent": 75,
                     }
                 )
-        except Exception as e:
+        except Exception:
             pass
 
     def test_websocket_progress_update(self, client, test_user_with_tokens):
@@ -142,7 +139,7 @@ class TestWebSocketEvents:
                         "percent": 50,
                     }
                 )
-        except Exception as e:
+        except Exception:
             pass
 
     def test_websocket_error_event(self, client, test_user_with_tokens):
@@ -160,7 +157,7 @@ class TestWebSocketEvents:
                         "details": {"asin": "B084L6Z6M3"},
                     }
                 )
-        except Exception as e:
+        except Exception:
             pass
 
 
@@ -189,7 +186,7 @@ class TestWebSocketConcurrency:
                     except:
                         # Timing-based, may not work in test environment
                         pass
-        except Exception as e:
+        except Exception:
             pass
 
     def test_connection_state_isolation(self, client, test_user_with_tokens):
@@ -207,7 +204,7 @@ class TestWebSocketConcurrency:
                     # Send different message on connection 2
                     websocket2.send_json({"type": "message2"})
                     # Both connections should remain active
-        except Exception as e:
+        except Exception:
             pass
 
 
@@ -226,7 +223,7 @@ class TestWebSocketLifecycle:
                 except TimeoutError:
                     # Expected behavior
                     pass
-        except Exception as e:
+        except Exception:
             pass
 
     def test_websocket_message_ordering(self, client, test_user_with_tokens):
@@ -254,7 +251,7 @@ class TestWebSocketLifecycle:
                 except:
                     # Timing-dependent in test environment
                     pass
-        except Exception as e:
+        except Exception:
             pass
 
     def test_websocket_reconnection(self, client, test_user_with_tokens):
@@ -271,7 +268,7 @@ class TestWebSocketLifecycle:
             ) as websocket2:
                 websocket2.send_json({"type": "ping"})
                 # Should be able to reconnect successfully
-        except Exception as e:
+        except Exception:
             pass
 
 
@@ -282,9 +279,7 @@ class TestWebSocketSecurity:
         """Test that different users cannot see each other's messages."""
         # This test would need two different user tokens
         # Skipped for simplicity, but important for production
-        pass
 
     def test_websocket_token_expiration(self, client):
         """Test WebSocket disconnects when token expires."""
         # Would need to mock token expiration
-        pass

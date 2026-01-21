@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+
 from loguru import logger
 
 from ..core.config import Config
@@ -12,7 +13,6 @@ from ..infrastructure.file_utils import (
     normalize_filename,
 )
 from ..infrastructure.storage_service import StorageService
-from ..database.db_downloads import download_ops
 
 
 async def download_book(
@@ -132,9 +132,7 @@ async def download_book(
         return False
 
 
-async def _upload_downloaded_file_to_minio(
-    book_asin: str, book_title: str, user_id: str
-) -> None:
+async def _upload_downloaded_file_to_minio(book_asin: str, book_title: str, user_id: str) -> None:
     """
     Upload downloaded file to MinIO after successful download.
 

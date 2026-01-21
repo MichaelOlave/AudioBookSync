@@ -6,7 +6,8 @@ error handling pattern that was previously duplicated 13 times throughout
 the codebase.
 """
 
-from typing import Protocol, Any, Callable, Awaitable, Optional
+from typing import Any, Awaitable, Callable, Optional, Protocol
+
 from loguru import logger
 
 

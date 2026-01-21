@@ -1,6 +1,7 @@
 """WebSocket connection manager for real-time updates."""
 
-from typing import Dict, Set, Any
+from typing import Any, Dict, Set
+
 from fastapi import WebSocket
 from loguru import logger
 

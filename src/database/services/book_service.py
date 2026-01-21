@@ -1,16 +1,15 @@
 """Book database service layer using SQLAlchemy ORM."""
 
-from typing import Optional, List
 from datetime import date
 from decimal import Decimal
+from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select, and_
-from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models.book import Book
-from src.database.models.download import DownloadStatus
-from src.database.models.decryption import DecryptionStatus
+from src.database.services import metadata_service
 
 
 async def add_book(
@@ -152,9 +151,7 @@ async def get_book_by_asin(db: AsyncSession, asin: str) -> Optional[Book]:
         Book object if found, None otherwise
     """
     try:
-        result = await db.execute(
-            select(Book).where(Book.asin == asin)
-        )
+        result = await db.execute(select(Book).where(Book.asin == asin))
         return result.scalar_one_or_none()
     except Exception as e:
         logger.error(f"Failed to get book by ASIN: {e}")
@@ -173,9 +170,7 @@ async def get_books_by_user(db: AsyncSession, user_id: str) -> List[Book]:
         List of Book objects
     """
     try:
-        result = await db.execute(
-            select(Book).where(Book.user_id == user_id).order_by(Book.title)
-        )
+        result = await db.execute(select(Book).where(Book.user_id == user_id).order_by(Book.title))
         return result.scalars().all()
     except Exception as e:
         logger.error(f"Failed to get books for user: {e}")
@@ -195,12 +190,14 @@ async def get_downloaded_books(db: AsyncSession, user_id: str) -> List[Book]:
     """
     try:
         result = await db.execute(
-            select(Book).where(
+            select(Book)
+            .where(
                 and_(
                     Book.user_id == user_id,
-                    Book.is_downloaded == True,
+                    Book.is_downloaded,
                 )
-            ).order_by(Book.title)
+            )
+            .order_by(Book.title)
         )
         return result.scalars().all()
     except Exception as e:
@@ -221,12 +218,14 @@ async def get_decrypted_books(db: AsyncSession, user_id: str) -> List[Book]:
     """
     try:
         result = await db.execute(
-            select(Book).where(
+            select(Book)
+            .where(
                 and_(
                     Book.user_id == user_id,
-                    Book.is_decrypted == True,
+                    Book.is_decrypted,
                 )
-            ).order_by(Book.title)
+            )
+            .order_by(Book.title)
         )
         return result.scalars().all()
     except Exception as e:
@@ -352,7 +351,8 @@ async def search_books(
     try:
         query_lower = f"%{query.lower()}%"
         result = await db.execute(
-            select(Book).where(
+            select(Book)
+            .where(
                 and_(
                     Book.user_id == user_id,
                     (
@@ -361,7 +361,8 @@ async def search_books(
                         | Book.narrator.ilike(query_lower)
                     ),
                 )
-            ).order_by(Book.title)
+            )
+            .order_by(Book.title)
         )
         return result.scalars().all()
     except Exception as e:
@@ -387,14 +388,186 @@ async def get_books_by_series(
     """
     try:
         result = await db.execute(
-            select(Book).where(
+            select(Book)
+            .where(
                 and_(
                     Book.user_id == user_id,
                     Book.series_name == series_name,
                 )
-            ).order_by(Book.series_sequence)
+            )
+            .order_by(Book.series_sequence)
         )
         return result.scalars().all()
     except Exception as e:
         logger.error(f"Failed to get books by series: {e}")
         return []
+
+
+async def add_book_with_metadata(
+    db: AsyncSession,
+    asin: str,
+    user_id: str,
+    title: str,
+    book_data: Dict[str, Any],
+    purchase_date: Optional[str] = None,
+) -> bool:
+    """
+    Orchestrate adding book with full metadata across 7 tables.
+
+    This coordinates:
+    1. Basic book record
+    2. Contributors (authors, narrators) with get-or-create
+    3. Book-contributor relationships
+    4. Media info (codec, bitrate, duration)
+    5. Reading progress initialization
+    6. Companion materials (PDFs, transcripts)
+    7. Flexible metadata (JSON)
+
+    Args:
+        db: Database session
+        asin: Amazon Standard Identification Number
+        user_id: User UUID
+        title: Book title
+        book_data: Dictionary containing full book metadata
+        purchase_date: Purchase date (YYYY-MM-DD format string)
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # 1. Add basic book
+        book_added = await add_book(
+            db,
+            asin=asin,
+            user_id=user_id,
+            title=title,
+            purchase_date=purchase_date,
+            runtime_min=_extract_runtime(book_data),
+            author=_extract_authors_string(book_data),
+            narrator=_extract_narrators_string(book_data),
+            series_name=book_data.get("series_name"),
+            description=book_data.get("description"),
+            rating=book_data.get("rating"),
+            subtitle=book_data.get("subtitle"),
+            publisher=book_data.get("publisher"),
+            publication_date=book_data.get("publication_date"),
+            language=book_data.get("language", "en-US"),
+            review_count=book_data.get("review_count"),
+            cover_art_url=book_data.get("cover_art_url"),
+        )
+
+        if not book_added:
+            logger.error(f"Failed to add basic book record: {asin}")
+            return False
+
+        # 2. Add contributors (authors, narrators)
+        contributors_data = book_data.get("authors", []) + book_data.get("narrators", [])
+        for idx, contrib_data in enumerate(contributors_data):
+            try:
+                contributor = await metadata_service.get_or_create_contributor(
+                    db,
+                    name=contrib_data.get("name"),
+                    contributor_type=contrib_data.get("type", "author"),
+                    audible_asin=contrib_data.get("asin"),
+                    description=contrib_data.get("description"),
+                    url=contrib_data.get("url"),
+                )
+                if contributor:
+                    await metadata_service.add_book_contributor(
+                        db,
+                        asin=asin,
+                        contributor_id=contributor.contributor_id,
+                        role=contrib_data.get("type", "author"),
+                        sequence_number=idx,
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to add contributor to book: {e}")
+                # Continue with other contributors
+
+        # 3. Add media info
+        media_data = book_data.get("media_info", {})
+        if media_data:
+            await metadata_service.upsert_media_info(
+                db,
+                asin=asin,
+                codec=media_data.get("codec"),
+                bitrate=media_data.get("bitrate"),
+                sample_rate=media_data.get("sample_rate"),
+                channels=media_data.get("channels"),
+                format_type=media_data.get("format_type"),
+                duration_ms=media_data.get("duration_ms"),
+                chapters_count=media_data.get("chapters_count"),
+                enhanced=media_data.get("enhanced", False),
+            )
+
+        # 4. Create reading progress
+        await metadata_service.create_reading_progress(
+            db,
+            asin=asin,
+            user_id=user_id,
+            percent_complete=book_data.get("percent_complete", 0),
+            position_ms=book_data.get("last_position_heard", 0),
+        )
+
+        # 5. Add companion materials
+        for material in book_data.get("companion_materials", []):
+            try:
+                await metadata_service.create_companion_material(
+                    db,
+                    asin=asin,
+                    material_type=material.get("material_type", "document"),
+                    url=material.get("url"),
+                    title=material.get("title"),
+                    file_size_bytes=material.get("file_size_bytes"),
+                    mime_type=material.get("mime_type"),
+                    sequence_number=material.get("sequence_number"),
+                    description=material.get("description"),
+                )
+            except Exception as e:
+                logger.warning(f"Failed to add companion material: {e}")
+                # Continue with other materials
+
+        # 6. Store flexible metadata
+        await metadata_service.create_book_metadata(
+            db,
+            asin=asin,
+            origin_asin=book_data.get("origin_asin"),
+            brand=book_data.get("brand_name"),
+            periodical_info=book_data.get("periodical_info"),
+            relationships=book_data.get("relationships"),
+            badges=book_data.get("badges"),
+            claim_code_url=book_data.get("claim_code_url"),
+            parent_asin=book_data.get("parent_asin"),
+            sku=book_data.get("sku"),
+            rating_distribution=book_data.get("rating_distribution"),
+            custom_metadata=book_data.get("custom_metadata"),
+        )
+
+        logger.info(f"Added book with complete metadata: {title} ({asin})")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to add book with metadata: {e}")
+        return False
+
+
+def _extract_runtime(book_data: Dict[str, Any]) -> Optional[int]:
+    """Extract runtime in minutes from book data."""
+    runtime_ms = book_data.get("runtime_length_min")
+    return int(runtime_ms) if runtime_ms else None
+
+
+def _extract_authors_string(book_data: Dict[str, Any]) -> Optional[str]:
+    """Extract comma-separated authors string."""
+    authors = book_data.get("authors", [])
+    if not authors:
+        return None
+    return ", ".join([a.get("name", "") for a in authors if a.get("name")])
+
+
+def _extract_narrators_string(book_data: Dict[str, Any]) -> Optional[str]:
+    """Extract comma-separated narrators string."""
+    narrators = book_data.get("narrators", [])
+    if not narrators:
+        return None
+    return ", ".join([n.get("name", "") for n in narrators if n.get("name")])

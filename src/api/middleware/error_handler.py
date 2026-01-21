@@ -1,13 +1,14 @@
 """Global exception handlers and custom exceptions for FastAPI."""
 
-from fastapi import FastAPI, Request, status, HTTPException
-from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
-from loguru import logger
-import traceback
-from typing import Optional, Callable, Any, TypeVar
-from functools import wraps
 import inspect
+import traceback
+from functools import wraps
+from typing import Any, Callable, Optional, TypeVar
+
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from loguru import logger
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -59,9 +60,7 @@ class ValidationError(AudioBookSyncException):
     """Raised when input validation fails."""
 
     def __init__(self, message: str = "Validation failed", detail: Optional[dict] = None):
-        super().__init__(
-            message, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail
-        )
+        super().__init__(message, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail)
 
 
 class InternalServerError(AudioBookSyncException):
@@ -168,9 +167,7 @@ def add_exception_handlers(app: FastAPI):
     """Register all exception handlers with the FastAPI app."""
 
     @app.exception_handler(AudioBookSyncException)
-    async def audiobooksync_exception_handler(
-        request: Request, exc: AudioBookSyncException
-    ):
+    async def audiobooksync_exception_handler(request: Request, exc: AudioBookSyncException):
         """Handle custom AudioBookSync exceptions."""
         logger.error(
             f"AudioBookSync error [{exc.status_code}]: {exc.message}",
@@ -188,9 +185,7 @@ def add_exception_handlers(app: FastAPI):
         )
 
     @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(
-        request: Request, exc: RequestValidationError
-    ):
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):
         """Handle Pydantic validation errors."""
         errors = []
         for error in exc.errors():

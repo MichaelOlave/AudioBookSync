@@ -1,20 +1,21 @@
 """Metadata operations consolidated service layer using SQLAlchemy ORM."""
 
-from typing import Optional, List
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from sqlalchemy import select, and_
-from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
+from sqlalchemy import and_, select
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
-from src.database.models.contributor import Contributor, BookContributor
+from src.database.models.book_availability import BookAvailability
+from src.database.models.book_metadata import BookMetadataJson
+from src.database.models.companion_material import CompanionMaterial
+from src.database.models.contributor import BookContributor, Contributor
 from src.database.models.media_info import MediaInfo
 from src.database.models.reading_progress import ReadingProgress
-from src.database.models.book_availability import BookAvailability
-from src.database.models.companion_material import CompanionMaterial
-from src.database.models.book_metadata import BookMetadataJson
-
 
 # ============================================================================
 # CONTRIBUTOR OPERATIONS
@@ -63,9 +64,7 @@ async def get_contributor_by_id(db: AsyncSession, contributor_id: UUID) -> Optio
 async def get_contributor_by_name(db: AsyncSession, name: str) -> Optional[Contributor]:
     """Get contributor by name."""
     try:
-        result = await db.execute(
-            select(Contributor).where(Contributor.name == name)
-        )
+        result = await db.execute(select(Contributor).where(Contributor.name == name))
         return result.scalar_one_or_none()
     except Exception as e:
         logger.error(f"Failed to get contributor by name: {e}")
@@ -94,6 +93,50 @@ async def add_book_contributor(
         return book_contrib
     except Exception as e:
         logger.error(f"Failed to add book contributor: {e}")
+        return None
+
+
+async def get_or_create_contributor(
+    db: AsyncSession,
+    name: str,
+    contributor_type: str,
+    audible_asin: Optional[str] = None,
+    description: Optional[str] = None,
+    url: Optional[str] = None,
+) -> Optional[Contributor]:
+    """
+    Get existing contributor or create new one.
+
+    Uses name and type as unique identifier to prevent duplicates.
+    """
+    try:
+        # Try to find existing contributor
+        result = await db.execute(
+            select(Contributor).where(
+                and_(
+                    Contributor.name == name,
+                    Contributor.type == contributor_type,
+                )
+            )
+        )
+        contributor = result.scalar_one_or_none()
+
+        if contributor:
+            logger.debug(f"Found existing contributor: {name} ({contributor_type})")
+            return contributor
+
+        # Create new contributor if not found
+        logger.debug(f"Creating new contributor: {name} ({contributor_type})")
+        return await create_contributor(
+            db=db,
+            name=name,
+            contributor_type=contributor_type,
+            audible_asin=audible_asin,
+            description=description,
+            url=url,
+        )
+    except Exception as e:
+        logger.error(f"Failed to get or create contributor: {e}")
         return None
 
 
@@ -140,13 +183,72 @@ async def create_media_info(
 async def get_media_info(db: AsyncSession, asin: str) -> Optional[MediaInfo]:
     """Get media info for a book."""
     try:
-        result = await db.execute(
-            select(MediaInfo).where(MediaInfo.asin == asin)
-        )
+        result = await db.execute(select(MediaInfo).where(MediaInfo.asin == asin))
         return result.scalar_one_or_none()
     except Exception as e:
         logger.error(f"Failed to get media info: {e}")
         return None
+
+
+async def upsert_media_info(
+    db: AsyncSession,
+    asin: str,
+    codec: Optional[str] = None,
+    bitrate: Optional[int] = None,
+    sample_rate: Optional[int] = None,
+    channels: Optional[int] = None,
+    format_type: Optional[str] = None,
+    duration_ms: Optional[int] = None,
+    chapters_count: Optional[int] = None,
+    enhanced: bool = False,
+) -> bool:
+    """
+    Insert or update media info using PostgreSQL upsert.
+
+    If media info exists for the asin, updates the provided fields.
+    If not, creates a new record.
+    """
+    try:
+        # Build update dict with non-None values
+        update_fields = {
+            "codec": codec,
+            "bitrate": bitrate,
+            "sample_rate": sample_rate,
+            "channels": channels,
+            "format_type": format_type,
+            "duration_ms": duration_ms,
+            "chapters_count": chapters_count,
+            "enhanced": enhanced,
+        }
+        # Remove None values to avoid overwriting with nulls
+        update_fields = {k: v for k, v in update_fields.items() if v is not None}
+
+        # Create insert statement
+        stmt = insert(MediaInfo).values(
+            asin=asin,
+            codec=codec,
+            bitrate=bitrate,
+            sample_rate=sample_rate,
+            channels=channels,
+            format_type=format_type,
+            duration_ms=duration_ms,
+            chapters_count=chapters_count,
+            enhanced=enhanced,
+        )
+
+        # Add on_conflict_do_update for upsert
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["asin"],
+            set_=update_fields,
+        )
+
+        await db.execute(stmt)
+        await db.flush()
+        logger.info(f"Upserted media info for {asin}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to upsert media info: {e}")
+        return False
 
 
 # ============================================================================
@@ -269,9 +371,7 @@ async def create_book_availability(
 async def get_book_availability(db: AsyncSession, asin: str) -> Optional[BookAvailability]:
     """Get book availability."""
     try:
-        result = await db.execute(
-            select(BookAvailability).where(BookAvailability.asin == asin)
-        )
+        result = await db.execute(select(BookAvailability).where(BookAvailability.asin == asin))
         return result.scalar_one_or_none()
     except Exception as e:
         logger.error(f"Failed to get book availability: {e}")
@@ -377,9 +477,7 @@ async def create_book_metadata(
 async def get_book_metadata(db: AsyncSession, asin: str) -> Optional[BookMetadataJson]:
     """Get book metadata."""
     try:
-        result = await db.execute(
-            select(BookMetadataJson).where(BookMetadataJson.asin == asin)
-        )
+        result = await db.execute(select(BookMetadataJson).where(BookMetadataJson.asin == asin))
         return result.scalar_one_or_none()
     except Exception as e:
         logger.error(f"Failed to get book metadata: {e}")
@@ -413,4 +511,78 @@ async def update_book_metadata(
         return True
     except Exception as e:
         logger.error(f"Failed to update book metadata: {e}")
+        return False
+
+
+async def add_custom_metadata(
+    db: AsyncSession,
+    asin: str,
+    key: str,
+    value: Any,
+) -> bool:
+    """
+    Add or update custom metadata field using JSON operations.
+
+    Creates or updates a specific key in the custom_metadata JSON object.
+    """
+    try:
+        metadata = await get_book_metadata(db, asin)
+
+        if not metadata:
+            # Create new metadata record with initial custom_metadata
+            metadata = BookMetadataJson(
+                asin=asin,
+                custom_metadata={key: value},
+            )
+            db.add(metadata)
+            logger.info(f"Created metadata with custom field for {asin}")
+        else:
+            # Update existing - initialize dict if None
+            if metadata.custom_metadata is None:
+                metadata.custom_metadata = {}
+            metadata.custom_metadata[key] = value
+            # CRITICAL: Mark as modified for JSON tracking
+            flag_modified(metadata, "custom_metadata")
+            logger.info(f"Added custom metadata field '{key}' to {asin}")
+
+        await db.flush()
+        return True
+    except Exception as e:
+        logger.error(f"Failed to add custom metadata: {e}")
+        return False
+
+
+async def add_badge(
+    db: AsyncSession,
+    asin: str,
+    badge_name: str,
+    badge_info: Optional[Dict[str, Any]] = None,
+) -> bool:
+    """
+    Append badge to JSON array.
+
+    Adds a new badge object to the badges array in book metadata.
+    """
+    try:
+        metadata = await get_book_metadata(db, asin)
+        badge_obj = {"name": badge_name, **(badge_info or {})}
+
+        if not metadata:
+            # Create new metadata with initial badges array
+            metadata = BookMetadataJson(asin=asin, badges=[badge_obj])
+            db.add(metadata)
+            logger.info(f"Created metadata with badge for {asin}")
+        else:
+            # Update existing - initialize array if None
+            if metadata.badges is None:
+                metadata.badges = []
+            metadata.badges.append(badge_obj)
+            # CRITICAL: Mark as modified for JSON tracking
+            flag_modified(metadata, "badges")
+            logger.info(f"Added badge '{badge_name}' to {asin}")
+
+        await db.flush()
+        return True
+    except Exception as e:
+        logger.error(f"Failed to add badge: {e}")
         return False

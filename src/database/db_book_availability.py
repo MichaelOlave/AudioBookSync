@@ -1,7 +1,8 @@
 """Database operations for book availability and licensing information."""
 
-from typing import Dict, Optional
 from datetime import datetime
+from typing import Dict, Optional
+
 from loguru import logger
 
 from .db_pool import db_pool as _db_pool

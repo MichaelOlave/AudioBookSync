@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+
 from loguru import logger
 
 from ..core.config import Config
@@ -12,7 +13,6 @@ from ..infrastructure.file_utils import (
     normalize_filename,
 )
 from ..infrastructure.storage_service import StorageService
-from ..database.db_decryptions import decryption_ops
 
 
 async def decrypt_book(
@@ -98,9 +98,7 @@ async def decrypt_book(
 
                     return True
                 else:
-                    raise Exception(
-                        f"Decryption failed for '{item}': validation failed"
-                    )
+                    raise Exception(f"Decryption failed for '{item}': validation failed")
             else:
                 stderr_text = stderr.decode().strip()
                 raise Exception(f"FFmpeg error decrypting '{item}': {stderr_text}")
@@ -122,9 +120,7 @@ async def decrypt_book(
         return False
 
 
-async def _upload_decrypted_file_to_minio(
-    book_asin: str, book_title: str, user_id: str
-) -> None:
+async def _upload_decrypted_file_to_minio(book_asin: str, book_title: str, user_id: str) -> None:
     """
     Upload decrypted file to MinIO after successful decryption.
 

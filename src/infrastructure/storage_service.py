@@ -17,7 +17,6 @@ from typing import Optional, Tuple
 
 from loguru import logger
 
-from src.core.config import Config
 from src.infrastructure.file_utils import normalize_filename
 from src.infrastructure.minio_client import MinIOClient
 
@@ -81,9 +80,7 @@ class StorageService:
             ValueError: If file_type is invalid or required parameters are missing
         """
         if file_type not in ("downloaded", "decrypted"):
-            raise ValueError(
-                f"Invalid file_type: {file_type}. Must be 'downloaded' or 'decrypted'"
-            )
+            raise ValueError(f"Invalid file_type: {file_type}. Must be 'downloaded' or 'decrypted'")
 
         if file_type == "downloaded":
             if not asin:
@@ -99,8 +96,7 @@ class StorageService:
         normalized_title = normalize_filename(title)
         object_key = f"decrypted/{normalized_title}.m4b"
         logger.debug(
-            f"Generated object key for decrypted file: {object_key} "
-            f"(original title: {title})"
+            f"Generated object key for decrypted file: {object_key} " f"(original title: {title})"
         )
         return object_key
 
@@ -174,9 +170,7 @@ class StorageService:
 
         # Generate object key
         try:
-            object_key = self._generate_object_key(
-                file_type=file_type, asin=asin, title=title
-            )
+            object_key = self._generate_object_key(file_type=file_type, asin=asin, title=title)
         except ValueError as e:
             logger.error(f"Failed to generate object key: {e}")
             return (False, None)
@@ -197,14 +191,12 @@ class StorageService:
 
         if success:
             logger.info(
-                f"Successfully uploaded to MinIO: user_id={user_id}, "
-                f"object_key={object_key}"
+                f"Successfully uploaded to MinIO: user_id={user_id}, " f"object_key={object_key}"
             )
             return (True, object_key)
         else:
             logger.error(
-                f"Failed to upload to MinIO: user_id={user_id}, "
-                f"object_key={object_key}"
+                f"Failed to upload to MinIO: user_id={user_id}, " f"object_key={object_key}"
             )
             return (False, None)
 
@@ -247,9 +239,7 @@ class StorageService:
                 return temp_path
             else:
                 # Download failed, clean up temp file
-                logger.error(
-                    f"MinIO download failed: user_id={user_id}, object_key={object_key}"
-                )
+                logger.error(f"MinIO download failed: user_id={user_id}, object_key={object_key}")
                 Path(temp_path).unlink(missing_ok=True)
                 return None
 
@@ -296,9 +286,7 @@ class StorageService:
             )
             return data
         else:
-            logger.error(
-                f"MinIO streaming failed: user_id={user_id}, object_key={object_key}"
-            )
+            logger.error(f"MinIO streaming failed: user_id={user_id}, object_key={object_key}")
             return b""
 
     def delete_file(self, user_id: str, object_key: str) -> bool:
@@ -313,21 +301,17 @@ class StorageService:
         """
         bucket_name = self._get_user_bucket(user_id)
 
-        logger.info(
-            f"Deleting file from MinIO: user_id={user_id}, object_key={object_key}"
-        )
+        logger.info(f"Deleting file from MinIO: user_id={user_id}, object_key={object_key}")
 
         success = self.minio_client.delete_file(bucket_name, object_key)
 
         if success:
             logger.info(
-                f"Successfully deleted from MinIO: user_id={user_id}, "
-                f"object_key={object_key}"
+                f"Successfully deleted from MinIO: user_id={user_id}, " f"object_key={object_key}"
             )
         else:
             logger.error(
-                f"Failed to delete from MinIO: user_id={user_id}, "
-                f"object_key={object_key}"
+                f"Failed to delete from MinIO: user_id={user_id}, " f"object_key={object_key}"
             )
 
         return success

@@ -2,15 +2,13 @@
 
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field, ConfigDict
-from .common import BookActionCreate, PaginatedResponse
 
+from pydantic import BaseModel, ConfigDict, Field
+
+from .common import BookActionCreate, PaginatedResponse
 
 class DecryptCreate(BookActionCreate):
     """Request to initiate book decryption."""
-
-    pass
-
 
 class DecryptResponse(BaseModel):
     """Decryption status response."""
@@ -72,7 +70,6 @@ class DecryptResponse(BaseModel):
             }
         }
     )
-
 
 DecryptList = PaginatedResponse[DecryptResponse]
 """Type alias for paginated decryption list response."""

@@ -27,8 +27,8 @@ Phase 2 (future): Consolidate actual implementation
   - Remove old individual modules
 """
 
-from ..database.db_downloads import download_ops as _download_ops
 from ..database.db_decryptions import decryption_ops as _decryption_ops
+from ..database.db_downloads import download_ops as _download_ops
 from ..database.db_sync import sync_ops as _sync_ops
 
 
@@ -65,9 +65,7 @@ class OperationTracking:
         """Get download record by ID (from db_downloads)."""
         return _download_ops.get_download_by_id(download_id=download_id)
 
-    def get_user_downloads(
-        self, user_id: str, status=None, limit: int = 10, offset: int = 0
-    ):
+    def get_user_downloads(self, user_id: str, status=None, limit: int = 10, offset: int = 0):
         """Get downloads for a user (from db_downloads)."""
         return _download_ops.get_user_downloads(
             user_id=user_id, status=status, limit=limit, offset=offset
@@ -81,9 +79,7 @@ class OperationTracking:
         """Create a decryption status entry (from db_decryptions)."""
         return _decryption_ops.create_decryption_status(asin=asin, status=status)
 
-    def update_decryption_status(
-        self, decryption_id: str, status: str, **kwargs
-    ) -> bool:
+    def update_decryption_status(self, decryption_id: str, status: str, **kwargs) -> bool:
         """Update decryption status (from db_decryptions)."""
         return _decryption_ops.update_decryption_status(
             decryption_id=decryption_id, status=status, **kwargs
@@ -93,9 +89,7 @@ class OperationTracking:
         """Get decryption record by ID (from db_decryptions)."""
         return _decryption_ops.get_decryption_by_id(decryption_id=decryption_id)
 
-    def get_user_decryptions(
-        self, user_id: str, status=None, limit: int = 10, offset: int = 0
-    ):
+    def get_user_decryptions(self, user_id: str, status=None, limit: int = 10, offset: int = 0):
         """Get decryptions for a user (from db_decryptions)."""
         return _decryption_ops.get_user_decryptions(
             user_id=user_id, status=status, limit=limit, offset=offset

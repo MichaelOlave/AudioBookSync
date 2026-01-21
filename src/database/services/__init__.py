@@ -2,13 +2,13 @@
 
 # Import services to make them available at package level
 from src.database.services import (
-    user_service,
     book_service,
-    download_service,
     decryption_service,
-    sync_service,
+    download_service,
     error_service,
     metadata_service,
+    sync_service,
+    user_service,
 )
 
 __all__ = [

@@ -24,17 +24,11 @@ class TestUserOperations:
                 mock_cursor = MagicMock()
                 mock_cursor.fetchone = MagicMock(return_value=("user-123",))
                 mock_pool.get_cursor = MagicMock()
-                mock_pool.get_cursor.return_value.__enter__ = MagicMock(
-                    return_value=mock_cursor
-                )
-                mock_pool.get_cursor.return_value.__exit__ = MagicMock(
-                    return_value=False
-                )
+                mock_pool.get_cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
+                mock_pool.get_cursor.return_value.__exit__ = MagicMock(return_value=False)
 
                 ops = UserOperations()
-                result = ops.create_user(
-                    "testuser", "test@example.com", "/path/auth", "bytes"
-                )
+                result = ops.create_user("testuser", "test@example.com", "/path/auth", "bytes")
 
                 assert result == "user-123" or result is not None
 
@@ -46,9 +40,7 @@ class TestUserOperations:
             mock_cursor.fetchone = MagicMock(return_value=mock_user)
             mock_pool = MagicMock()
             mock_pool.get_cursor = MagicMock()
-            mock_pool.get_cursor.return_value.__enter__ = MagicMock(
-                return_value=mock_cursor
-            )
+            mock_pool.get_cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
             mock_pool.get_cursor.return_value.__exit__ = MagicMock(return_value=False)
 
             ops = UserOperations()
@@ -64,9 +56,7 @@ class TestUserOperations:
             mock_cursor = MagicMock()
             mock_pool = MagicMock()
             mock_pool.get_cursor = MagicMock()
-            mock_pool.get_cursor.return_value.__enter__ = MagicMock(
-                return_value=mock_cursor
-            )
+            mock_pool.get_cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
             mock_pool.get_cursor.return_value.__exit__ = MagicMock(return_value=False)
 
             ops = UserOperations()
@@ -88,9 +78,7 @@ class TestBookOperations:
             ops = BookOperations()
             ops.db_pool = MagicMock()
             ops.db_pool.get_cursor = MagicMock()
-            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(
-                return_value=mock_cursor
-            )
+            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
             ops.db_pool.get_cursor.return_value.__exit__ = MagicMock(return_value=False)
 
             result = ops.add_book(
@@ -112,9 +100,7 @@ class TestBookOperations:
             ops = BookOperations()
             ops.db_pool = MagicMock()
             ops.db_pool.get_cursor = MagicMock()
-            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(
-                return_value=mock_cursor
-            )
+            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
             ops.db_pool.get_cursor.return_value.__exit__ = MagicMock(return_value=False)
 
             result = ops.get_user_books("user-123")
@@ -128,9 +114,7 @@ class TestBookOperations:
             ops = BookOperations()
             ops.db_pool = MagicMock()
             ops.db_pool.get_cursor = MagicMock()
-            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(
-                return_value=mock_cursor
-            )
+            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
             ops.db_pool.get_cursor.return_value.__exit__ = MagicMock(return_value=False)
 
             result = ops.remove_book("B001")
@@ -146,9 +130,7 @@ class TestBookOperations:
             ops = BookOperations()
             ops.db_pool = MagicMock()
             ops.db_pool.get_cursor = MagicMock()
-            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(
-                return_value=mock_cursor
-            )
+            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
             ops.db_pool.get_cursor.return_value.__exit__ = MagicMock(return_value=False)
 
             result = ops.get_book_by_asin("B001")
@@ -169,9 +151,7 @@ class TestDownloadOperations:
             ops = DownloadOperations()
             ops.db_pool = MagicMock()
             ops.db_pool.get_cursor = MagicMock()
-            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(
-                return_value=mock_cursor
-            )
+            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
             ops.db_pool.get_cursor.return_value.__exit__ = MagicMock(return_value=False)
 
             result = ops.create_download_status("B001", status="pending")
@@ -185,9 +165,7 @@ class TestDownloadOperations:
             ops = DownloadOperations()
             ops.db_pool = MagicMock()
             ops.db_pool.get_cursor = MagicMock()
-            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(
-                return_value=mock_cursor
-            )
+            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
             ops.db_pool.get_cursor.return_value.__exit__ = MagicMock(return_value=False)
 
             result = ops.update_download_status(
@@ -210,9 +188,7 @@ class TestDecryptionOperations:
             ops = DecryptionOperations()
             ops.db_pool = MagicMock()
             ops.db_pool.get_cursor = MagicMock()
-            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(
-                return_value=mock_cursor
-            )
+            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
             ops.db_pool.get_cursor.return_value.__exit__ = MagicMock(return_value=False)
 
             result = ops.create_decryption_status(
@@ -228,9 +204,7 @@ class TestDecryptionOperations:
             ops = DecryptionOperations()
             ops.db_pool = MagicMock()
             ops.db_pool.get_cursor = MagicMock()
-            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(
-                return_value=mock_cursor
-            )
+            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
             ops.db_pool.get_cursor.return_value.__exit__ = MagicMock(return_value=False)
 
             result = ops.update_decryption_status(
@@ -253,9 +227,7 @@ class TestSyncOperations:
             ops = SyncOperations()
             ops.db_pool = MagicMock()
             ops.db_pool.get_cursor = MagicMock()
-            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(
-                return_value=mock_cursor
-            )
+            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
             ops.db_pool.get_cursor.return_value.__exit__ = MagicMock(return_value=False)
 
             result = ops.create_sync_history("user-123", sync_type="full")
@@ -269,9 +241,7 @@ class TestSyncOperations:
             ops = SyncOperations()
             ops.db_pool = MagicMock()
             ops.db_pool.get_cursor = MagicMock()
-            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(
-                return_value=mock_cursor
-            )
+            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
             ops.db_pool.get_cursor.return_value.__exit__ = MagicMock(return_value=False)
 
             result = ops.complete_sync_history(
@@ -296,9 +266,7 @@ class TestErrorOperations:
             ops = ErrorOperations()
             ops.db_pool = MagicMock()
             ops.db_pool.get_cursor = MagicMock()
-            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(
-                return_value=mock_cursor
-            )
+            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
             ops.db_pool.get_cursor.return_value.__exit__ = MagicMock(return_value=False)
 
             result = ops.log_error(
@@ -316,9 +284,7 @@ class TestErrorOperations:
             ops = ErrorOperations()
             ops.db_pool = MagicMock()
             ops.db_pool.get_cursor = MagicMock()
-            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(
-                return_value=mock_cursor
-            )
+            ops.db_pool.get_cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
             ops.db_pool.get_cursor.return_value.__exit__ = MagicMock(return_value=False)
 
             result = ops.log_error(

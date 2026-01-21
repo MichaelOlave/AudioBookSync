@@ -25,21 +25,22 @@ Phase 3 (future): Old imports removed
   - Use consolidated modules exclusively
 """
 
+from .db_book_availability import book_availability_ops
+from .db_book_contributors import book_contributor_ops
+from .db_book_metadata import book_metadata_ops
+
 # Re-export operations from their original modules
 # This allows `from src.database.db_books import book_ops` to still work
 from .db_books import book_ops
-from .db_book_metadata import book_metadata_ops
-from .db_contributors import contributor_ops
-from .db_book_contributors import book_contributor_ops
-from .db_media_info import media_info_ops
-from .db_book_availability import book_availability_ops
 from .db_companion_materials import companion_material_ops
-from .db_downloads import download_ops
+from .db_contributors import contributor_ops
 from .db_decryptions import decryption_ops
+from .db_downloads import download_ops
+from .db_errors import error_ops
+from .db_media_info import media_info_ops
+from .db_reading_progress import reading_progress_ops
 from .db_sync import sync_ops
 from .db_users import user_ops
-from .db_reading_progress import reading_progress_ops
-from .db_errors import error_ops
 
 __all__ = [
     # Book operations (now consolidated)

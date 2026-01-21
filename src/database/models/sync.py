@@ -1,15 +1,15 @@
 """Sync history model for SQLAlchemy ORM."""
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from src.database.models.base import Base
 
 if TYPE_CHECKING:
-    from src.database.models.user import User
+    pass
 
 
 class SyncHistory(Base):
@@ -22,9 +22,16 @@ class SyncHistory(Base):
         primary_key=True,
         server_default="uuid_generate_v4()",
     )
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     sync_type = Column(String(20), default="full", nullable=False)
-    sync_started_at = Column(DateTime(timezone=True), server_default="CURRENT_TIMESTAMP", nullable=False)
+    sync_started_at = Column(
+        DateTime(timezone=True), server_default="CURRENT_TIMESTAMP", nullable=False
+    )
     sync_completed_at = Column(DateTime(timezone=True), nullable=True)
     duration_seconds = Column(Integer, nullable=True)
     books_found = Column(Integer, default=0)
@@ -41,4 +48,6 @@ class SyncHistory(Base):
     user = relationship("User", back_populates="sync_history", lazy="select")
 
     def __repr__(self) -> str:
-        return f"<SyncHistory(sync_id={self.sync_id}, user_id={self.user_id}, status={self.status})>"
+        return (
+            f"<SyncHistory(sync_id={self.sync_id}, user_id={self.user_id}, status={self.status})>"
+        )

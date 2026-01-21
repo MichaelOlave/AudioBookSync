@@ -9,17 +9,18 @@ from urllib.parse import parse_qs
 
 import audible
 import httpx
+from audible.localization import Locale
+from audible.login import build_oauth_url, create_code_verifier
+from audible.register import register
 from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...database.services import user_service
 from ..middleware.error_handler import AuthenticationError, InternalServerError
 from ..schemas.auth import AuthStartResponse
 from ..schemas.credentials import AudibleCredentialsUpdate, AuthSessionData
 from ..services.session_manager import session_manager
 from ..utils.auth_utils import normalize_activation_bytes
-from ...database.db_users import user_ops
-from audible.localization import Locale
-from audible.login import build_oauth_url, create_code_verifier
-from audible.register import register
 
 
 async def start_audible_auth_flow(
@@ -65,8 +66,7 @@ async def start_audible_auth_flow(
     session_manager.save_session(user_id, session_data)
 
     logger.info(
-        f"Stored auth session for user {user_id} "
-        f"(locale={country_code}, serial={serial})"
+        f"Stored auth session for user {user_id} " f"(locale={country_code}, serial={serial})"
     )
 
     logger.info(
@@ -77,6 +77,7 @@ async def start_audible_auth_flow(
 
 
 async def complete_audible_auth_flow(
+    db: AsyncSession,
     user_id: str,
     redirect_url: str,
 ) -> AudibleCredentialsUpdate:
@@ -84,6 +85,7 @@ async def complete_audible_auth_flow(
     Complete the Audible authentication using the redirect URL from the browser.
 
     Args:
+        db: Database session
         user_id: The user ID associated with the auth session
         redirect_url: The browser redirect URL containing the authorization code
 
@@ -101,11 +103,10 @@ async def complete_audible_auth_flow(
 
     session_data = session_manager.load_session(user_id)
     if not session_data:
-        logger.error(
-            f"No auth session found for user {user_id}. "
-            f"Please call auth start first."
+        logger.error(f"No auth session found for user {user_id}. " f"Please call auth start first.")
+        raise AuthenticationError(
+            "Authentication process not started. Please call auth start first"
         )
-        raise AuthenticationError("Authentication process not started. Please call auth start first")
 
     logger.info(f"Session data loaded successfully for user {user_id}")
 
@@ -118,17 +119,13 @@ async def complete_audible_auth_flow(
     locale = Locale(country_code=session_data.country_code)
 
     # Parse the authorization code from the redirect URL
-    logger.info(
-        f"Parsing authorization code from redirect_url: "
-        f"{redirect_url[:100]}..."
-    )
+    logger.info(f"Parsing authorization code from redirect_url: " f"{redirect_url[:100]}...")
     try:
         response_url = httpx.URL(redirect_url)
         parsed_url = parse_qs(response_url.query.decode())
         authorization_code = parsed_url["openid.oa2.authorization_code"][0]
         logger.info(
-            f"Successfully extracted authorization code "
-            f"(length: {len(authorization_code)})"
+            f"Successfully extracted authorization code " f"(length: {len(authorization_code)})"
         )
     except (KeyError, IndexError) as e:
         logger.error(f"Failed to parse authorization code from URL: {e}")
@@ -167,28 +164,27 @@ async def complete_audible_auth_flow(
 
     activation_bytes = normalize_activation_bytes(activation_bytes_raw)
     if activation_bytes:
-        logger.info(
-            f"Retrieved activation bytes for user {user_id}: "
-            f"{bool(activation_bytes)}"
-        )
+        logger.info(f"Retrieved activation bytes for user {user_id}: " f"{bool(activation_bytes)}")
 
     # Get auth data directly from authenticator
     auth_json = authenticator.to_dict()
     logger.info("Converting authenticator to dict for database storage")
 
-    # Save to database
-    success = user_ops.update_audible_auth_json(
+    # Save to database using ORM
+    success = await user_service.update_audible_auth_json(
+        db=db,
         user_id=user_id,
         auth_json=auth_json,
         activation_bytes=activation_bytes,
     )
+    await db.commit()
+
     if not success:
         logger.error(f"Failed to persist Audible auth.json for user {user_id}")
         raise InternalServerError("Failed to save authentication data to database")
 
     logger.info(
-        f"Completed Audible authentication for user {user_id}; "
-        f"credentials saved to database"
+        f"Completed Audible authentication for user {user_id}; " f"credentials saved to database"
     )
 
     try:
@@ -202,6 +198,4 @@ async def complete_audible_auth_flow(
         if session_data is not None:
             session_manager.delete_session(user_id)
         else:
-            logger.warning(
-                f"Session data was None, not deleting session file for user {user_id}"
-            )
+            logger.warning(f"Session data was None, not deleting session file for user {user_id}")

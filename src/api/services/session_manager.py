@@ -54,13 +54,9 @@ class SessionManager:
         """
         user_id_str = str(user_id)
         session_file = self.session_dir / f"{user_id_str}.json"
-        logger.info(
-            f"Looking for session file: {session_file} (exists: {session_file.exists()})"
-        )
+        logger.info(f"Looking for session file: {session_file} (exists: {session_file.exists()})")
         if not session_file.exists():
-            logger.warning(
-                f"No session file found for user {user_id_str} at {session_file}"
-            )
+            logger.warning(f"No session file found for user {user_id_str} at {session_file}")
             # List all session files for debugging
             session_files = list(self.session_dir.glob("*.json"))
             logger.info(f"Available session files: {[f.name for f in session_files]}")

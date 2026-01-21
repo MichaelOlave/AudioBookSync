@@ -1,6 +1,7 @@
 """Database operations for book-contributor relationships."""
 
 from typing import Dict, List, Optional
+
 from loguru import logger
 
 from .db_pool import db_pool as _db_pool
@@ -41,9 +42,7 @@ class BookContributorOperations:
                     """,
                     (asin, contributor_id, role, sequence_number),
                 )
-                logger.debug(
-                    f"Added contributor {contributor_id} to book {asin} as {role}"
-                )
+                logger.debug(f"Added contributor {contributor_id} to book {asin} as {role}")
                 return True
         except Exception as e:
             logger.error(f"Failed to add book contributor: {e}")
@@ -118,9 +117,7 @@ class BookContributorOperations:
             logger.error(f"Failed to get contributors by role: {e}")
             return []
 
-    def remove_book_contributor(
-        self, asin: str, contributor_id: str, role: str
-    ) -> bool:
+    def remove_book_contributor(self, asin: str, contributor_id: str, role: str) -> bool:
         """
         Remove a contributor from a book.
 

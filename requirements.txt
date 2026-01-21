@@ -35,3 +35,11 @@ audible
 pytest==7.4.3
 pytest-asyncio==0.23.3
 httpx
+
+# Linting and code quality
+black==24.1.1
+isort==5.13.2
+flake8==7.0.0
+flake8-docstrings==1.7.0
+mypy==1.8.0
+pytest-cov==4.1.0

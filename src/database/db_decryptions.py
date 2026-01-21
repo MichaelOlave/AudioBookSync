@@ -1,6 +1,6 @@
 """Decryption status tracking database operations."""
 
-from typing import Optional, List, Any
+from typing import Any, List, Optional
 
 from loguru import logger
 
@@ -113,9 +113,7 @@ class DecryptionOperations:
             logger.error(f"Failed to update decryption status: {e}")
             return False
 
-    def update_decryption_object_key(
-        self, decryption_id: str, object_key: str
-    ) -> bool:
+    def update_decryption_object_key(self, decryption_id: str, object_key: str) -> bool:
         """
         Update decryption status with MinIO object_key.
 

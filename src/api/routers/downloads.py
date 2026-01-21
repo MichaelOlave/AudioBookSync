@@ -3,14 +3,14 @@
 from fastapi import APIRouter
 
 from ...database.services import download_service
+from ..middleware.error_handler import ResourceNotFoundError
 from ..schemas.download import (
     DownloadCreate,
-    DownloadResponse,
     DownloadList,
+    DownloadResponse,
 )
 from ..services.background_service import BackgroundTaskService
-from ..middleware.error_handler import ResourceNotFoundError
-from .router_factory import StatusRouterFactory, RouterConfig
+from .router_factory import RouterConfig, StatusRouterFactory
 
 # Configure router for download operations
 config = RouterConfig(

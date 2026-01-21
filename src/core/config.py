@@ -123,6 +123,51 @@ class Config:
         "CLEANUP_SCHEDULE", "0 2 * * *"
     )  # Cron schedule for orphaned file cleanup (default: daily at 2 AM)
 
+    # ========================================================================
+    # ORM Migration Feature Flags (Phase 5 Rollout)
+    # ========================================================================
+    # Metadata operations (low risk) - enable first
+    USE_ORM_METADATA = os.getenv("USE_ORM_METADATA", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
+    # User operations (medium risk)
+    USE_ORM_USERS = os.getenv("USE_ORM_USERS", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
+    # Sync operations (medium risk)
+    USE_ORM_SYNC = os.getenv("USE_ORM_SYNC", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
+    # Book operations (high risk) - enable last
+    USE_ORM_BOOKS = os.getenv("USE_ORM_BOOKS", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
+    # Master switch to disable all ORM operations (emergency rollback)
+    USE_ORM_GLOBAL = os.getenv("USE_ORM_GLOBAL", "true").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
+    # Enable detailed logging of feature flag usage
+    LOG_FEATURE_FLAGS = os.getenv("LOG_FEATURE_FLAGS", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
     @classmethod
     def ensure_directories(cls) -> None:
         """Create necessary directories if they don't exist."""

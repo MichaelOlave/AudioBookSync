@@ -1,22 +1,25 @@
 """User settings and Audible credentials endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from loguru import logger
 from urllib.parse import urlparse
 
-from ...database.db_users import user_ops
-from ..security.auth import get_current_user
+from fastapi import APIRouter, Depends, status
+from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ...database.engine import get_db_session
+from ...database.services import user_service
 from ..middleware.error_handler import AuthenticationError, InternalServerError, handle_route_errors
-from ..utils.auth_utils import get_user_id
 from ..schemas.credentials import (
     AudibleCredentialsResponse,
     AudibleCredentialsUpdate,
 )
 from ..schemas.storage import (
-    StorageConfigResponse,
     StorageConfigRequest,
+    StorageConfigResponse,
     StorageTestResponse,
 )
+from ..security.auth import get_current_user
+from ..utils.auth_utils import get_user_id
 
 router = APIRouter()
 
@@ -108,6 +111,7 @@ async def test_minio_connection(
 @handle_route_errors("get Audible credentials")
 async def get_audible_credentials(
     current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
 ) -> AudibleCredentialsResponse:
     """
     Get the current user's Audible authentication credentials.
@@ -117,6 +121,7 @@ async def get_audible_credentials(
 
     Args:
         current_user: Current authenticated user (from JWT token)
+        db: Database session
 
     Returns:
         AudibleCredentialsResponse: User's Audible configuration status
@@ -140,8 +145,8 @@ async def get_audible_credentials(
         raise AuthenticationError("Invalid user authentication")
     logger.info(f"Getting Audible credentials for user {user_id}")
 
-    # Get user from database to ensure fresh data
-    user = user_ops.get_user_by_id(user_id)
+    # Get user from database to ensure fresh data using ORM
+    user = await user_service.get_user_by_id(db, user_id)
     if not user:
         raise InternalServerError("User not found")
 
@@ -165,7 +170,7 @@ async def get_audible_credentials(
         has_access_token=auth_configured,
         has_activation_bytes=activation_bytes is not None,
         auth_configured=auth_configured,
-        auth_json_raw=None,  # Ensure raw data is not sen
+        auth_json_raw=None,  # Ensure raw data is not sent
     )
 
 
@@ -183,6 +188,7 @@ async def get_audible_credentials(
 @handle_route_errors("clear Audible credentials")
 async def clear_audible_credentials(
     current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
 ) -> AudibleCredentialsUpdate:
     """
     Clear/remove the current user's Audible authentication credentials.
@@ -193,6 +199,7 @@ async def clear_audible_credentials(
 
     Args:
         current_user: Current authenticated user (from JWT token)
+        db: Database session
 
     Returns:
         AudibleCredentialsUpdate: Confirmation of clearance
@@ -213,8 +220,9 @@ async def clear_audible_credentials(
         raise AuthenticationError("Invalid user authentication")
     logger.info(f"Clearing Audible credentials for user {user_id}")
 
-    # Clear credentials in database using the new dedicated function
-    success = user_ops.clear_audible_auth(user_id)
+    # Clear credentials in database using ORM
+    success = await user_service.clear_audible_auth(db, user_id)
+    await db.commit()
 
     if not success:
         logger.error(f"Failed to clear credentials for user {user_id}")
@@ -279,7 +287,11 @@ async def get_storage_config(
     is_dict = isinstance(storage_config, dict)
 
     provider_type = storage_config.get("provider_type", "minio") if is_dict else "minio"
-    endpoint = storage_config.get("endpoint", "http://localhost:9000") if is_dict else "http://localhost:9000"
+    endpoint = (
+        storage_config.get("endpoint", "http://localhost:9000")
+        if is_dict
+        else "http://localhost:9000"
+    )
     bucket_name = storage_config.get("bucket_name", "audiobooks") if is_dict else "audiobooks"
     use_ssl = storage_config.get("use_ssl", False) if is_dict else False
 
@@ -296,9 +308,7 @@ async def get_storage_config(
         is_connected = False
         message = "Storage not configured"
 
-    logger.info(
-        f"Retrieved storage config for user {user_id}: provider={provider_type}"
-    )
+    logger.info(f"Retrieved storage config for user {user_id}: provider={provider_type}")
 
     return StorageConfigResponse(
         user_id=user_id,
@@ -326,6 +336,7 @@ async def get_storage_config(
 async def update_storage_config(
     config: StorageConfigRequest,
     current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
 ) -> StorageConfigResponse:
     """
     Update the current user's storage provider configuration.
@@ -335,6 +346,7 @@ async def update_storage_config(
     Args:
         config: New storage configuration
         current_user: Current authenticated user (from JWT token)
+        db: Database session
 
     Returns:
         StorageConfigResponse: Updated storage configuration
@@ -374,7 +386,7 @@ async def update_storage_config(
     if not config.endpoint or not config.bucket_name:
         raise InternalServerError("Endpoint and bucket name are required")
 
-    # Update user storage config in database
+    # Update user storage config in database using ORM
     storage_config = {
         "provider_type": config.provider_type,
         "endpoint": config.endpoint,
@@ -385,7 +397,8 @@ async def update_storage_config(
         "region": config.region,
     }
 
-    success = user_ops.update_user_storage_config(user_id, storage_config)
+    success = await user_service.update_user_storage_config(db, user_id, storage_config)
+    await db.commit()
 
     if not success:
         logger.error(f"Failed to update storage config for user {user_id}")
@@ -473,7 +486,9 @@ async def test_storage_connection(
     if not user_id:
         raise AuthenticationError("Invalid user authentication")
 
-    logger.info(f"Testing storage connection for user {user_id} with provider {config.provider_type}")
+    logger.info(
+        f"Testing storage connection for user {user_id} with provider {config.provider_type}"
+    )
 
     success, message, bucket_exists = await test_minio_connection(
         endpoint=config.endpoint,

@@ -1,11 +1,12 @@
 """Book processing handler orchestrating download and decrypt workflows."""
 
-from typing import Optional, Callable, Any, Awaitable
+from typing import Any, Awaitable, Callable, Optional
+
 from loguru import logger
 
 from ...domain.progress import safe_progress_callback
-from ..downloader import download_book
 from ..decryptor import decrypt_book
+from ..downloader import download_book
 
 
 class BookProcessingHandler:

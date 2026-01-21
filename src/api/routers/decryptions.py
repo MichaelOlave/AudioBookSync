@@ -1,20 +1,21 @@
 """Decryption management endpoints."""
 
 from contextvars import ContextVar
-from fastapi import APIRouter
-from sqlalchemy.ext.asyncio import AsyncSession
-from loguru import logger
 
-from ...database.services import decryption_service, download_service
+from fastapi import APIRouter
+from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from ...database.models.user import User
+from ...database.services import decryption_service, download_service
+from ..middleware.error_handler import InternalServerError, ResourceNotFoundError
 from ..schemas.decryption import (
     DecryptCreate,
-    DecryptResponse,
     DecryptList,
+    DecryptResponse,
 )
 from ..services.background_service import BackgroundTaskService
-from ..middleware.error_handler import ResourceNotFoundError, InternalServerError
-from .router_factory import StatusRouterFactory, RouterConfig
+from .router_factory import RouterConfig, StatusRouterFactory
 
 # Context variable for storing validation data
 _validation_context: ContextVar[dict] = ContextVar("validation_context", default={})
@@ -43,9 +44,7 @@ async def validate_download_exists(
         raise ResourceNotFoundError("Book must be downloaded before decryption")
 
     if download.status != "completed":
-        logger.warning(
-            f"Download not completed for {create_data.asin}: {download.status}"
-        )
+        logger.warning(f"Download not completed for {create_data.asin}: {download.status}")
         raise InternalServerError(
             f"Download must be completed before decryption (current status: {download.status})"
         )

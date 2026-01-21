@@ -1,27 +1,38 @@
 """Audiobook file serving and streaming endpoints."""
 
-from pathlib import Path
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Header
-from fastapi.responses import FileResponse, StreamingResponse
-from loguru import logger
+from uuid import UUID
 
-from ...database.db_books import book_ops
-from ...database.db_decryptions import decryption_ops
+from fastapi import APIRouter, Depends, Header
+from fastapi.responses import StreamingResponse
+from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ...database.engine import get_db_session
+from ...database.services import book_service, decryption_service
 from ...infrastructure.storage_service import StorageService
-from ...core.config import Config
+from ..middleware.error_handler import (
+    AuthenticationError,
+    InternalServerError,
+    ResourceNotFoundError,
+    handle_route_errors,
+)
 from ..security.auth import get_current_user
-from ..middleware.error_handler import ResourceNotFoundError, AuthorizationError, AuthenticationError, InternalServerError, handle_route_errors
 from ..utils.auth_utils import get_user_id
 from ..utils.generic_handlers import verify_book_ownership
 
 router = APIRouter()
 
 
-def _get_object_key_for_asin(user_id: str, asin: str) -> Optional[str]:
-    """Get MinIO object_key for a specific ASIN from decryption status.
+async def _get_object_key_for_asin(
+    db: AsyncSession,
+    user_id: str,
+    asin: str,
+) -> Optional[str]:
+    """Get MinIO object_key for a specific ASIN from decryption status using ORM.
 
     Args:
+        db: Database session
         user_id: User ID
         asin: Amazon Standard Identification Number
 
@@ -29,11 +40,15 @@ def _get_object_key_for_asin(user_id: str, asin: str) -> Optional[str]:
         object_key if found and not None, None otherwise
     """
     try:
-        # Get user's decryptions and find matching ASIN
-        decryptions = decryption_ops.get_user_decryptions(user_id=user_id, limit=100)
+        # Get user's decryptions and find matching ASIN using ORM
+        decryptions = await decryption_service.get_decryptions_by_user(
+            db=db,
+            user_id=UUID(user_id),
+            limit=100,
+        )
         for decryption in decryptions:
-            if decryption.get("asin") == asin:
-                return decryption.get("object_key")
+            if decryption.asin == asin:
+                return decryption.object_key
         return None
     except Exception as e:
         logger.warning(f"Failed to get object_key for {asin}: {e}")
@@ -64,6 +79,7 @@ async def stream_audiobook(
     asin: str,
     current_user: dict = Depends(get_current_user),
     range_header: Optional[str] = Header(default=None),
+    db: AsyncSession = Depends(get_db_session),
 ):
     """
     Stream an audiobook file from MinIO with Range request support.
@@ -76,6 +92,7 @@ async def stream_audiobook(
         asin: Amazon Standard Identification Number
         current_user: Current authenticated user (from JWT token)
         range_header: HTTP Range header (e.g., "bytes=0-1023")
+        db: Database session
 
     Returns:
         StreamingResponse with audio file
@@ -96,16 +113,16 @@ async def stream_audiobook(
 
     logger.info(f"Audio stream requested for {asin} by user {user_id}")
 
-    # Verify book exists and belongs to user
-    book = book_ops.get_book_by_asin(asin)
+    # Verify book exists and belongs to user using ORM
+    book = await book_service.get_book_by_asin(db, asin)
     if not book:
         logger.warning(f"Book not found: {asin}")
         raise ResourceNotFoundError(f"Book '{asin}' not found")
 
     verify_book_ownership(book, user_id, asin)
 
-    # Get MinIO object_key from decryption status (required)
-    object_key = _get_object_key_for_asin(user_id, asin)
+    # Get MinIO object_key from decryption status (required) using ORM
+    object_key = await _get_object_key_for_asin(db, user_id, asin)
     if not object_key:
         logger.warning(f"MinIO object_key not available for {asin}")
         raise ResourceNotFoundError("Decrypted audiobook file not available")

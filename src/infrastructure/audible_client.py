@@ -66,9 +66,7 @@ def authenticate():
         raise
 
 
-async def login_and_save_auth(
-    email: str, password: str, locale: str = "us"
-) -> AsyncAudibleClient:
+async def login_and_save_auth(email: str, password: str, locale: str = "us") -> AsyncAudibleClient:
     """
     Perform interactive login with Audible and save auth file.
 

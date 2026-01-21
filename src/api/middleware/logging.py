@@ -1,10 +1,11 @@
 """Request/response logging middleware for FastAPI."""
 
 import time
+
 from fastapi import Request
+from loguru import logger
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
-from loguru import logger
 
 
 class LoggingMiddleware(BaseHTTPMiddleware):
@@ -36,9 +37,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
         # Get request size (approximate)
         request_size = (
-            len(await request.body())
-            if request.method in ["POST", "PUT", "PATCH"]
-            else 0
+            len(await request.body()) if request.method in ["POST", "PUT", "PATCH"] else 0
         )
 
         # Log reques

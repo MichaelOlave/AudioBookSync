@@ -1,10 +1,11 @@
 """Pydantic schemas for user endpoints."""
 
+import re
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
-import re
-from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class UserBase(BaseModel):
@@ -73,9 +74,7 @@ class UserResponse(UserBase):
         description="Last update timestamp",
     )
 
-    model_config = ConfigDict(
-        from_attributes=True
-    )
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserWithAuth(UserResponse):

@@ -1,6 +1,6 @@
 """Download status tracking database operations."""
 
-from typing import Optional, List, Any
+from typing import Any, List, Optional
 
 from loguru import logger
 
@@ -14,9 +14,7 @@ class DownloadOperations:
     # Allow tests and callers to override the pool; default to shared singleton.
     db_pool = _db_pool
 
-    def create_download_status(
-        self, asin: str, status: str = "pending"
-    ) -> Optional[str]:
+    def create_download_status(self, asin: str, status: str = "pending") -> Optional[str]:
         """
         Create a download status entry.
 
@@ -105,9 +103,7 @@ class DownloadOperations:
             logger.error(f"Failed to update download status: {e}")
             return False
 
-    def update_download_object_key(
-        self, download_id: str, object_key: str
-    ) -> bool:
+    def update_download_object_key(self, download_id: str, object_key: str) -> bool:
         """
         Update download status with MinIO object_key.
 

@@ -1,8 +1,7 @@
 """Tests for StorageService abstraction layer."""
 
-import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -38,10 +37,7 @@ class TestObjectKeyGeneration:
         service = storage_service
 
         # Generate object key for downloaded file
-        object_key = service._generate_object_key(
-            file_type="downloaded",
-            asin="B001ABC123"
-        )
+        object_key = service._generate_object_key(file_type="downloaded", asin="B001ABC123")
 
         # Verify pattern: downloaded/{asin}.aax
         assert object_key == "downloaded/B001ABC123.aax"
@@ -52,8 +48,7 @@ class TestObjectKeyGeneration:
 
         # Generate object key for decrypted file with special characters in title
         object_key = service._generate_object_key(
-            file_type="decrypted",
-            title="The Great Book: Volume 2 - Part One!"
+            file_type="decrypted", title="The Great Book: Volume 2 - Part One!"
         )
 
         # Verify pattern: decrypted/{normalized_title}.m4b
@@ -154,7 +149,7 @@ class TestSaveFile:
             user_id="test-user-123",
             file_path=str(test_file),
             file_type="downloaded",
-            asin="B001ABC123"
+            asin="B001ABC123",
         )
 
         # Verify upload was successful
@@ -163,9 +158,7 @@ class TestSaveFile:
 
         # Verify MinIO upload was called with correct parameters
         mock_minio_client.upload_file.assert_called_once_with(
-            str(test_file),
-            "user-test-user-123",
-            "downloaded/B001ABC123.aax"
+            str(test_file), "user-test-user-123", "downloaded/B001ABC123.aax"
         )
 
     def test_save_file_returns_false_on_upload_failure(
@@ -187,7 +180,7 @@ class TestSaveFile:
             user_id="test-user-123",
             file_path=str(test_file),
             file_type="downloaded",
-            asin="B001ABC123"
+            asin="B001ABC123",
         )
 
         # Verify operation failed
@@ -215,12 +208,10 @@ class TestGetFile:
 
         # Get file from MinIO
         file_path = service.get_file(
-            user_id="test-user-123",
-            object_key="downloaded/B001ABC123.aax"
+            user_id="test-user-123", object_key="downloaded/B001ABC123.aax"
         )
 
         # Verify file path returned (should be temp location)
         assert file_path is not None
         assert Path(file_path).exists()
         assert Path(file_path).read_bytes() == b"MinIO content"
-
