@@ -1,9 +1,13 @@
 """Download management endpoints."""
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
 from loguru import logger
 
-from ...database.db_downloads import download_ops
+from ...database.services import download_service
+from ...database.engine import get_db_session
+from ...database.models.user import User
 from ..security.auth import get_current_user
 from ..schemas.download import (
     DownloadCreate,
@@ -31,7 +35,8 @@ router = APIRouter()
 async def trigger_download(
     download_data: DownloadCreate,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
 ) -> DownloadResponse:
     """
     Trigger a book download operation in background.
@@ -43,6 +48,7 @@ async def trigger_download(
         download_data: Book information (asin, title)
         background_tasks: FastAPI background tasks queue
         current_user: Authenticated user from JWT token
+        db: Database session
 
     Returns:
         DownloadResponse: Initial download record with status 'pending'
@@ -66,40 +72,36 @@ async def trigger_download(
         }
     """
     try:
-        user_id = current_user.get("user_id")
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid user authentication",
-            )
-
-        logger.info(f"Download triggered for {download_data.asin} by user {user_id}")
+        logger.info(f"Download triggered for {download_data.asin} by user {current_user.user_id}")
 
         # Create download status record in database
-        download_id = download_ops.create_download_status(
+        download = await download_service.create_download_status(
+            db=db,
             asin=download_data.asin,
             status="pending",
         )
 
-        if not download_id:
+        if not download:
             logger.error(f"Failed to create download record for {download_data.asin}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to create download record",
             )
 
+        await db.commit()
+
         # Queue background download task
         background_tasks.add_task(
             BackgroundTaskService.execute_download_operation,
-            user_id=user_id,
-            download_id=download_id,
+            user_id=str(current_user.user_id),
+            download_id=download.download_id,
             book=download_data.dict(),
         )
 
-        logger.info(f"Download queued: {download_id}")
+        logger.info(f"Download queued: {download.download_id}")
 
         return DownloadResponse(
-            download_id=download_id,
+            download_id=download.download_id,
             asin=download_data.asin,
             status="pending",
             message="Download initiated",
@@ -126,7 +128,8 @@ async def trigger_download(
     },
 )
 async def list_downloads(
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
     status_filter: str = Query(
         None,
         alias="status",
@@ -152,6 +155,7 @@ async def list_downloads(
 
     Args:
         current_user: Authenticated user from JWT token
+        db: Database session
         status_filter: Optional status filter
         page: Page number for pagination (default: 1)
         page_size: Items per page (default: 10, max: 50)
@@ -163,27 +167,23 @@ async def list_downloads(
         GET /api/v1/downloads/?status=completed&page=1&page_size=10
     """
     try:
-        user_id = current_user.get("user_id")
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid user authentication",
-            )
-
-        logger.info(f"Fetching downloads for user {user_id}")
+        logger.info(f"Fetching downloads for user {current_user.user_id}")
 
         # Get downloads with pagination
-        # Note: db_downloads.py needs to be extended with get_user_downloads()
-        # For now, using basic query approach
-        downloads = download_ops.get_user_downloads(
-            user_id=user_id,
+        downloads = await download_service.get_downloads_by_user(
+            db=db,
+            user_id=str(current_user.user_id),
             status=status_filter,
             limit=page_size,
             offset=(page - 1) * page_size,
         )
 
         # Get total count
-        total = download_ops.count_user_downloads(user_id, status_filter)
+        total = await download_service.count_downloads_by_user(
+            db=db,
+            user_id=str(current_user.user_id),
+            status=status_filter,
+        )
 
         # Calculate pages
         pages = (total + page_size - 1) // page_size if total > 0 else 1
@@ -194,10 +194,10 @@ async def list_downloads(
             page = pages
 
         # Convert to response objects
-        items = [DownloadResponse(**download) for download in downloads]
+        items = [DownloadResponse.from_orm(download) for download in downloads]
 
         logger.info(
-            f"Retrieved {len(items)} downloads for user {user_id} (page {page}/{pages})"
+            f"Retrieved {len(items)} downloads for user {current_user.user_id} (page {page}/{pages})"
         )
 
         return DownloadList(
@@ -231,7 +231,8 @@ async def list_downloads(
 )
 async def get_download_status(
     download_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
 ) -> DownloadResponse:
     """
     Get detailed status of a specific download.
@@ -242,6 +243,7 @@ async def get_download_status(
     Args:
         download_id: Unique download identifier
         current_user: Authenticated user from JWT token
+        db: Database session
 
     Returns:
         DownloadResponse: Complete download record
@@ -254,35 +256,21 @@ async def get_download_status(
         GET /api/v1/downloads/550e8400-e29b-41d4-a716-446655440000
     """
     try:
-        user_id = current_user.get("user_id")
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid user authentication",
-            )
+        logger.info(f"Fetching download status: {download_id} for user {current_user.user_id}")
 
-        logger.info(f"Fetching download status: {download_id} for user {user_id}")
-
-        # Get download by ID
-        download = download_ops.get_download_by_id(download_id)
+        # Get download by ID with user authorization check
+        download = await download_service.get_download_by_id_for_user(
+            db=db,
+            download_id=UUID(download_id),
+            user_id=str(current_user.user_id),
+        )
 
         if not download:
-            logger.warning(f"Download not found: {download_id}")
+            logger.warning(f"Download not found or user not authorized: {download_id}")
             raise ResourceNotFoundError(f"Download '{download_id}' not found")
 
-        # Verify ownership by checking associated book user_id
-        # (requires join with books table, which db_downloads.py needs to support)
-        if download.get("user_id") != user_id:
-            logger.warning(
-                f"Unauthorized access attempt to download {download_id} by user {user_id}"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to access this download",
-            )
-
         logger.info(f"Retrieved download details: {download_id}")
-        return DownloadResponse(**download)
+        return DownloadResponse.from_orm(download)
 
     except HTTPException:
         raise
