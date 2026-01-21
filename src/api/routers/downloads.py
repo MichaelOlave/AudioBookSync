@@ -1,6 +1,6 @@
 """Download management endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, status, BackgroundTasks, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 from loguru import logger
@@ -15,7 +15,8 @@ from ..schemas.download import (
     DownloadList,
 )
 from ..services.background_service import BackgroundTaskService
-from ..middleware.error_handler import ResourceNotFoundError
+from ..middleware.error_handler import ResourceNotFoundError, handle_route_errors
+from ..utils.generic_handlers import get_paginated_list
 
 router = APIRouter()
 
@@ -32,6 +33,7 @@ router = APIRouter()
         401: {"description": "Not authenticated"},
     },
 )
+@handle_route_errors("trigger download")
 async def trigger_download(
     download_data: DownloadCreate,
     background_tasks: BackgroundTasks,
@@ -71,50 +73,37 @@ async def trigger_download(
             "message": "Download initiated"
         }
     """
-    try:
-        logger.info(f"Download triggered for {download_data.asin} by user {current_user.user_id}")
+    logger.info(f"Download triggered for {download_data.asin} by user {current_user.user_id}")
 
-        # Create download status record in database
-        download = await download_service.create_download_status(
-            db=db,
-            asin=download_data.asin,
-            status="pending",
-        )
+    # Create download status record in database
+    download = await download_service.create_download_status(
+        db=db,
+        asin=download_data.asin,
+        status="pending",
+    )
 
-        if not download:
-            logger.error(f"Failed to create download record for {download_data.asin}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to create download record",
-            )
+    if not download:
+        logger.error(f"Failed to create download record for {download_data.asin}")
+        raise ResourceNotFoundError(f"Failed to create download record for {download_data.asin}")
 
-        await db.commit()
+    await db.commit()
 
-        # Queue background download task
-        background_tasks.add_task(
-            BackgroundTaskService.execute_download_operation,
-            user_id=str(current_user.user_id),
-            download_id=download.download_id,
-            book=download_data.dict(),
-        )
+    # Queue background download task
+    background_tasks.add_task(
+        BackgroundTaskService.execute_download_operation,
+        user_id=str(current_user.user_id),
+        download_id=download.download_id,
+        book=download_data.dict(),
+    )
 
-        logger.info(f"Download queued: {download.download_id}")
+    logger.info(f"Download queued: {download.download_id}")
 
-        return DownloadResponse(
-            download_id=download.download_id,
-            asin=download_data.asin,
-            status="pending",
-            message="Download initiated",
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error triggering download: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to initiate download",
-        )
+    return DownloadResponse(
+        download_id=download.download_id,
+        asin=download_data.asin,
+        status="pending",
+        message="Download initiated",
+    )
 
 
 @router.get(
@@ -127,6 +116,7 @@ async def trigger_download(
         401: {"description": "Not authenticated"},
     },
 )
+@handle_route_errors("list downloads")
 async def list_downloads(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
@@ -166,55 +156,29 @@ async def list_downloads(
     Example:
         GET /api/v1/downloads/?status=completed&page=1&page_size=10
     """
-    try:
-        logger.info(f"Fetching downloads for user {current_user.user_id}")
+    result = await get_paginated_list(
+        get_items_func=download_service.get_downloads_by_user,
+        response_model=DownloadResponse,
+        get_items_kwargs={
+            "db": db,
+            "user_id": str(current_user.user_id),
+            "status": status_filter,
+            "limit": page_size,
+            "offset": (page - 1) * page_size,
+        },
+        user_id=str(current_user.user_id),
+        page=page,
+        page_size=page_size,
+        count_func=download_service.count_downloads_by_user,
+        count_kwargs={
+            "db": db,
+            "user_id": str(current_user.user_id),
+            "status": status_filter,
+        },
+        resource_name="downloads",
+    )
 
-        # Get downloads with pagination
-        downloads = await download_service.get_downloads_by_user(
-            db=db,
-            user_id=str(current_user.user_id),
-            status=status_filter,
-            limit=page_size,
-            offset=(page - 1) * page_size,
-        )
-
-        # Get total count
-        total = await download_service.count_downloads_by_user(
-            db=db,
-            user_id=str(current_user.user_id),
-            status=status_filter,
-        )
-
-        # Calculate pages
-        pages = (total + page_size - 1) // page_size if total > 0 else 1
-
-        # Validate page number
-        if page > pages and total > 0:
-            logger.warning(f"Page {page} exceeds max pages {pages}")
-            page = pages
-
-        # Convert to response objects
-        items = [DownloadResponse.from_orm(download) for download in downloads]
-
-        logger.info(
-            f"Retrieved {len(items)} downloads for user {current_user.user_id} (page {page}/{pages})"
-        )
-
-        return DownloadList(
-            items=items,
-            total=total,
-            page=page,
-            page_size=page_size,
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching downloads: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve downloads",
-        )
+    return DownloadList(**result)
 
 
 @router.get(
@@ -229,6 +193,7 @@ async def list_downloads(
         404: {"description": "Download not found"},
     },
 )
+@handle_route_errors("get download status")
 async def get_download_status(
     download_id: str,
     current_user: User = Depends(get_current_user),
@@ -255,28 +220,18 @@ async def get_download_status(
     Example:
         GET /api/v1/downloads/550e8400-e29b-41d4-a716-446655440000
     """
-    try:
-        logger.info(f"Fetching download status: {download_id} for user {current_user.user_id}")
+    logger.info(f"Fetching download status: {download_id} for user {current_user.user_id}")
 
-        # Get download by ID with user authorization check
-        download = await download_service.get_download_by_id_for_user(
-            db=db,
-            download_id=UUID(download_id),
-            user_id=str(current_user.user_id),
-        )
+    # Get download by ID with user authorization check
+    download = await download_service.get_download_by_id_for_user(
+        db=db,
+        download_id=UUID(download_id),
+        user_id=str(current_user.user_id),
+    )
 
-        if not download:
-            logger.warning(f"Download not found or user not authorized: {download_id}")
-            raise ResourceNotFoundError(f"Download '{download_id}' not found")
+    if not download:
+        logger.warning(f"Download not found or user not authorized: {download_id}")
+        raise ResourceNotFoundError(f"Download '{download_id}' not found")
 
-        logger.info(f"Retrieved download details: {download_id}")
-        return DownloadResponse.from_orm(download)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching download {download_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve download status",
-        )
+    logger.info(f"Retrieved download details: {download_id}")
+    return DownloadResponse.from_orm(download)

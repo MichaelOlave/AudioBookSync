@@ -12,7 +12,8 @@ from ..schemas.sync import (
     SyncHistoryList,
     SyncAcceptedResponse,
 )
-from ..middleware.error_handler import ResourceNotFoundError
+from ..middleware.error_handler import ResourceNotFoundError, AuthorizationError, InternalServerError, handle_route_errors
+from ..utils.generic_handlers import get_paginated_list
 
 router = APIRouter()
 
@@ -28,6 +29,7 @@ router = APIRouter()
         401: {"description": "Not authenticated"},
     },
 )
+@handle_route_errors("trigger sync")
 async def trigger_sync(
     sync_data: SyncCreate,
     background_tasks: BackgroundTasks,
@@ -54,58 +56,43 @@ async def trigger_sync(
             "sync_type": "full"
         }
     """
-    try:
-        user_id = current_user.get("user_id")
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid user authentication",
-            )
-        logger.info(
-            f"Sync triggered for user {user_id} with type: {sync_data.sync_type}"
-        )
-
-        # Create sync history entry
-        sync_id = sync_ops.create_sync_history(
-            user_id=user_id,
-            sync_type=sync_data.sync_type,
-        )
-
-        if not sync_id:
-            logger.error(f"Failed to create sync record for user {user_id}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to initiate sync",
-            )
-
-        # Queue background sync task
-        from ..services.background_service import BackgroundTaskService
-
-        background_tasks.add_task(
-            BackgroundTaskService.execute_sync_operation,
-            user_id=user_id,
-            sync_id=sync_id,
-            sync_type=sync_data.sync_type,
-        )
-        logger.info(f"Sync queued for background execution: {sync_id}")
-
-        return SyncAcceptedResponse(
-            sync_id=sync_id,
-            status="in_progress",
-            message="Sync initiated successfully, running in background",
-            sync_started_at=datetime.now(timezone.utc),
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(
-            f"Error triggering sync for user {current_user.get('user_id')}: {e}"
-        )
+    user_id = current_user.get("user_id")
+    if not user_id:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to initiate sync",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user authentication",
         )
+    logger.info(
+        f"Sync triggered for user {user_id} with type: {sync_data.sync_type}"
+    )
+
+    # Create sync history entry
+    sync_id = sync_ops.create_sync_history(
+        user_id=user_id,
+        sync_type=sync_data.sync_type,
+    )
+
+    if not sync_id:
+        logger.error(f"Failed to create sync record for user {user_id}")
+        raise InternalServerError(f"Failed to create sync record for user {user_id}")
+
+    # Queue background sync task
+    from ..services.background_service import BackgroundTaskService
+
+    background_tasks.add_task(
+        BackgroundTaskService.execute_sync_operation,
+        user_id=user_id,
+        sync_id=sync_id,
+        sync_type=sync_data.sync_type,
+    )
+    logger.info(f"Sync queued for background execution: {sync_id}")
+
+    return SyncAcceptedResponse(
+        sync_id=sync_id,
+        status="in_progress",
+        message="Sync initiated successfully, running in background",
+        sync_started_at=datetime.now(timezone.utc),
+    )
 
 
 @router.get(
@@ -118,6 +105,7 @@ async def trigger_sync(
         401: {"description": "Not authenticated"},
     },
 )
+@handle_route_errors("get sync history")
 async def get_sync_history(
     current_user: dict = Depends(get_current_user),
     page: int = Query(
@@ -148,55 +136,27 @@ async def get_sync_history(
     Example:
         GET /api/v1/sync/history?page=1&page_size=10
     """
-    try:
-        user_id = current_user.get("user_id")
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid user authentication",
-            )
-        logger.info(f"Fetching sync history for user: {user_id}")
-
-        # Get sync history with larger limit to support pagination
-        all_syncs = sync_ops.get_user_sync_history(user_id, limit=1000)
-
-        # Calculate pagination
-        total = len(all_syncs)
-        pages = (total + page_size - 1) // page_size if total > 0 else 0
-
-        # Validate page number
-        if page > pages and total > 0:
-            logger.warning(f"Page {page} exceeds max pages {pages} for user {user_id}")
-            page = pages
-
-        # Apply pagination
-        start_idx = (page - 1) * page_size
-        end_idx = start_idx + page_size
-        paginated_syncs = all_syncs[start_idx:end_idx]
-
-        # Convert to SyncResponse objects
-        items = [SyncResponse(**sync) for sync in paginated_syncs]
-
-        logger.info(
-            f"Retrieved {len(items)} sync records for user {user_id} (page {page}/{pages})"
-        )
-
-        return SyncHistoryList(
-            items=items,
-            total=total,
-            page=page,
-            page_size=page_size,
-            pages=pages,
-        )
-
-    except Exception as e:
-        logger.error(
-            f"Error fetching sync history for user {current_user.get('user_id')}: {e}"
-        )
+    user_id = current_user.get("user_id")
+    if not user_id:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve sync history",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user authentication",
         )
+
+    def get_syncs(**kwargs):
+        return sync_ops.get_user_sync_history(kwargs["user_id"], limit=1000)
+
+    result = await get_paginated_list(
+        get_items_func=get_syncs,
+        response_model=SyncResponse,
+        get_items_kwargs={"user_id": user_id},
+        user_id=user_id,
+        page=page,
+        page_size=page_size,
+        resource_name="sync records",
+    )
+
+    return SyncHistoryList(**result)
 
 
 @router.get(
@@ -211,6 +171,7 @@ async def get_sync_history(
         404: {"description": "Sync not found"},
     },
 )
+@handle_route_errors("get sync status")
 async def get_sync_status(
     sync_id: str,
     current_user: dict = Depends(get_current_user),
@@ -235,35 +196,22 @@ async def get_sync_status(
     Example:
         GET /api/v1/sync/sync-uuid-123
     """
-    try:
-        user_id = current_user.get("user_id")
-        logger.info(f"Fetching sync status: {sync_id} for user: {user_id}")
+    user_id = current_user.get("user_id")
+    logger.info(f"Fetching sync status: {sync_id} for user: {user_id}")
 
-        # Get sync by ID
-        sync = sync_ops.get_sync_by_id(sync_id)
+    # Get sync by ID
+    sync = sync_ops.get_sync_by_id(sync_id)
 
-        if not sync:
-            logger.warning(f"Sync not found: {sync_id}")
-            raise ResourceNotFoundError(f"Sync '{sync_id}' not found")
+    if not sync:
+        logger.warning(f"Sync not found: {sync_id}")
+        raise ResourceNotFoundError(f"Sync '{sync_id}' not found")
 
-        # Verify ownership
-        if sync.get("user_id") != user_id:
-            logger.warning(
-                f"Unauthorized access attempt to sync {sync_id} by user {user_id}"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to access this sync",
-            )
-
-        logger.info(f"Retrieved sync details: {sync_id}")
-        return SyncResponse(**sync)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching sync {sync_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve sync status",
+    # Verify ownership
+    if sync.get("user_id") != user_id:
+        logger.warning(
+            f"Unauthorized access attempt to sync {sync_id} by user {user_id}"
         )
+        raise AuthorizationError("Not authorized to access this sync")
+
+    logger.info(f"Retrieved sync details: {sync_id}")
+    return SyncResponse(**sync)

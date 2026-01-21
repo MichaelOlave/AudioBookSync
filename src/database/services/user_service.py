@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
 from src.database.models.user import User
+from src.database.services.base_service import get_by_id, update_entity, delete_entity
 
 
 async def create_user(
@@ -62,14 +63,7 @@ async def get_user_by_id(db: AsyncSession, user_id: str) -> Optional[User]:
     Returns:
         User object if found, None otherwise
     """
-    try:
-        result = await db.execute(
-            select(User).where(User.user_id == user_id)
-        )
-        return result.scalar_one_or_none()
-    except Exception as e:
-        logger.error(f"Failed to get user by ID: {e}")
-        return None
+    return await get_by_id(db, User, user_id, id_column="user_id")
 
 
 async def get_user_by_username(db: AsyncSession, username: str) -> Optional[User]:
@@ -147,18 +141,10 @@ async def update_user_password(db: AsyncSession, user_id: str, password_hash: st
     Returns:
         True if successful, False otherwise
     """
-    try:
-        user = await get_user_by_id(db, user_id)
-        if not user:
-            return False
-
-        user.password_hash = password_hash
-        await db.flush()
-        logger.info(f"Updated password for user: {user_id}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to update user password: {e}")
-        return False
+    user = await get_user_by_id(db, user_id)
+    return await update_entity(
+        db, user, {"password_hash": password_hash}, entity_id=user_id
+    )
 
 
 async def update_user_email(db: AsyncSession, user_id: str, email: str) -> bool:
@@ -173,18 +159,8 @@ async def update_user_email(db: AsyncSession, user_id: str, email: str) -> bool:
     Returns:
         True if successful, False otherwise
     """
-    try:
-        user = await get_user_by_id(db, user_id)
-        if not user:
-            return False
-
-        user.email = email
-        await db.flush()
-        logger.info(f"Updated email for user: {user_id}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to update user email: {e}")
-        return False
+    user = await get_user_by_id(db, user_id)
+    return await update_entity(db, user, {"email": email}, entity_id=user_id)
 
 
 async def update_user_last_sync(db: AsyncSession, user_id: str) -> bool:
@@ -198,18 +174,10 @@ async def update_user_last_sync(db: AsyncSession, user_id: str) -> bool:
     Returns:
         True if successful, False otherwise
     """
-    try:
-        user = await get_user_by_id(db, user_id)
-        if not user:
-            return False
-
-        user.last_sync_date = datetime.now(timezone.utc)
-        await db.flush()
-        logger.info(f"Updated last sync date for user: {user_id}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to update user last sync: {e}")
-        return False
+    user = await get_user_by_id(db, user_id)
+    return await update_entity(
+        db, user, {"last_sync_date": datetime.now(timezone.utc)}, entity_id=user_id
+    )
 
 
 async def update_user_audible_auth(
@@ -232,24 +200,19 @@ async def update_user_audible_auth(
     Returns:
         True if successful, False otherwise
     """
-    try:
-        user = await get_user_by_id(db, user_id)
-        if not user:
-            return False
+    user = await get_user_by_id(db, user_id)
+    updates = {}
+    if audible_auth_json is not None:
+        updates["audible_auth_json"] = audible_auth_json
+    if audible_email is not None:
+        updates["audible_email"] = audible_email
+    if audible_device_name is not None:
+        updates["audible_device_name"] = audible_device_name
 
-        if audible_auth_json is not None:
-            user.audible_auth_json = audible_auth_json
-        if audible_email is not None:
-            user.audible_email = audible_email
-        if audible_device_name is not None:
-            user.audible_device_name = audible_device_name
-
-        await db.flush()
-        logger.info(f"Updated Audible auth for user: {user_id}")
+    if not updates:
         return True
-    except Exception as e:
-        logger.error(f"Failed to update Audible auth: {e}")
-        return False
+
+    return await update_entity(db, user, updates, entity_id=user_id)
 
 
 async def update_user_activation_bytes(db: AsyncSession, user_id: str, activation_bytes: str) -> bool:
@@ -264,18 +227,10 @@ async def update_user_activation_bytes(db: AsyncSession, user_id: str, activatio
     Returns:
         True if successful, False otherwise
     """
-    try:
-        user = await get_user_by_id(db, user_id)
-        if not user:
-            return False
-
-        user.activation_bytes = activation_bytes
-        await db.flush()
-        logger.info(f"Updated activation bytes for user: {user_id}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to update activation bytes: {e}")
-        return False
+    user = await get_user_by_id(db, user_id)
+    return await update_entity(
+        db, user, {"activation_bytes": activation_bytes}, entity_id=user_id
+    )
 
 
 async def get_active_users(db: AsyncSession) -> list[User]:
@@ -309,18 +264,8 @@ async def deactivate_user(db: AsyncSession, user_id: str) -> bool:
     Returns:
         True if successful, False otherwise
     """
-    try:
-        user = await get_user_by_id(db, user_id)
-        if not user:
-            return False
-
-        user.is_active = False
-        await db.flush()
-        logger.info(f"Deactivated user: {user_id}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to deactivate user: {e}")
-        return False
+    user = await get_user_by_id(db, user_id)
+    return await update_entity(db, user, {"is_active": False}, entity_id=user_id)
 
 
 async def delete_user(db: AsyncSession, user_id: str) -> bool:
@@ -334,15 +279,5 @@ async def delete_user(db: AsyncSession, user_id: str) -> bool:
     Returns:
         True if successful, False otherwise
     """
-    try:
-        user = await get_user_by_id(db, user_id)
-        if not user:
-            return False
-
-        await db.delete(user)
-        await db.flush()
-        logger.info(f"Deleted user: {user_id}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to delete user: {e}")
-        return False
+    user = await get_user_by_id(db, user_id)
+    return await delete_entity(db, user, entity_id=user_id)

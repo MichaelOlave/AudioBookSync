@@ -8,9 +8,11 @@ from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.config import Config
-from ...database.db_users import user_ops
+from ...database.services import user_service
+from ...database.engine import get_db_session
 
 # OAuth2 scheme for automatic Swagger documentation
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -128,7 +130,10 @@ def decode_token(token: str) -> dict:
         )
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict:
     """
     FastAPI dependency to get the current authenticated user from JWT token.
 
@@ -137,6 +142,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
 
     Args:
         token: JWT token from Authorization header (automatically extracted)
+        db: Database session (automatically injected)
 
     Returns:
         User dictionary from database
@@ -176,15 +182,15 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     except HTTPException:
         raise
 
-    # Fetch user from database
-    user = user_ops.get_user_by_id(user_id)
+    # Fetch user from database using async service
+    user = await user_service.get_user_by_id(db, user_id)
 
     if user is None:
         logger.warning(f"User not found: {user_id}")
         raise credentials_exception
 
     # Check if user is active
-    if not user.get("is_active", True):
+    if not user.is_active:
         logger.warning(f"Inactive user attempted access: {user_id}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

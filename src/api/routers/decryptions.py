@@ -1,6 +1,6 @@
 """Decryption management endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, status, BackgroundTasks, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 from loguru import logger
@@ -15,7 +15,8 @@ from ..schemas.decryption import (
     DecryptList,
 )
 from ..services.background_service import BackgroundTaskService
-from ..middleware.error_handler import ResourceNotFoundError
+from ..middleware.error_handler import ResourceNotFoundError, handle_route_errors, InternalServerError
+from ..utils.generic_handlers import get_paginated_list
 
 router = APIRouter()
 
@@ -32,6 +33,7 @@ router = APIRouter()
         401: {"description": "Not authenticated"},
     },
 )
+@handle_route_errors("trigger decryption")
 async def trigger_decrypt(
     decrypt_data: DecryptCreate,
     background_tasks: BackgroundTasks,
@@ -71,70 +73,57 @@ async def trigger_decrypt(
             "message": "Decryption initiated"
         }
     """
-    try:
-        logger.info(f"Decryption triggered for {decrypt_data.asin} by user {current_user.user_id}")
+    logger.info(f"Decryption triggered for {decrypt_data.asin} by user {current_user.user_id}")
 
-        # Verify download exists and is completed
-        from ...database.services import download_service
-        download = await download_service.get_latest_download(db, decrypt_data.asin)
-        if not download:
-            logger.warning(f"Download not found for {decrypt_data.asin}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Book must be downloaded before decryption",
-            )
-
-        if download.status != "completed":
-            logger.warning(
-                f"Download not completed for {decrypt_data.asin}: {download.status}"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Download must be completed before decryption (current status: {download.status})",
-            )
-
-        # Create decryption status record in database
-        decryption = await decryption_service.create_decryption_status(
-            db=db,
-            asin=decrypt_data.asin,
-            download_id=download.download_id,
-            status="pending",
-        )
-
-        if not decryption:
-            logger.error(f"Failed to create decryption record for {decrypt_data.asin}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to create decryption record",
-            )
-
-        await db.commit()
-
-        # Queue background decryption task
-        background_tasks.add_task(
-            BackgroundTaskService.execute_decrypt_operation,
-            user_id=str(current_user.user_id),
-            decryption_id=decryption.decryption_id,
-            book=decrypt_data.dict(),
-        )
-
-        logger.info(f"Decryption queued: {decryption.decryption_id}")
-
-        return DecryptResponse(
-            decryption_id=decryption.decryption_id,
-            asin=decrypt_data.asin,
-            status="pending",
-            message="Decryption initiated",
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error triggering decryption: {e}")
+    # Verify download exists and is completed
+    from ...database.services import download_service
+    download = await download_service.get_latest_download(db, decrypt_data.asin)
+    if not download:
+        logger.warning(f"Download not found for {decrypt_data.asin}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to initiate decryption",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Book must be downloaded before decryption",
         )
+
+    if download.status != "completed":
+        logger.warning(
+            f"Download not completed for {decrypt_data.asin}: {download.status}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Download must be completed before decryption (current status: {download.status})",
+        )
+
+    # Create decryption status record in database
+    decryption = await decryption_service.create_decryption_status(
+        db=db,
+        asin=decrypt_data.asin,
+        download_id=download.download_id,
+        status="pending",
+    )
+
+    if not decryption:
+        logger.error(f"Failed to create decryption record for {decrypt_data.asin}")
+        raise InternalServerError(f"Failed to create decryption record for {decrypt_data.asin}")
+
+    await db.commit()
+
+    # Queue background decryption task
+    background_tasks.add_task(
+        BackgroundTaskService.execute_decrypt_operation,
+        user_id=str(current_user.user_id),
+        decryption_id=decryption.decryption_id,
+        book=decrypt_data.dict(),
+    )
+
+    logger.info(f"Decryption queued: {decryption.decryption_id}")
+
+    return DecryptResponse(
+        decryption_id=decryption.decryption_id,
+        asin=decrypt_data.asin,
+        status="pending",
+        message="Decryption initiated",
+    )
 
 
 @router.get(
@@ -147,6 +136,7 @@ async def trigger_decrypt(
         401: {"description": "Not authenticated"},
     },
 )
+@handle_route_errors("list decryptions")
 async def list_decryptions(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
@@ -185,55 +175,29 @@ async def list_decryptions(
     Example:
         GET /api/v1/decryptions/?status=completed&page=1&page_size=10
     """
-    try:
-        logger.info(f"Fetching decryptions for user {current_user.user_id}")
+    result = await get_paginated_list(
+        get_items_func=decryption_service.get_decryptions_by_user,
+        response_model=DecryptResponse,
+        get_items_kwargs={
+            "db": db,
+            "user_id": str(current_user.user_id),
+            "status": status_filter,
+            "limit": page_size,
+            "offset": (page - 1) * page_size,
+        },
+        user_id=str(current_user.user_id),
+        page=page,
+        page_size=page_size,
+        count_func=decryption_service.count_decryptions_by_user,
+        count_kwargs={
+            "db": db,
+            "user_id": str(current_user.user_id),
+            "status": status_filter,
+        },
+        resource_name="decryptions",
+    )
 
-        # Get decryptions with pagination
-        decryptions = await decryption_service.get_decryptions_by_user(
-            db=db,
-            user_id=str(current_user.user_id),
-            status=status_filter,
-            limit=page_size,
-            offset=(page - 1) * page_size,
-        )
-
-        # Get total count
-        total = await decryption_service.count_decryptions_by_user(
-            db=db,
-            user_id=str(current_user.user_id),
-            status=status_filter,
-        )
-
-        # Calculate pages
-        pages = (total + page_size - 1) // page_size if total > 0 else 1
-
-        # Validate page number
-        if page > pages and total > 0:
-            logger.warning(f"Page {page} exceeds max pages {pages}")
-            page = pages
-
-        # Convert to response objects
-        items = [DecryptResponse.from_orm(decryption) for decryption in decryptions]
-
-        logger.info(
-            f"Retrieved {len(items)} decryptions for user {current_user.user_id} (page {page}/{pages})"
-        )
-
-        return DecryptList(
-            items=items,
-            total=total,
-            page=page,
-            page_size=page_size,
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching decryptions: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve decryptions",
-        )
+    return DecryptList(**result)
 
 
 @router.get(
@@ -248,6 +212,7 @@ async def list_decryptions(
         404: {"description": "Decryption not found"},
     },
 )
+@handle_route_errors("get decryption status")
 async def get_decryption_status(
     decryption_id: str,
     current_user: User = Depends(get_current_user),
@@ -274,28 +239,18 @@ async def get_decryption_status(
     Example:
         GET /api/v1/decryptions/550e8400-e29b-41d4-a716-446655440000
     """
-    try:
-        logger.info(f"Fetching decryption status: {decryption_id} for user {current_user.user_id}")
+    logger.info(f"Fetching decryption status: {decryption_id} for user {current_user.user_id}")
 
-        # Get decryption by ID with user authorization check
-        decryption = await decryption_service.get_decryption_by_id_for_user(
-            db=db,
-            decryption_id=UUID(decryption_id),
-            user_id=str(current_user.user_id),
-        )
+    # Get decryption by ID with user authorization check
+    decryption = await decryption_service.get_decryption_by_id_for_user(
+        db=db,
+        decryption_id=UUID(decryption_id),
+        user_id=str(current_user.user_id),
+    )
 
-        if not decryption:
-            logger.warning(f"Decryption not found or user not authorized: {decryption_id}")
-            raise ResourceNotFoundError(f"Decryption '{decryption_id}' not found")
+    if not decryption:
+        logger.warning(f"Decryption not found or user not authorized: {decryption_id}")
+        raise ResourceNotFoundError(f"Decryption '{decryption_id}' not found")
 
-        logger.info(f"Retrieved decryption details: {decryption_id}")
-        return DecryptResponse.from_orm(decryption)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching decryption {decryption_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve decryption status",
-        )
+    logger.info(f"Retrieved decryption details: {decryption_id}")
+    return DecryptResponse.from_orm(decryption)

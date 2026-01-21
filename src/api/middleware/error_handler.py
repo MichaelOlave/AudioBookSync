@@ -1,11 +1,15 @@
 """Global exception handlers and custom exceptions for FastAPI."""
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from loguru import logger
 import traceback
-from typing import Optional
+from typing import Optional, Callable, Any, TypeVar
+from functools import wraps
+import inspect
+
+F = TypeVar("F", bound=Callable[..., Any])
 
 
 # ============================================================================
@@ -65,6 +69,94 @@ class InternalServerError(AudioBookSyncException):
 
     def __init__(self, message: str = "Internal server error"):
         super().__init__(message, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ============================================================================
+# DECORATORS
+# ============================================================================
+
+
+def handle_route_errors(operation_name: str = None) -> Callable:
+    """
+    Decorator for FastAPI route handlers that provides centralized error handling.
+
+    Wraps async route handlers to catch exceptions, log them appropriately, and
+    return standardized error responses. HTTPException instances are re-raised
+    as-is. AudioBookSyncException subclasses are re-raised. All other exceptions
+    are logged with full context and converted to 500 Internal Server Error.
+
+    Args:
+        operation_name: Optional human-readable name for the operation (for logging).
+                       If not provided, uses the function name.
+
+    Usage:
+        @router.post("/items/")
+        @handle_route_errors("create item")
+        async def create_item(item_data: ItemCreate, db: AsyncSession) -> ItemResponse:
+            # No need for try-except, the decorator handles it
+            result = await db_service.create(db, item_data)
+            await db.commit()
+            return result
+
+    Example of cleaned-up code:
+        # BEFORE (15 lines of boilerplate per handler)
+        try:
+            logger.info(f"Creating item...")
+            result = await service.create(db, data)
+            await db.commit()
+            return result
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error creating item: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create item",
+            )
+
+        # AFTER (decorator removes all boilerplate)
+        @handle_route_errors("create item")
+        async def create_item(...):
+            result = await service.create(db, data)
+            await db.commit()
+            return result
+    """
+
+    def decorator(func: F) -> F:
+        op_name = operation_name or func.__name__
+
+        # Check if it's an async function
+        if not inspect.iscoroutinefunction(func):
+            raise TypeError(
+                f"@handle_route_errors can only decorate async functions. "
+                f"'{func.__name__}' is not async."
+            )
+
+        @wraps(func)
+        async def wrapper(*args, **kwargs) -> Any:
+            try:
+                return await func(*args, **kwargs)
+            except HTTPException:
+                # Re-raise FastAPI HTTPExceptions as-is
+                raise
+            except AudioBookSyncException:
+                # Re-raise our custom exceptions as-is
+                raise
+            except Exception as e:
+                # Log all other exceptions with full context
+                logger.error(
+                    f"Error during {op_name}: {type(e).__name__}: {str(e)}",
+                    extra={"function": func.__name__, "traceback": traceback.format_exc()},
+                )
+                # Raise a generic 500 error
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to {op_name}",
+                )
+
+        return wrapper  # type: ignore
+
+    return decorator
 
 
 # ============================================================================

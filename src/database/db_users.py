@@ -234,6 +234,36 @@ class UserOperations:
             logger.error(f"Failed to update password: {e}")
             return False
 
+    def update_user_email(self, user_id: str, email: str) -> bool:
+        """
+        Update user's email address.
+
+        Args:
+            user_id: User's UUID
+            email: New email address
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            with self.db_pool.get_cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE users
+                    SET email = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE user_id = %s
+                """,
+                    (email, user_id),
+                )
+                logger.info(f"Updated email for user: {user_id}")
+                return True
+        except psycopg2.IntegrityError as e:
+            logger.error(f"Email update failed (duplicate): {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Failed to update email: {e}")
+            return False
+
     def update_audible_auth_json(
         self,
         user_id: str,
@@ -378,6 +408,39 @@ class UserOperations:
         except Exception as e:
             logger.error(f"Failed to get auth.json for user {user_id}: {e}")
             return None
+
+    def update_user_storage_config(self, user_id: str, storage_config: Dict) -> bool:
+        """
+        Update user's storage provider configuration.
+
+        Args:
+            user_id: User's UUID
+            storage_config: Storage configuration dictionary
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Store storage config as JSON string
+            storage_config_str = json.dumps(storage_config)
+
+            with self.db_pool.get_cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE users
+                    SET storage_config = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE user_id = %s
+                """,
+                    (storage_config_str, user_id),
+                )
+                logger.info(
+                    f"Updated storage configuration for user: {user_id} "
+                    f"(provider={storage_config.get('provider_type')})"
+                )
+                return True
+        except Exception as e:
+            logger.error(f"Failed to update storage config for user {user_id}: {e}")
+            return False
 
 
 # Singleton instance

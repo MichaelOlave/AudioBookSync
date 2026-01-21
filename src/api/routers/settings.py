@@ -90,7 +90,7 @@ async def get_audible_credentials(
         }
     """
     try:
-        user_id = current_user.get("user_id")
+        user_id = current_user.user_id
         if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -103,26 +103,26 @@ async def get_audible_credentials(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        auth_configured = user.get("audible_auth_json") is not None
+        auth_configured = getattr(user, "audible_auth_json", None) is not None
 
         logger.info(
             f"Retrieved credentials for user {user_id}: "
-            f"configured={auth_configured}, email={user.get('audible_email')}"
+            f"configured={auth_configured}, email={getattr(user, 'audible_email', None)}"
         )
 
         return AudibleCredentialsResponse(
             user_id=user_id,
-            audible_email=user.get("audible_email"),
-            device_name=user.get("audible_device_name"),
-            has_access_token=user.get("audible_auth_json") is not None,
-            has_activation_bytes=user.get("activation_bytes") is not None,
+            audible_email=getattr(user, "audible_email", None),
+            device_name=getattr(user, "audible_device_name", None),
+            has_access_token=getattr(user, "audible_auth_json", None) is not None,
+            has_activation_bytes=getattr(user, "activation_bytes", None) is not None,
             auth_configured=auth_configured,
             auth_json_raw=None,  # Ensure raw data is not sen
         )
 
     except Exception as e:
         logger.error(
-            f"Error getting credentials for user {current_user.get('user_id')}: {e}"
+            f"Error getting credentials for user {current_user.user_id}: {e}"
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -169,7 +169,7 @@ async def clear_audible_credentials(
         }
     """
     try:
-        user_id = current_user.get("user_id")
+        user_id = current_user.user_id
         if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -199,7 +199,7 @@ async def clear_audible_credentials(
         raise
     except Exception as e:
         logger.error(
-            f"Error clearing credentials for user {current_user.get('user_id')}: {e}"
+            f"Error clearing credentials for user {current_user.user_id}: {e}"
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -247,7 +247,7 @@ async def get_storage_config(
         }
     """
     try:
-        user_id = current_user.get("user_id")
+        user_id = current_user.user_id
         if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -255,17 +255,12 @@ async def get_storage_config(
             )
         logger.info(f"Getting storage configuration for user {user_id}")
 
-        # Get user from database
-        user = user_ops.get_user_by_id(user_id)
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
         # Get storage config from user data (or use defaults)
-        storage_config = user.get("storage_config") or {}
-        provider_type = storage_config.get("provider_type", "minio")
-        endpoint = storage_config.get("endpoint", "http://localhost:9000")
-        bucket_name = storage_config.get("bucket_name", "audiobooks")
-        use_ssl = storage_config.get("use_ssl", False)
+        storage_config = getattr(current_user, "storage_config", None) or {}
+        provider_type = storage_config.get("provider_type", "minio") if isinstance(storage_config, dict) else "minio"
+        endpoint = storage_config.get("endpoint", "http://localhost:9000") if isinstance(storage_config, dict) else "http://localhost:9000"
+        bucket_name = storage_config.get("bucket_name", "audiobooks") if isinstance(storage_config, dict) else "audiobooks"
+        use_ssl = storage_config.get("use_ssl", False) if isinstance(storage_config, dict) else False
 
         # Test if storage is connected
         is_connected = False
@@ -309,7 +304,7 @@ async def get_storage_config(
         raise
     except Exception as e:
         logger.error(
-            f"Error getting storage configuration for user {current_user.get('user_id')}: {e}"
+            f"Error getting storage configuration for user {current_user.user_id}: {e}"
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -370,7 +365,7 @@ async def update_storage_config(
         }
     """
     try:
-        user_id = current_user.get("user_id")
+        user_id = current_user.user_id
         if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -446,7 +441,7 @@ async def update_storage_config(
         raise
     except Exception as e:
         logger.error(
-            f"Error updating storage configuration for user {current_user.get('user_id')}: {e}"
+            f"Error updating storage configuration for user {current_user.user_id}: {e}"
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -503,7 +498,7 @@ async def test_storage_connection(
         }
     """
     try:
-        user_id = current_user.get("user_id")
+        user_id = current_user.user_id
         if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -553,7 +548,7 @@ async def test_storage_connection(
         raise
     except Exception as e:
         logger.error(
-            f"Error testing storage connection for user {current_user.get('user_id')}: {e}"
+            f"Error testing storage connection for user {current_user.user_id}: {e}"
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -12,7 +12,8 @@ from ...database.engine import get_db_session
 from ...database.models.user import User
 from ..security.auth import get_current_user
 from ..schemas.book import BookResponse, BookList
-from ..middleware.error_handler import ResourceNotFoundError
+from ..middleware.error_handler import ResourceNotFoundError, AuthorizationError, handle_route_errors
+from ..utils.generic_handlers import get_paginated_list
 
 router = APIRouter()
 
@@ -27,6 +28,7 @@ router = APIRouter()
         401: {"description": "Not authenticated"},
     },
 )
+@handle_route_errors("get library")
 async def get_library(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
@@ -59,51 +61,23 @@ async def get_library(
     Example:
         GET /api/v1/library?page=1&page_size=50
     """
-    try:
-        logger.info(
-            f"Fetching library for user: {current_user.user_id} (page {page}, size {page_size})"
-        )
+    async def get_books(**kwargs):
+        return await book_service.get_books_by_user(kwargs["db"], kwargs["user_id"])
 
-        # Get all books for user
-        all_books = await book_service.get_books_by_user(db, str(current_user.user_id))
+    result = await get_paginated_list(
+        get_items_func=get_books,
+        response_model=BookResponse,
+        get_items_kwargs={
+            "db": db,
+            "user_id": str(current_user.user_id),
+        },
+        user_id=str(current_user.user_id),
+        page=page,
+        page_size=page_size,
+        resource_name="books",
+    )
 
-        # Calculate pagination
-        total = len(all_books)
-        pages = (total + page_size - 1) // page_size if total > 0 else 0
-
-        # Validate page number
-        if page > pages and total > 0:
-            logger.warning(f"Page {page} exceeds max pages {pages} for user {current_user.user_id}")
-            page = pages
-
-        # Apply pagination
-        start_idx = (page - 1) * page_size
-        end_idx = start_idx + page_size
-        paginated_books = all_books[start_idx:end_idx]
-
-        # Convert to BookResponse objects
-        items = [BookResponse.from_orm(book) for book in paginated_books]
-
-        logger.info(
-            f"Retrieved {len(items)} books for user {current_user.user_id} (page {page}/{pages})"
-        )
-
-        return BookList(
-            items=items,
-            total=total,
-            page=page,
-            page_size=page_size,
-            pages=pages,
-        )
-
-    except Exception as e:
-        logger.error(
-            f"Error fetching library for user {current_user.user_id}: {e}"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve library",
-        )
+    return BookList(**result)
 
 
 @router.get(
@@ -117,6 +91,7 @@ async def get_library(
         500: {"description": "Failed to fetch from Audible"},
     },
 )
+@handle_route_errors("fetch Audible library")
 async def fetch_audible_library(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
@@ -152,63 +127,48 @@ async def fetch_audible_library(
     Example:
         GET /api/v1/library/audible/fetch?num_results=100
     """
-    try:
-        logger.info(f"Fetching Audible library for user: {current_user.user_id}")
+    logger.info(f"Fetching Audible library for user: {current_user.user_id}")
 
-        # Get user's Audible credentials from database
-        user = await user_service.get_user_by_id(db, str(current_user.user_id))
+    # Get user's Audible credentials from database
+    user = await user_service.get_user_by_id(db, str(current_user.user_id))
 
-        if not user or not user.audible_auth_json:
-            logger.error(f"No Audible credentials found for user {current_user.user_id}")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Audible credentials not configured. Please authenticate with Audible first.",
-            )
+    if not user or not user.audible_auth_json:
+        logger.error(f"No Audible credentials found for user {current_user.user_id}")
+        raise AuthorizationError("Audible credentials not configured. Please authenticate with Audible first.")
 
-        auth_data = json.loads(user.audible_auth_json)
+    auth_data = json.loads(user.audible_auth_json)
 
-        # Create Audible client from stored credentials
-        logger.info("Creating Audible authenticator from stored credentials")
-        auth = audible.Authenticator.from_dict(auth_data)
+    # Create Audible client from stored credentials
+    logger.info("Creating Audible authenticator from stored credentials")
+    auth = audible.Authenticator.from_dict(auth_data)
 
-        # Create async client and fetch library
-        logger.info(f"Fetching library from Audible (num_results={num_results})")
-        async with audible.AsyncClient(auth=auth) as client:
-            library_response = await client.get(
-                "library",
-                num_results=num_results,
-                page=page,
-                response_groups=(
-                    "product_desc,"
-                    "product_attrs,"
-                    "media,"
-                    "rating"
-                ),
-                sort_by="-PurchaseDate",
-            )
-
-        items = library_response.get("items", [])
-        logger.info(
-            f"Successfully fetched {len(items)} books from Audible for user {current_user.user_id}"
+    # Create async client and fetch library
+    logger.info(f"Fetching library from Audible (num_results={num_results})")
+    async with audible.AsyncClient(auth=auth) as client:
+        library_response = await client.get(
+            "library",
+            num_results=num_results,
+            page=page,
+            response_groups=(
+                "product_desc,"
+                "product_attrs,"
+                "media,"
+                "rating"
+            ),
+            sort_by="-PurchaseDate",
         )
 
-        return {
-            "items": items,
-            "total": len(items),
-            "user_id": str(current_user.user_id),
-            "num_results": num_results,
-        }
+    items = library_response.get("items", [])
+    logger.info(
+        f"Successfully fetched {len(items)} books from Audible for user {current_user.user_id}"
+    )
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception(
-            f"Error fetching Audible library for user {current_user.user_id}: {e}"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch library from Audible: {str(e)}",
-        )
+    return {
+        "items": items,
+        "total": len(items),
+        "user_id": str(current_user.user_id),
+        "num_results": num_results,
+    }
 
 
 @router.get(
@@ -223,6 +183,7 @@ async def fetch_audible_library(
         404: {"description": "Book not found"},
     },
 )
+@handle_route_errors("get book details")
 async def get_book_details(
     asin: str,
     current_user: User = Depends(get_current_user),
@@ -249,34 +210,21 @@ async def get_book_details(
     Example:
         GET /api/v1/library/B084L6Z6M3
     """
-    try:
-        logger.info(f"Fetching book details: {asin} for user: {current_user.user_id}")
+    logger.info(f"Fetching book details: {asin} for user: {current_user.user_id}")
 
-        # Get book by ASIN
-        book = await book_service.get_book_by_asin(db, asin)
+    # Get book by ASIN
+    book = await book_service.get_book_by_asin(db, asin)
 
-        if not book:
-            logger.warning(f"Book not found: {asin}")
-            raise ResourceNotFoundError(f"Book '{asin}' not found")
+    if not book:
+        logger.warning(f"Book not found: {asin}")
+        raise ResourceNotFoundError(f"Book '{asin}' not found")
 
-        # Verify ownership
-        if book.user_id != current_user.user_id:
-            logger.warning(
-                f"Unauthorized access attempt to book {asin} by user {current_user.user_id}"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to access this book",
-            )
-
-        logger.info(f"Retrieved book details: {asin}")
-        return BookResponse.from_orm(book)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching book {asin}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve book details",
+    # Verify ownership
+    if book.user_id != current_user.user_id:
+        logger.warning(
+            f"Unauthorized access attempt to book {asin} by user {current_user.user_id}"
         )
+        raise AuthorizationError("Not authorized to access this book")
+
+    logger.info(f"Retrieved book details: {asin}")
+    return BookResponse.from_orm(book)

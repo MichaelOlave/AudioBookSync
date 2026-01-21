@@ -11,7 +11,7 @@ from loguru import logger
 
 from ..core.config import Config
 from ..core.logging_config import configure_logging
-from ..database.db_pool import db_pool
+from ..database.engine import engine as db_engine
 from .middleware.error_handler import add_exception_handlers
 from .middleware.logging import LoggingMiddleware
 from .routers import (
@@ -25,7 +25,7 @@ from .routers import (
     files,
     websocket,
     settings,
-    audible_auth,
+    users,
 )
 from .schemas.common import HealthResponse
 
@@ -74,7 +74,7 @@ async def lifespan(app: FastAPI):
     # ========== SHUTDOWN ==========
     try:
         logger.info("AudioBookSync API Shutting Down")
-        db_pool.close_all_connections()
+        await db_engine.dispose()
         logger.info("Database connections closed")
     except Exception as e:
         logger.error(f"Shutdown error: {e}", exc_info=True)
@@ -145,6 +145,12 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(
+        users.router,
+        prefix="/api/v1/users",
+        tags=["Users"],
+    )
+
+    app.include_router(
         library.router,
         prefix="/api/v1/library",
         tags=["Library"],
@@ -196,12 +202,6 @@ def create_app() -> FastAPI:
         settings.router,
         prefix="/api/v1/settings",
         tags=["Settings"],
-    )
-
-    app.include_router(
-        audible_auth.router,
-        prefix="/api/v1/audible",
-        tags=["Audible"],
     )
 
     # ========== HEALTH CHECK ENDPOINT ==========

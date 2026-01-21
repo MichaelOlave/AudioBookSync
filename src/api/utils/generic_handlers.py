@@ -1,0 +1,142 @@
+"""
+Generic request handlers for common API patterns.
+
+Provides reusable handlers for paginated list endpoints and other common patterns.
+"""
+
+import inspect
+from typing import Callable, List, Optional, TypeVar, Generic, Type, Any
+from loguru import logger
+
+from .pagination import calculate_pages, validate_page, paginate_list
+
+T = TypeVar("T")
+ResponseT = TypeVar("ResponseT")
+
+
+async def get_paginated_list(
+    get_items_func: Callable,
+    response_model: Type,
+    get_items_kwargs: dict,
+    user_id: str,
+    page: int,
+    page_size: int,
+    count_func: Optional[Callable] = None,
+    count_kwargs: Optional[dict] = None,
+    resource_name: str = "items",
+) -> dict:
+    """
+    Generic handler for paginated list endpoints.
+
+    Supports both database-level pagination (using limit/offset with separate count)
+    and in-memory pagination (loading all items and slicing).
+
+    Args:
+        get_items_func: Async function to fetch items. Should accept **get_items_kwargs
+        response_model: Pydantic model or ORM class for item conversion
+        get_items_kwargs: Kwargs to pass to get_items_func. Should include 'db', 'user_id', etc.
+        user_id: User ID for logging
+        page: Requested page number (1-indexed)
+        page_size: Number of items per page
+        count_func: Optional async function to count total items. If None, uses len(items)
+        count_kwargs: Optional kwargs for count_func
+        resource_name: Human-readable resource name for logging
+
+    Returns:
+        Dict with 'items', 'total', 'page', 'page_size', and 'pages' keys
+
+    Example:
+        # Database-level pagination (downloads, decryptions)
+        result = await get_paginated_list(
+            get_items_func=download_service.get_downloads_by_user,
+            response_model=DownloadResponse,
+            get_items_kwargs={
+                "db": db,
+                "user_id": str(current_user.user_id),
+                "status": status_filter,
+                "limit": page_size,
+                "offset": (page - 1) * page_size,
+            },
+            user_id=str(current_user.user_id),
+            page=page,
+            page_size=page_size,
+            count_func=download_service.count_downloads_by_user,
+            count_kwargs={
+                "db": db,
+                "user_id": str(current_user.user_id),
+                "status": status_filter,
+            },
+            resource_name="downloads",
+        )
+
+        # In-memory pagination (library, sync)
+        all_items = await book_service.get_books_by_user(db, str(current_user.user_id))
+        result = await get_paginated_list(
+            get_items_func=lambda **kwargs: all_items,
+            response_model=BookResponse,
+            get_items_kwargs={},
+            user_id=str(current_user.user_id),
+            page=page,
+            page_size=page_size,
+            resource_name="books",
+        )
+    """
+    logger.info(f"Fetching {resource_name} for user {user_id}")
+
+    # Get items (handle both async and sync functions)
+    result = get_items_func(**get_items_kwargs)
+    if inspect.iscoroutine(result):
+        items = await result
+    else:
+        items = result
+
+    # Get total count (handle both async and sync functions)
+    if count_func:
+        count_result = count_func(**(count_kwargs or {}))
+        if inspect.iscoroutine(count_result):
+            total = await count_result
+        else:
+            total = count_result
+    else:
+        total = len(items)
+
+    # Calculate and validate pagination
+    pages = calculate_pages(total, page_size)
+    validated_page = validate_page(page, pages, total)
+
+    # If using database-level pagination, items are already sliced
+    if count_func:
+        response_items = items
+    else:
+        # In-memory pagination: slice the items
+        response_items, validated_page, pages = paginate_list(
+            items, validated_page, page_size
+        )
+
+    # Convert to response objects
+    try:
+        # Handle both ORM models (with .from_orm()) and dict models (with **)
+        converted_items = []
+        for item in response_items:
+            if hasattr(response_model, "from_orm"):
+                converted_items.append(response_model.from_orm(item))
+            elif isinstance(item, dict):
+                converted_items.append(response_model(**item))
+            else:
+                converted_items.append(item)
+    except Exception as e:
+        logger.error(f"Failed to convert {resource_name} to response model: {e}")
+        converted_items = response_items
+
+    logger.info(
+        f"Retrieved {len(converted_items)} {resource_name} for user {user_id} "
+        f"(page {validated_page}/{pages})"
+    )
+
+    return {
+        "items": converted_items,
+        "total": total,
+        "page": validated_page,
+        "page_size": page_size,
+        "pages": pages,
+    }

@@ -36,19 +36,32 @@ class MinIOClient:
         data = client.stream_file("user-123", "downloaded/book.aax", offset=0, length=8192)
     """
 
-    def __init__(self):
-        """Initialize MinIO client with configuration from Config class.
+    def __init__(
+        self,
+        endpoint: Optional[str] = None,
+        access_key: Optional[str] = None,
+        secret_key: Optional[str] = None,
+        secure: Optional[bool] = None,
+    ):
+        """Initialize MinIO client with configuration from Config class or custom parameters.
 
         Loads connection parameters from environment variables via Config:
         - MINIO_ENDPOINT: MinIO server endpoint (e.g., "localhost:9000")
         - MINIO_ACCESS_KEY: Access key for authentication
         - MINIO_SECRET_KEY: Secret key for authentication
         - MINIO_SECURE: Whether to use HTTPS (default: False for local dev)
+
+        Args:
+            endpoint: Optional custom MinIO endpoint (overrides Config)
+            access_key: Optional custom access key (overrides Config)
+            secret_key: Optional custom secret key (overrides Config)
+            secure: Optional custom secure setting (overrides Config)
         """
-        self.endpoint = Config.MINIO_ENDPOINT
-        self.access_key = Config.MINIO_ACCESS_KEY
-        self.secret_key = Config.MINIO_SECRET_KEY
-        self.secure = Config.MINIO_SECURE
+        # Use provided parameters or fall back to Config
+        self.endpoint = endpoint or Config.MINIO_ENDPOINT
+        self.access_key = access_key or Config.MINIO_ACCESS_KEY
+        self.secret_key = secret_key or Config.MINIO_SECRET_KEY
+        self.secure = secure if secure is not None else Config.MINIO_SECURE
 
         # Initialize Minio client with connection parameters
         self.client = Minio(

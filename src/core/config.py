@@ -12,9 +12,18 @@ load_dotenv()
 class Config:
     """Application configuration loaded from environment variables and defaults."""
 
-    DATABASE_URL = os.getenv(
-        "DATABASE_URL", "postgresql://postgres@localhost:5432/audiobooksync"
-    )
+    # Build DATABASE_URL from individual env vars or use full URL if provided
+    if "DATABASE_URL" in os.environ:
+        DATABASE_URL = os.getenv("DATABASE_URL")
+    else:
+        # Build from individual components (defaults to Docker service names)
+        _db_host = os.getenv("POSTGRES_HOST", "localhost")
+        _db_port = os.getenv("POSTGRES_PORT", "5432")
+        _db_name = os.getenv("POSTGRES_DB", "audiobooksync")
+        _db_user = os.getenv("POSTGRES_USER", "postgres")
+        _db_password = os.getenv("POSTGRES_PASSWORD", "")
+        _db_password_part = f":{_db_password}@" if _db_password else "@"
+        DATABASE_URL = f"postgresql://{_db_user}{_db_password_part}{_db_host}:{_db_port}/{_db_name}"
 
     # Audible Authentication
     AUTH_FILE = os.getenv("AUTH_FILE", "auth.json")
@@ -86,7 +95,7 @@ class Config:
     # MinIO Object Storage Configuration
     # ========================================================================
     # MinIO Connection Settings
-    MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "localhost:9000")
+    MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "minio:9000")
     MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
     MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
     MINIO_SECURE = os.getenv("MINIO_SECURE", "false").lower() in ("true", "1", "yes")

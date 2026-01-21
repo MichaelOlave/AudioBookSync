@@ -1,6 +1,6 @@
 """Book management endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
@@ -10,7 +10,12 @@ from ...database.models.user import User
 from ..security.auth import get_current_user
 from ..schemas.book import BookBase, BookResponse
 from ..schemas.common import MessageResponse
-from ..middleware.error_handler import ResourceNotFoundError
+from ..middleware.error_handler import (
+    ResourceNotFoundError,
+    AuthorizationError,
+    InternalServerError,
+    handle_route_errors,
+)
 
 router = APIRouter()
 
@@ -27,6 +32,7 @@ router = APIRouter()
         401: {"description": "Not authenticated"},
     },
 )
+@handle_route_errors("add book")
 async def create_book(
     book_data: BookBase,
     current_user: User = Depends(get_current_user),
@@ -59,51 +65,35 @@ async def create_book(
             "rating": 4.8
         }
     """
-    try:
-        logger.info(f"Adding book {book_data.asin} for user {current_user.user_id}")
+    logger.info(f"Adding book {book_data.asin} for user {current_user.user_id}")
 
-        # Add/update book in database
-        success = await book_service.add_book(
-            db=db,
-            asin=book_data.asin,
-            user_id=str(current_user.user_id),
-            title=book_data.title,
-            runtime_min=book_data.runtime_min,
-            author=book_data.author,
-            narrator=book_data.narrator,
-            series_name=book_data.series_name,
-            description=book_data.description,
-            rating=book_data.rating,
-        )
+    # Add/update book in database
+    success = await book_service.add_book(
+        db=db,
+        asin=book_data.asin,
+        user_id=str(current_user.user_id),
+        title=book_data.title,
+        runtime_min=book_data.runtime_min,
+        author=book_data.author,
+        narrator=book_data.narrator,
+        series_name=book_data.series_name,
+        description=book_data.description,
+        rating=book_data.rating,
+    )
 
-        if not success:
-            logger.error(f"Failed to add book {book_data.asin}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to add book",
-            )
+    if not success:
+        logger.error(f"Failed to add book {book_data.asin}")
+        raise ResourceNotFoundError(f"Failed to add book {book_data.asin}")
 
-        # Fetch and return the added book
-        book = await book_service.get_book_by_asin(db, book_data.asin)
-        if not book:
-            logger.error(f"Added book not found: {book_data.asin}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to retrieve added book",
-            )
+    # Fetch and return the added book
+    book = await book_service.get_book_by_asin(db, book_data.asin)
+    if not book:
+        logger.error(f"Added book not found: {book_data.asin}")
+        raise ResourceNotFoundError(f"Added book not found: {book_data.asin}")
 
-        await db.commit()
-        logger.info(f"Book added successfully: {book_data.asin} for user {current_user.user_id}")
-        return BookResponse.from_orm(book)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error adding book {book_data.asin}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to add book",
-        )
+    await db.commit()
+    logger.info(f"Book added successfully: {book_data.asin} for user {current_user.user_id}")
+    return BookResponse.from_orm(book)
 
 
 @router.delete(
@@ -119,6 +109,7 @@ async def create_book(
         404: {"description": "Book not found"},
     },
 )
+@handle_route_errors("delete book")
 async def delete_book(
     asin: str,
     current_user: User = Depends(get_current_user),
@@ -144,46 +135,30 @@ async def delete_book(
     Example:
         DELETE /api/v1/books/B084L6Z6M3
     """
-    try:
-        logger.info(f"Deleting book {asin} for user {current_user.user_id}")
+    logger.info(f"Deleting book {asin} for user {current_user.user_id}")
 
-        # Verify book exists and belongs to user
-        book = await book_service.get_book_by_asin(db, asin)
-        if not book:
-            logger.warning(f"Book not found: {asin}")
-            raise ResourceNotFoundError(f"Book '{asin}' not found")
+    # Verify book exists and belongs to user
+    book = await book_service.get_book_by_asin(db, asin)
+    if not book:
+        logger.warning(f"Book not found: {asin}")
+        raise ResourceNotFoundError(f"Book '{asin}' not found")
 
-        # Verify ownership
-        if book.user_id != current_user.user_id:
-            logger.warning(
-                f"Unauthorized delete attempt for book {asin} by user {current_user.user_id}"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to delete this book",
-            )
-
-        # Delete the book
-        success = await book_service.delete_book(db, asin)
-        if not success:
-            logger.error(f"Failed to delete book {asin}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to delete book",
-            )
-
-        await db.commit()
-        logger.info(f"Book deleted successfully: {asin}")
-        return MessageResponse(
-            message=f"Book '{asin}' deleted successfully",
-            success=True,
+    # Verify ownership
+    if book.user_id != current_user.user_id:
+        logger.warning(
+            f"Unauthorized delete attempt for book {asin} by user {current_user.user_id}"
         )
+        raise AuthorizationError("Not authorized to delete this book")
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error deleting book {asin}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete book",
-        )
+    # Delete the book
+    success = await book_service.delete_book(db, asin)
+    if not success:
+        logger.error(f"Failed to delete book {asin}")
+        raise InternalServerError(f"Failed to delete book {asin}")
+
+    await db.commit()
+    logger.info(f"Book deleted successfully: {asin}")
+    return MessageResponse(
+        message=f"Book '{asin}' deleted successfully",
+        success=True,
+    )
