@@ -103,6 +103,7 @@ class AuthCompleteRequest(BaseModel):
     summary="Start Audible authentication",
     description="Generate a browser login URL for Audible and start an auth session.",
 )
+@handle_route_errors("start Audible auth")
 async def start_audible_auth(
     request: AuthStartRequest,
     current_user: Dict = Depends(get_current_user),
@@ -115,51 +116,40 @@ async def start_audible_auth(
     """
     user_id = current_user.get("user_id")
     if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User context is required to start Audible authentication.",
-        )
+        raise AuthenticationError("User context is required to start Audible authentication")
 
     logger.info(f"Starting auth for user_id: {user_id} (type: {type(user_id)})")
 
-    try:
-        # Get locale information
-        locale = Locale(country_code=request.country_code)
+    # Get locale information
+    locale = Locale(country_code=request.country_code)
 
-        # Generate code verifier and OAuth URL
-        code_verifier = create_code_verifier()
-        oauth_url, serial = build_oauth_url(
-            country_code=locale.country_code,
-            domain=locale.domain,
-            market_place_id=locale.market_place_id,
-            code_verifier=code_verifier,
-        )
+    # Generate code verifier and OAuth URL
+    code_verifier = create_code_verifier()
+    oauth_url, serial = build_oauth_url(
+        country_code=locale.country_code,
+        domain=locale.domain,
+        market_place_id=locale.market_place_id,
+        code_verifier=code_verifier,
+    )
 
-        # Store session data (keep code_verifier as bytes)
-        session_data = AuthSessionData(
-            country_code=request.country_code,
-            code_verifier=code_verifier.decode("utf-8"),
-            serial=serial,
-        )
-        _save_session(user_id, session_data)
+    # Store session data (keep code_verifier as bytes)
+    session_data = AuthSessionData(
+        country_code=request.country_code,
+        code_verifier=code_verifier.decode("utf-8"),
+        serial=serial,
+    )
+    _save_session(user_id, session_data)
 
-        logger.info(
-            f"Stored auth session for user {user_id} "
-            f"(locale={request.country_code}, serial={serial})"
-        )
+    logger.info(
+        f"Stored auth session for user {user_id} "
+        f"(locale={request.country_code}, serial={serial})"
+    )
 
-        logger.info(
-            f"Started Audible auth session for user {user_id} "
-            f"(locale={request.country_code}), login_url generated."
-        )
-        return AuthStartResponse(login_url=oauth_url)
-    except Exception as exc:
-        logger.error(f"Failed to generate Audible login URL for user {user_id}: {exc}")
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get Audible login URL.",
-        ) from exc
+    logger.info(
+        f"Started Audible auth session for user {user_id} "
+        f"(locale={request.country_code}), login_url generated."
+    )
+    return AuthStartResponse(login_url=oauth_url)
 
 
 def _normalize_activation_bytes(raw_bytes: object) -> Optional[str]:
