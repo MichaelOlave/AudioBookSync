@@ -1,12 +1,15 @@
 """Background sync service for library synchronization."""
 
-from typing import Optional
 from datetime import datetime
+from typing import Optional
+from uuid import UUID
+
 from loguru import logger
 
-from ...database.db_sync import sync_ops
+from ...database.services import sync_service as orm_sync_service
+from ...database.engine import get_db_session
 from ...operations.library_sync import sync_library
-from ..websockets import ws_manager, EventType
+from ..websockets import EventType, ws_manager
 
 
 class SyncService:
@@ -47,9 +50,7 @@ class SyncService:
             or a task queue like Celery for production use.
         """
         try:
-            logger.info(
-                f"Starting sync {sync_id} for user {user_id} (type: {sync_type})"
-            )
+            logger.info(f"Starting sync {sync_id} for user {user_id} (type: {sync_type})")
 
             # Broadcast sync started event
             await ws_manager.broadcast_to_user(
@@ -125,44 +126,57 @@ class SyncService:
         try:
             logger.info(f"Completing sync {sync_id} with status {status}")
 
-            # Update sync record in database
-            success = sync_ops.complete_sync_history(
-                sync_id=sync_id,
-                status=status,
-                books_found=stats.get("books_found", 0),
-                books_added=stats.get("books_added", 0),
-                books_downloaded=stats.get("books_downloaded", 0),
-                books_decrypted=stats.get("books_decrypted", 0),
-                errors_count=stats.get("errors_count", 0),
-                notes=stats.get("notes"),
-            )
+            # Convert string sync_id to UUID if needed
+            try:
+                sync_uuid = UUID(sync_id) if isinstance(sync_id, str) else sync_id
+            except (ValueError, AttributeError):
+                logger.error(f"Invalid sync_id format: {sync_id}")
+                return
+
+            # Update sync record in database using ORM
+            async with get_db_session() as db:
+                success = await orm_sync_service.complete_sync(
+                    db=db,
+                    sync_id=sync_uuid,
+                    books_found=stats.get("books_found", 0),
+                    books_added=stats.get("books_added", 0),
+                    books_removed=stats.get("books_removed", 0),
+                    books_downloaded=stats.get("books_downloaded", 0),
+                    books_decrypted=stats.get("books_decrypted", 0),
+                    errors_count=stats.get("errors_count", 0),
+                )
+                await db.commit()
 
             if not success:
                 logger.error(f"Failed to update sync record {sync_id}")
                 return
 
             # Get final sync record
-            sync = sync_ops.get_sync_by_id(sync_id)
-            if not sync:
-                logger.error(f"Sync record not found: {sync_id}")
-                return
+            async with get_db_session() as db:
+                sync_obj = await orm_sync_service.get_sync_by_id(db, sync_uuid)
+                if not sync_obj:
+                    logger.error(f"Sync record not found: {sync_id}")
+                    return
+
+                # Convert ORM object to dict for broadcast
+                duration = sync_obj.duration_seconds or 0
+                sync_data = {
+                    "sync_id": str(sync_obj.sync_id),
+                    "status": sync_obj.status,
+                    "books_found": sync_obj.books_found,
+                    "books_added": sync_obj.books_added,
+                    "books_downloaded": sync_obj.books_downloaded,
+                    "books_decrypted": sync_obj.books_decrypted,
+                    "errors_count": sync_obj.errors_count,
+                    "duration_seconds": duration,
+                    "timestamp": datetime.utcnow().timestamp(),
+                }
 
             # Broadcast sync completed event
-            duration = sync.get("duration_seconds", 0.0) or 0.0
             await ws_manager.broadcast_to_user(
                 user_id=user_id,
                 event_type=EventType.SYNC_COMPLETED.value,
-                data={
-                    "sync_id": sync_id,
-                    "status": status,
-                    "books_found": sync.get("books_found", 0),
-                    "books_added": sync.get("books_added", 0),
-                    "books_downloaded": sync.get("books_downloaded", 0),
-                    "books_decrypted": sync.get("books_decrypted", 0),
-                    "errors_count": sync.get("errors_count", 0),
-                    "duration_seconds": duration,
-                    "timestamp": datetime.utcnow().timestamp(),
-                },
+                data=sync_data,
             )
 
             logger.info(f"Sync {sync_id} completed and broadcast sent")
@@ -191,12 +205,21 @@ class SyncService:
         try:
             logger.error(f"Failing sync {sync_id}: {error}")
 
-            # Mark as failed in database
-            success = sync_ops.complete_sync_history(
-                sync_id=sync_id,
-                status="failed",
-                notes=f"Sync failed: {error}",
-            )
+            # Convert string sync_id to UUID if needed
+            try:
+                sync_uuid = UUID(sync_id) if isinstance(sync_id, str) else sync_id
+            except (ValueError, AttributeError):
+                logger.error(f"Invalid sync_id format: {sync_id}")
+                return
+
+            # Mark as failed in database using ORM
+            async with get_db_session() as db:
+                success = await orm_sync_service.fail_sync(
+                    db=db,
+                    sync_id=sync_uuid,
+                    error_message=error,
+                )
+                await db.commit()
 
             if not success:
                 logger.error(f"Failed to update sync record {sync_id}")
@@ -281,9 +304,7 @@ class SyncService:
         Sends real-time download progress via WebSocket.
         """
         try:
-            progress_percent = (
-                (bytes_downloaded / total_bytes * 100) if total_bytes > 0 else 0.0
-            )
+            progress_percent = (bytes_downloaded / total_bytes * 100) if total_bytes > 0 else 0.0
 
             await ws_manager.broadcast_to_user(
                 user_id=user_id,
