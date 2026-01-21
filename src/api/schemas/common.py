@@ -22,6 +22,32 @@ class PaginationParams(BaseModel):
     )
 
 
+class BookActionCreate(BaseModel):
+    """Shared schema for book action requests (download, decrypt, sync)."""
+
+    asin: str = Field(
+        ...,
+        min_length=10,
+        max_length=10,
+        description="Amazon Standard Identification Number (10 characters)",
+    )
+    title: str = Field(
+        ...,
+        min_length=1,
+        max_length=500,
+        description="Book title",
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "asin": "B084L6Z6M3",
+                "title": "Becoming",
+            }
+        }
+    )
+
+
 class PaginatedResponse(BaseModel, Generic[T]):
     """Generic paginated response wrapper."""
 

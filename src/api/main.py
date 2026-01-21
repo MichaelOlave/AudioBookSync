@@ -16,6 +16,7 @@ from .middleware.error_handler import add_exception_handlers
 from .middleware.logging import LoggingMiddleware
 from .routers import (
     auth,
+    audible_auth,
     library,
     books,
     sync,
@@ -141,6 +142,12 @@ def create_app() -> FastAPI:
     app.include_router(
         auth.router,
         prefix="/api/v1/auth",
+        tags=["Authentication"],
+    )
+
+    app.include_router(
+        audible_auth.router,
+        prefix="/api/v1",
         tags=["Authentication"],
     )
 

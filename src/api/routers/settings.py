@@ -52,6 +52,49 @@ def normalize_endpoint(endpoint: str) -> str:
         return endpoint
 
 
+async def test_minio_connection(
+    endpoint: str,
+    bucket_name: str,
+    use_ssl: bool,
+    access_key: str | None = None,
+    secret_key: str | None = None,
+) -> tuple[bool, str, bool]:
+    """
+    Test MinIO storage connection and bucket existence.
+
+    Args:
+        endpoint: Storage endpoint (normalized or raw)
+        bucket_name: Bucket name to check
+        use_ssl: Whether to use SSL
+        access_key: Optional access key (defaults to "minioadmin")
+        secret_key: Optional secret key (defaults to "minioadmin")
+
+    Returns:
+        Tuple of (is_connected: bool, message: str, bucket_exists: bool)
+    """
+    try:
+        from ...infrastructure.minio_client import MinIOClient
+
+        normalized_endpoint = normalize_endpoint(endpoint) if endpoint else None
+
+        if not normalized_endpoint:
+            return False, "Endpoint not provided", False
+
+        client = MinIOClient(
+            endpoint=normalized_endpoint,
+            access_key=access_key or "minioadmin",
+            secret_key=secret_key or "minioadmin",
+            secure=use_ssl,
+        )
+        bucket_exists = client.bucket_exists(bucket_name)
+        return True, "Storage connection successful", bucket_exists
+
+    except Exception as e:
+        error_msg = str(e)
+        logger.debug(f"Storage connection test failed: {error_msg}")
+        return False, f"Storage connection failed: {error_msg}", False
+
+
 @router.get(
     "/audible-credentials",
     response_model=AudibleCredentialsResponse,
@@ -102,19 +145,25 @@ async def get_audible_credentials(
     if not user:
         raise InternalServerError("User not found")
 
-    auth_configured = getattr(user, "audible_auth_json", None) is not None
+    # Extract all Audible credentials at once
+    audible_auth_json = getattr(user, "audible_auth_json", None)
+    audible_email = getattr(user, "audible_email", None)
+    device_name = getattr(user, "audible_device_name", None)
+    activation_bytes = getattr(user, "activation_bytes", None)
+
+    auth_configured = audible_auth_json is not None
 
     logger.info(
         f"Retrieved credentials for user {user_id}: "
-        f"configured={auth_configured}, email={getattr(user, 'audible_email', None)}"
+        f"configured={auth_configured}, email={audible_email}"
     )
 
     return AudibleCredentialsResponse(
         user_id=user_id,
-        audible_email=getattr(user, "audible_email", None),
-        device_name=getattr(user, "audible_device_name", None),
-        has_access_token=getattr(user, "audible_auth_json", None) is not None,
-        has_activation_bytes=getattr(user, "activation_bytes", None) is not None,
+        audible_email=audible_email,
+        device_name=device_name,
+        has_access_token=auth_configured,
+        has_activation_bytes=activation_bytes is not None,
         auth_configured=auth_configured,
         auth_json_raw=None,  # Ensure raw data is not sen
     )
@@ -227,34 +276,25 @@ async def get_storage_config(
 
     # Get storage config from user data (or use defaults)
     storage_config = getattr(current_user, "storage_config", None) or {}
-    provider_type = storage_config.get("provider_type", "minio") if isinstance(storage_config, dict) else "minio"
-    endpoint = storage_config.get("endpoint", "http://localhost:9000") if isinstance(storage_config, dict) else "http://localhost:9000"
-    bucket_name = storage_config.get("bucket_name", "audiobooks") if isinstance(storage_config, dict) else "audiobooks"
-    use_ssl = storage_config.get("use_ssl", False) if isinstance(storage_config, dict) else False
+    is_dict = isinstance(storage_config, dict)
+
+    provider_type = storage_config.get("provider_type", "minio") if is_dict else "minio"
+    endpoint = storage_config.get("endpoint", "http://localhost:9000") if is_dict else "http://localhost:9000"
+    bucket_name = storage_config.get("bucket_name", "audiobooks") if is_dict else "audiobooks"
+    use_ssl = storage_config.get("use_ssl", False) if is_dict else False
 
     # Test if storage is connected
-    is_connected = False
-    message = "Storage not configured"
-    try:
-        from ...infrastructure.minio_client import MinIOClient
-
-        # Normalize endpoint for MinIO client
-        normalized_endpoint = normalize_endpoint(endpoint) if endpoint else None
-
-        if normalized_endpoint:
-            client = MinIOClient(
-                endpoint=normalized_endpoint,
-                secure=use_ssl,
-            )
-        else:
-            client = MinIOClient()
-
-        client.bucket_exists(bucket_name)
-        is_connected = True
-        message = "Storage is configured and healthy"
-    except Exception as e:
-        logger.debug(f"Storage connection test failed: {e}")
-        message = f"Storage connection failed: {str(e)}"
+    if endpoint and bucket_name:
+        is_connected, message, _ = await test_minio_connection(
+            endpoint=endpoint,
+            bucket_name=bucket_name,
+            use_ssl=use_ssl,
+        )
+        if is_connected:
+            message = "Storage is configured and healthy"
+    else:
+        is_connected = False
+        message = "Storage not configured"
 
     logger.info(
         f"Retrieved storage config for user {user_id}: provider={provider_type}"
@@ -352,26 +392,18 @@ async def update_storage_config(
         raise InternalServerError("Failed to update storage configuration")
 
     # Test if new storage is connected
-    is_connected = False
-    message = "Storage configuration updated"
-    try:
-        from ...infrastructure.minio_client import MinIOClient
+    is_connected, connection_message, _ = await test_minio_connection(
+        endpoint=config.endpoint,
+        bucket_name=config.bucket_name,
+        use_ssl=config.use_ssl,
+        access_key=config.access_key,
+        secret_key=config.secret_key,
+    )
 
-        # Normalize endpoint for MinIO client
-        normalized_endpoint = normalize_endpoint(config.endpoint)
-
-        client = MinIOClient(
-            endpoint=normalized_endpoint,
-            access_key=config.access_key or "minioadmin",
-            secret_key=config.secret_key or "minioadmin",
-            secure=config.use_ssl,
-        )
-        client.bucket_exists(config.bucket_name)
-        is_connected = True
+    if is_connected:
         message = "Storage configuration updated and connected successfully"
-    except Exception as e:
-        logger.debug(f"Storage connection test failed after update: {e}")
-        message = f"Storage configuration updated but connection test failed: {str(e)}"
+    else:
+        message = f"Storage configuration updated but connection test failed: {connection_message}"
 
     logger.info(
         f"Successfully updated storage config for user {user_id}: provider={config.provider_type}"
@@ -443,39 +475,24 @@ async def test_storage_connection(
 
     logger.info(f"Testing storage connection for user {user_id} with provider {config.provider_type}")
 
-    try:
-        from ...infrastructure.minio_client import MinIOClient
+    success, message, bucket_exists = await test_minio_connection(
+        endpoint=config.endpoint,
+        bucket_name=config.bucket_name,
+        use_ssl=config.use_ssl,
+        access_key=config.access_key,
+        secret_key=config.secret_key,
+    )
 
-        # Normalize endpoint (remove protocol prefix)
-        normalized_endpoint = normalize_endpoint(config.endpoint)
-
-        # Create client with the provided configuration
-        client = MinIOClient(
-            endpoint=normalized_endpoint,
-            access_key=config.access_key or "minioadmin",
-            secret_key=config.secret_key or "minioadmin",
-            secure=config.use_ssl,
-        )
-        bucket_exists = client.bucket_exists(config.bucket_name)
-
+    if success:
         logger.info(
             f"Storage connection test successful for user {user_id}: bucket_exists={bucket_exists}"
         )
+    else:
+        logger.warning(f"Storage connection test failed for user {user_id}: {message}")
 
-        return StorageTestResponse(
-            success=True,
-            message="Storage connection successful",
-            bucket_exists=bucket_exists,
-            error=None,
-        )
-
-    except Exception as e:
-        error_msg = str(e)
-        logger.warning(f"Storage connection test failed for user {user_id}: {error_msg}")
-
-        return StorageTestResponse(
-            success=False,
-            message="Storage connection failed",
-            bucket_exists=False,
-            error=error_msg,
-        )
+    return StorageTestResponse(
+        success=success,
+        message="Storage connection successful" if success else "Storage connection failed",
+        bucket_exists=bucket_exists,
+        error=None if success else message,
+    )

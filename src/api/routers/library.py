@@ -13,10 +13,13 @@ from ...database.models.user import User
 from ..security.auth import get_current_user
 from ..schemas.book import BookResponse, BookList
 from ..middleware.error_handler import ResourceNotFoundError, AuthorizationError, handle_route_errors
-from ..utils.generic_handlers import get_paginated_list
+from ..utils.generic_handlers import get_paginated_list, get_pagination_params, verify_book_ownership
 from ..utils.auth_utils import get_user_id
 
 router = APIRouter()
+
+# Pagination parameters for library endpoint
+_lib_page, _lib_page_size = get_pagination_params(page_size_default=50, page_size_max=100)
 
 
 @router.get(
@@ -33,17 +36,8 @@ router = APIRouter()
 async def get_library(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
-    page: int = Query(
-        default=1,
-        ge=1,
-        description="Page number (starting from 1)",
-    ),
-    page_size: int = Query(
-        default=50,
-        ge=1,
-        le=100,
-        description="Number of items per page (1-100)",
-    ),
+    page: int = _lib_page,
+    page_size: int = _lib_page_size,
 ) -> BookList:
     """
     Get user's audiobook library with pagination.
@@ -222,12 +216,7 @@ async def get_book_details(
         logger.warning(f"Book not found: {asin}")
         raise ResourceNotFoundError(f"Book '{asin}' not found")
 
-    # Verify ownership
-    if str(book.user_id) != user_id:
-        logger.warning(
-            f"Unauthorized access attempt to book {asin} by user {user_id}"
-        )
-        raise AuthorizationError("Not authorized to access this book")
+    verify_book_ownership(book, user_id, asin)
 
     logger.info(f"Retrieved book details: {asin}")
     return BookResponse.from_orm(book)

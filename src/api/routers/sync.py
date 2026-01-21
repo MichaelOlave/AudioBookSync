@@ -1,6 +1,6 @@
 """Sync operation endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from loguru import logger
 from datetime import datetime, timezone
 
@@ -13,10 +13,13 @@ from ..schemas.sync import (
     SyncAcceptedResponse,
 )
 from ..middleware.error_handler import ResourceNotFoundError, AuthorizationError, InternalServerError, AuthenticationError, handle_route_errors
-from ..utils.generic_handlers import get_paginated_list
+from ..utils.generic_handlers import get_paginated_list, get_pagination_params
 from ..utils.auth_utils import get_user_id
 
 router = APIRouter()
+
+# Pagination parameters for sync history endpoint
+_sync_page, _sync_page_size = get_pagination_params(page_size_default=10, page_size_max=50)
 
 
 @router.post(
@@ -106,17 +109,8 @@ async def trigger_sync(
 @handle_route_errors("get sync history")
 async def get_sync_history(
     current_user: dict = Depends(get_current_user),
-    page: int = Query(
-        default=1,
-        ge=1,
-        description="Page number (starting from 1)",
-    ),
-    page_size: int = Query(
-        default=10,
-        ge=1,
-        le=50,
-        description="Number of items per page (1-50)",
-    ),
+    page: int = _sync_page,
+    page_size: int = _sync_page_size,
 ) -> SyncHistoryList:
     """
     Get user's sync history with pagination.

@@ -5,13 +5,79 @@ Provides reusable handlers for paginated list endpoints and other common pattern
 """
 
 import inspect
-from typing import Callable, List, Optional, TypeVar, Generic, Type, Any
+from typing import Callable, List, Optional, TypeVar, Generic, Type, Any, Union
+from fastapi import Query
 from loguru import logger
 
 from .pagination import calculate_pages, validate_page, paginate_list
+from ..middleware.error_handler import ResourceNotFoundError, AuthorizationError
 
 T = TypeVar("T")
 ResponseT = TypeVar("ResponseT")
+
+
+def verify_book_ownership(book: Union[dict, object], user_id: str, asin: str) -> None:
+    """
+    Verify that a book belongs to the specified user.
+
+    Handles both dict-like and object attribute access for user_id.
+
+    Args:
+        book: Book object (dict or ORM model)
+        user_id: User ID to verify ownership against
+        asin: Amazon Standard Identification Number (for logging)
+
+    Raises:
+        AuthorizationError: If the book doesn't belong to the user
+    """
+    # Extract user_id from book (handles both dict and object access)
+    book_user_id = book.get("user_id") if isinstance(book, dict) else str(book.user_id)
+
+    if book_user_id != user_id:
+        logger.warning(
+            f"Unauthorized access attempt to audiobook {asin} by user {user_id}"
+        )
+        raise AuthorizationError("Not authorized to access this book")
+
+
+def get_pagination_params(
+    page_default: int = 1,
+    page_size_default: int = 50,
+    page_size_max: int = 100,
+):
+    """
+    Create pagination Query parameters with customizable defaults and limits.
+
+    Args:
+        page_default: Default page number (default: 1)
+        page_size_default: Default items per page (default: 50)
+        page_size_max: Maximum items per page limit (default: 100)
+
+    Returns:
+        Tuple of (page, page_size) Query parameters
+
+    Example:
+        page, page_size = get_pagination_params(page_size_default=10, page_size_max=50)
+
+        @router.get("/items")
+        async def get_items(
+            page: int = page,
+            page_size: int = page_size,
+        ):
+            ...
+    """
+    page = Query(
+        default=page_default,
+        ge=1,
+        description="Page number (starting from 1)",
+    )
+    page_size = Query(
+        default=page_size_default,
+        ge=1,
+        le=page_size_max,
+        description=f"Number of items per page (1-{page_size_max})",
+    )
+    return page, page_size
 
 
 async def get_paginated_list(

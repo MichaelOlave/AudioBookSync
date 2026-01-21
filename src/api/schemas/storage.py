@@ -88,37 +88,8 @@ class StorageConfigResponse(BaseModel):
     )
 
 
-class StorageConfigRequest(BaseModel):
+class StorageConfigRequest(StorageProvider):
     """Request to update storage configuration."""
-
-    provider_type: Literal["minio", "aws_s3", "gcs"] = Field(
-        default="minio",
-        description="Type of storage provider",
-    )
-    endpoint: str = Field(
-        ...,
-        description="Storage endpoint URL or address",
-    )
-    bucket_name: str = Field(
-        ...,
-        description="Bucket or container name",
-    )
-    access_key: Optional[str] = Field(
-        default=None,
-        description="Access key or username",
-    )
-    secret_key: Optional[str] = Field(
-        default=None,
-        description="Secret key or password",
-    )
-    use_ssl: bool = Field(
-        default=False,
-        description="Whether to use SSL/TLS",
-    )
-    region: Optional[str] = Field(
-        default=None,
-        description="AWS region (for S3 only)",
-    )
 
     model_config = ConfigDict(
         json_schema_extra={

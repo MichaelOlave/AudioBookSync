@@ -98,3 +98,24 @@ class RefreshTokenRequest(BaseModel):
     refresh_token: str = Field(
         description="The refresh token to use for obtaining a new access token",
     )
+
+
+class AuthStartRequest(BaseModel):
+    """Request to start Audible authentication."""
+
+    country_code: str = Field(
+        "us",
+        description="Audible country code (e.g., 'us', 'de', 'uk')",
+    )
+
+
+class AuthStartResponse(BaseModel):
+    """Response containing the Audible login URL."""
+
+    login_url: str
+
+
+class AuthCompleteRequest(BaseModel):
+    """Request to complete Audible authentication."""
+
+    redirect_url: str

@@ -13,6 +13,7 @@ from ...core.config import Config
 from ..security.auth import get_current_user
 from ..middleware.error_handler import ResourceNotFoundError, AuthorizationError, AuthenticationError, InternalServerError, handle_route_errors
 from ..utils.auth_utils import get_user_id
+from ..utils.generic_handlers import verify_book_ownership
 
 router = APIRouter()
 
@@ -101,12 +102,7 @@ async def stream_audiobook(
         logger.warning(f"Book not found: {asin}")
         raise ResourceNotFoundError(f"Book '{asin}' not found")
 
-    # Verify ownership
-    if book.get("user_id") != user_id:
-        logger.warning(
-            f"Unauthorized access attempt to audiobook {asin} by user {user_id}"
-        )
-        raise AuthorizationError("Not authorized to access this book")
+    verify_book_ownership(book, user_id, asin)
 
     # Get MinIO object_key from decryption status (required)
     object_key = _get_object_key_for_asin(user_id, asin)
