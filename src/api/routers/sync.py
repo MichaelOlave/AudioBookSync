@@ -14,6 +14,7 @@ from ..schemas.sync import (
 )
 from ..middleware.error_handler import ResourceNotFoundError, AuthorizationError, InternalServerError, AuthenticationError, handle_route_errors
 from ..utils.generic_handlers import get_paginated_list
+from ..utils.auth_utils import get_user_id
 
 router = APIRouter()
 
@@ -56,7 +57,7 @@ async def trigger_sync(
             "sync_type": "full"
         }
     """
-    user_id = current_user.get("user_id")
+    user_id = get_user_id(current_user)
     if not user_id:
         raise AuthenticationError("Invalid user authentication")
     logger.info(
@@ -133,7 +134,7 @@ async def get_sync_history(
     Example:
         GET /api/v1/sync/history?page=1&page_size=10
     """
-    user_id = current_user.get("user_id")
+    user_id = get_user_id(current_user)
     if not user_id:
         raise AuthenticationError("Invalid user authentication")
 
@@ -190,7 +191,7 @@ async def get_sync_status(
     Example:
         GET /api/v1/sync/sync-uuid-123
     """
-    user_id = current_user.get("user_id")
+    user_id = get_user_id(current_user)
     logger.info(f"Fetching sync status: {sync_id} for user: {user_id}")
 
     # Get sync by ID

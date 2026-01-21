@@ -12,6 +12,7 @@ from ...infrastructure.storage_service import StorageService
 from ...core.config import Config
 from ..security.auth import get_current_user
 from ..middleware.error_handler import ResourceNotFoundError, AuthorizationError, AuthenticationError, InternalServerError, handle_route_errors
+from ..utils.auth_utils import get_user_id
 
 router = APIRouter()
 
@@ -87,7 +88,7 @@ async def stream_audiobook(
         GET /api/v1/files/audiobook/B084L6Z6M3 HTTP/1.1
         Range: bytes=0-1023
     """
-    user_id = current_user.get("user_id")
+    user_id = get_user_id(current_user)
     if not user_id:
         logger.error("User ID not found in token")
         raise AuthenticationError("Invalid authentication token")

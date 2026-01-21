@@ -16,6 +16,7 @@ from ..middleware.error_handler import (
     InternalServerError,
     handle_route_errors,
 )
+from ..utils.auth_utils import get_user_id
 
 router = APIRouter()
 
@@ -65,13 +66,14 @@ async def create_book(
             "rating": 4.8
         }
     """
-    logger.info(f"Adding book {book_data.asin} for user {current_user.user_id}")
+    user_id = get_user_id(current_user)
+    logger.info(f"Adding book {book_data.asin} for user {user_id}")
 
     # Add/update book in database
     success = await book_service.add_book(
         db=db,
         asin=book_data.asin,
-        user_id=str(current_user.user_id),
+        user_id=user_id,
         title=book_data.title,
         runtime_min=book_data.runtime_min,
         author=book_data.author,
@@ -92,7 +94,7 @@ async def create_book(
         raise ResourceNotFoundError(f"Added book not found: {book_data.asin}")
 
     await db.commit()
-    logger.info(f"Book added successfully: {book_data.asin} for user {current_user.user_id}")
+    logger.info(f"Book added successfully: {book_data.asin} for user {user_id}")
     return BookResponse.from_orm(book)
 
 
@@ -135,7 +137,8 @@ async def delete_book(
     Example:
         DELETE /api/v1/books/B084L6Z6M3
     """
-    logger.info(f"Deleting book {asin} for user {current_user.user_id}")
+    user_id = get_user_id(current_user)
+    logger.info(f"Deleting book {asin} for user {user_id}")
 
     # Verify book exists and belongs to user
     book = await book_service.get_book_by_asin(db, asin)
@@ -144,9 +147,9 @@ async def delete_book(
         raise ResourceNotFoundError(f"Book '{asin}' not found")
 
     # Verify ownership
-    if book.user_id != current_user.user_id:
+    if str(book.user_id) != user_id:
         logger.warning(
-            f"Unauthorized delete attempt for book {asin} by user {current_user.user_id}"
+            f"Unauthorized delete attempt for book {asin} by user {user_id}"
         )
         raise AuthorizationError("Not authorized to delete this book")
 

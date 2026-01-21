@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 from ...database.db_users import user_ops
 from ..security.auth import get_current_user
 from ..middleware.error_handler import AuthenticationError, InternalServerError, handle_route_errors
+from ..utils.auth_utils import get_user_id
 from ..schemas.credentials import (
     AudibleCredentialsResponse,
     AudibleCredentialsUpdate,
@@ -91,7 +92,7 @@ async def get_audible_credentials(
             "has_activation_bytes": true
         }
     """
-    user_id = str(current_user.user_id)
+    user_id = get_user_id(current_user)
     if not user_id:
         raise AuthenticationError("Invalid user authentication")
     logger.info(f"Getting Audible credentials for user {user_id}")
@@ -158,7 +159,7 @@ async def clear_audible_credentials(
             "auth_file_path": null
         }
     """
-    user_id = str(current_user.user_id)
+    user_id = get_user_id(current_user)
     if not user_id:
         raise AuthenticationError("Invalid user authentication")
     logger.info(f"Clearing Audible credentials for user {user_id}")
@@ -219,7 +220,7 @@ async def get_storage_config(
             "message": "Storage is configured and healthy"
         }
     """
-    user_id = str(current_user.user_id)
+    user_id = get_user_id(current_user)
     if not user_id:
         raise AuthenticationError("Invalid user authentication")
     logger.info(f"Getting storage configuration for user {user_id}")
@@ -323,7 +324,7 @@ async def update_storage_config(
             "message": "Storage configuration updated successfully"
         }
     """
-    user_id = str(current_user.user_id)
+    user_id = get_user_id(current_user)
     if not user_id:
         raise AuthenticationError("Invalid user authentication")
 
@@ -436,7 +437,7 @@ async def test_storage_connection(
             "error": null
         }
     """
-    user_id = str(current_user.user_id)
+    user_id = get_user_id(current_user)
     if not user_id:
         raise AuthenticationError("Invalid user authentication")
 

@@ -14,6 +14,7 @@ from ..security.auth import get_current_user
 from ..schemas.book import BookResponse, BookList
 from ..middleware.error_handler import ResourceNotFoundError, AuthorizationError, handle_route_errors
 from ..utils.generic_handlers import get_paginated_list
+from ..utils.auth_utils import get_user_id
 
 router = APIRouter()
 
@@ -69,9 +70,9 @@ async def get_library(
         response_model=BookResponse,
         get_items_kwargs={
             "db": db,
-            "user_id": str(current_user.user_id),
+            "user_id": get_user_id(current_user),
         },
-        user_id=str(current_user.user_id),
+        user_id=get_user_id(current_user),
         page=page,
         page_size=page_size,
         resource_name="books",
@@ -127,13 +128,14 @@ async def fetch_audible_library(
     Example:
         GET /api/v1/library/audible/fetch?num_results=100
     """
-    logger.info(f"Fetching Audible library for user: {current_user.user_id}")
+    user_id = get_user_id(current_user)
+    logger.info(f"Fetching Audible library for user: {user_id}")
 
     # Get user's Audible credentials from database
-    user = await user_service.get_user_by_id(db, str(current_user.user_id))
+    user = await user_service.get_user_by_id(db, user_id)
 
     if not user or not user.audible_auth_json:
-        logger.error(f"No Audible credentials found for user {current_user.user_id}")
+        logger.error(f"No Audible credentials found for user {user_id}")
         raise AuthorizationError("Audible credentials not configured. Please authenticate with Audible first.")
 
     auth_data = json.loads(user.audible_auth_json)
@@ -160,13 +162,13 @@ async def fetch_audible_library(
 
     items = library_response.get("items", [])
     logger.info(
-        f"Successfully fetched {len(items)} books from Audible for user {current_user.user_id}"
+        f"Successfully fetched {len(items)} books from Audible for user {user_id}"
     )
 
     return {
         "items": items,
         "total": len(items),
-        "user_id": str(current_user.user_id),
+        "user_id": user_id,
         "num_results": num_results,
     }
 
@@ -210,7 +212,8 @@ async def get_book_details(
     Example:
         GET /api/v1/library/B084L6Z6M3
     """
-    logger.info(f"Fetching book details: {asin} for user: {current_user.user_id}")
+    user_id = get_user_id(current_user)
+    logger.info(f"Fetching book details: {asin} for user: {user_id}")
 
     # Get book by ASIN
     book = await book_service.get_book_by_asin(db, asin)
@@ -220,9 +223,9 @@ async def get_book_details(
         raise ResourceNotFoundError(f"Book '{asin}' not found")
 
     # Verify ownership
-    if book.user_id != current_user.user_id:
+    if str(book.user_id) != user_id:
         logger.warning(
-            f"Unauthorized access attempt to book {asin} by user {current_user.user_id}"
+            f"Unauthorized access attempt to book {asin} by user {user_id}"
         )
         raise AuthorizationError("Not authorized to access this book")
 

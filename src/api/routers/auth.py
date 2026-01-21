@@ -20,7 +20,7 @@ from ..security.password import hash_password, verify_password
 from ..security.auth import create_access_token, create_refresh_token, decode_token, get_current_user
 from ..middleware.error_handler import ConflictError, AuthenticationError, InternalServerError, AuthorizationError, handle_route_errors
 from ..services.session_manager import session_manager
-from ..utils.auth_utils import normalize_activation_bytes
+from ..utils.auth_utils import normalize_activation_bytes, get_user_id
 from audible.localization import Locale
 from audible.login import build_oauth_url, create_code_verifier
 from audible.register import register
@@ -278,7 +278,7 @@ async def start_audible_auth(
     The login session is tied to the current user and stored in-memory
     until the flow is completed via `/auth/complete`.
     """
-    user_id = str(current_user.user_id)
+    user_id = get_user_id(current_user)
     if not user_id:
         raise AuthenticationError("User context is required to start Audible authentication")
 
@@ -339,7 +339,7 @@ async def complete_audible_auth(
     - Save the auth file to `Config.AUTH_FILE` for compatibility with existing tools
     - Store the parsed auth.json and activation bytes in the database
     """
-    user_id = str(current_user.user_id)
+    user_id = get_user_id(current_user)
     if not user_id:
         raise AuthenticationError("User context is required to complete Audible authentication")
 
