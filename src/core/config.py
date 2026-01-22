@@ -60,6 +60,7 @@ class Config:
     API_PORT = int(os.getenv("API_PORT", "8000"))
     API_WORKERS = int(os.getenv("API_WORKERS", "4"))
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+    DEBUG = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
 
     # ========================================================================
     # Security Configuration

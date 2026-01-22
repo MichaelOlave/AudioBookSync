@@ -55,6 +55,9 @@ export default function SettingsPage() {
   const [audibleLoading, setAudibleLoading] = useState(false);
   const [audibleLinkDialogOpen, setAudibleLinkDialogOpen] = useState(false);
   const [audibleAuthUrl, setAudibleAuthUrl] = useState("");
+  const [audibleWaitingForCallback, setAudibleWaitingForCallback] =
+    useState(false);
+  const [audibleCallbackUrl, setAudibleCallbackUrl] = useState("");
 
   // Fetch storage config on mount
   useEffect(() => {
@@ -163,7 +166,10 @@ export default function SettingsPage() {
 
   const fetchAudibleStatus = async () => {
     try {
-      const data = await apiClient.request<any>("GET", "/settings/audible-credentials");
+      const data = await apiClient.request<any>(
+        "GET",
+        "/settings/audible-credentials",
+      );
       setAudibleConnected(data.auth_configured === true);
       setAudibleEmail(data.audible_email || "");
       setAudibleDeviceName(data.device_name || "");
@@ -179,18 +185,30 @@ export default function SettingsPage() {
     setAudibleLoading(true);
     setError("");
     try {
-      const data = await apiClient.request<any>("POST", "/auth/start");
-      setAudibleAuthUrl(data.auth_url);
+      const data = await apiClient.request<any>("POST", "/auth/start", {
+        body: {
+          country_code: "us",
+        },
+      });
+      setAudibleAuthUrl(data.login_url);
       setAudibleLinkDialogOpen(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to initiate Audible linking");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to initiate Audible linking",
+      );
     } finally {
       setAudibleLoading(false);
     }
   };
 
   const handleAudibleUnlink = async () => {
-    if (!window.confirm("Are you sure you want to unlink your Audible account? This will remove your Audible library access.")) {
+    if (
+      !window.confirm(
+        "Are you sure you want to unlink your Audible account? This will remove your Audible library access.",
+      )
+    ) {
       return;
     }
 
@@ -204,7 +222,46 @@ export default function SettingsPage() {
       setSuccess("Audible account unlinked successfully");
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to unlink Audible account");
+      setError(
+        err instanceof Error ? err.message : "Failed to unlink Audible account",
+      );
+    } finally {
+      setAudibleLoading(false);
+    }
+  };
+
+  const handleAudibleCallbackSubmit = async () => {
+    if (!audibleCallbackUrl) {
+      setError("Please paste the Audible redirect URL");
+      return;
+    }
+
+    setAudibleLoading(true);
+    setError("");
+    try {
+      const data = await apiClient.request<{ message?: string }>(
+        "POST",
+        "/auth/complete",
+        {
+          body: {
+            redirect_url: audibleCallbackUrl,
+          },
+        },
+      );
+
+      setSuccess(data.message || "Audible account linked successfully");
+      setAudibleConnected(true);
+      setAudibleLinkDialogOpen(false);
+      setAudibleWaitingForCallback(false);
+      setAudibleCallbackUrl("");
+      await fetchAudibleStatus();
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to complete Audible linking",
+      );
     } finally {
       setAudibleLoading(false);
     }
@@ -237,9 +294,13 @@ export default function SettingsPage() {
     setStorageLoading(true);
     setError("");
     try {
-      const data = await apiClient.request<any>("POST", "/settings/storage/test", {
-        body: storageConfig,
-      });
+      const data = await apiClient.request<any>(
+        "POST",
+        "/settings/storage/test",
+        {
+          body: storageConfig,
+        },
+      );
       if (data.success) {
         setStorageConnected(true);
         setSuccess("Storage connection successful!");
@@ -285,277 +346,309 @@ export default function SettingsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {/* Account Section */}
         <Card className="p-6 border border-border">
-            <div className="flex items-center gap-3 mb-6">
-              <Lock className="w-5 h-5 text-primary" />
-              <h2 className="text-xl font-semibold">Account Settings</h2>
-            </div>
+          <div className="flex items-center gap-3 mb-6">
+            <Lock className="w-5 h-5 text-primary" />
+            <h2 className="text-xl font-semibold">Account Settings</h2>
+          </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                  Email Address
-                </label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={user?.email || ""}
-                    readOnly
-                    className="bg-muted"
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setEditEmailOpen(true)}
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                  Password
-                </label>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                Email Address
+              </label>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={user?.email || ""}
+                  readOnly
+                  className="bg-muted"
+                />
                 <Button
                   variant="outline"
-                  className="w-full justify-start"
-                  onClick={() => setEditPasswordOpen(true)}
+                  size="sm"
+                  onClick={() => setEditEmailOpen(true)}
                 >
-                  Change Password
+                  <Edit2 className="w-4 h-4" />
                 </Button>
               </div>
+            </div>
 
-              <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                  Two-Factor Authentication
-                </label>
-                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
-                    <span className="text-sm">Enabled</span>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    Manage
-                  </Button>
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                Password
+              </label>
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => setEditPasswordOpen(true)}
+              >
+                Change Password
+              </Button>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                Two-Factor Authentication
+              </label>
+              <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                  <span className="text-sm">Enabled</span>
                 </div>
+                <Button variant="outline" size="sm">
+                  Manage
+                </Button>
               </div>
             </div>
-          </Card>
+          </div>
+        </Card>
 
         {/* Storage Settings */}
         <Card className="p-6 border border-border">
-            <div className="flex items-center gap-3 mb-6">
-              <Database className="w-5 h-5 text-primary" />
-              <h2 className="text-xl font-semibold">Storage Configuration</h2>
-            </div>
+          <div className="flex items-center gap-3 mb-6">
+            <Database className="w-5 h-5 text-primary" />
+            <h2 className="text-xl font-semibold">Storage Configuration</h2>
+          </div>
 
-            <div className="space-y-4">
-              {storageMessage && (
-                <div className={`p-3 rounded-lg text-sm ${
+          <div className="space-y-4">
+            {storageMessage && (
+              <div
+                className={`p-3 rounded-lg text-sm ${
                   storageConnected
                     ? "bg-green-50 text-green-700 dark:bg-green-950/20 dark:text-green-400"
                     : "bg-yellow-50 text-yellow-700 dark:bg-yellow-950/20 dark:text-yellow-400"
-                }`}>
-                  {storageMessage}
+                }`}
+              >
+                {storageMessage}
+              </div>
+            )}
+
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                Storage Provider
+              </label>
+              <select
+                value={storageConfig.provider_type}
+                onChange={(e) =>
+                  setStorageConfig({
+                    ...storageConfig,
+                    provider_type: e.target.value as any,
+                  })
+                }
+                className="w-full px-3 py-2 rounded-lg border border-border bg-background"
+                disabled={storageLoading}
+              >
+                <option value="minio">MinIO (Self-Hosted)</option>
+                <option value="aws_s3">AWS S3</option>
+                <option value="gcs">Google Cloud Storage</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                Storage Endpoint
+              </label>
+              <Input
+                value={storageConfig.endpoint}
+                onChange={(e) =>
+                  setStorageConfig({
+                    ...storageConfig,
+                    endpoint: e.target.value,
+                  })
+                }
+                placeholder="http://localhost:9000"
+                disabled={storageLoading}
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                Bucket Name
+              </label>
+              <Input
+                value={storageConfig.bucket_name}
+                onChange={(e) =>
+                  setStorageConfig({
+                    ...storageConfig,
+                    bucket_name: e.target.value,
+                  })
+                }
+                placeholder="audiobooks"
+                disabled={storageLoading}
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="use_ssl"
+                checked={storageConfig.use_ssl}
+                onChange={(e) =>
+                  setStorageConfig({
+                    ...storageConfig,
+                    use_ssl: e.target.checked,
+                  })
+                }
+                disabled={storageLoading}
+                className="rounded"
+              />
+              <label
+                htmlFor="use_ssl"
+                className="text-sm font-medium text-muted-foreground cursor-pointer"
+              >
+                Use SSL/TLS
+              </label>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={handleStorageUpdate}
+                disabled={storageLoading}
+                className="flex-1"
+              >
+                {storageLoading ? "Saving..." : "Save Configuration"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleTestConnection}
+                disabled={storageLoading}
+                className="flex-1"
+              >
+                {storageLoading ? "Testing..." : "Test Connection"}
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        {/* Family Members */}
+        <Card className="p-6 border border-border">
+          <div className="flex items-center gap-3 mb-6">
+            <Users className="w-5 h-5 text-primary" />
+            <h2 className="text-xl font-semibold">Family Members</h2>
+          </div>
+
+          <div className="space-y-3 mb-4">
+            {[
+              {
+                name: "You",
+                email: user?.email || "user@example.com",
+                role: "Owner",
+              },
+              { name: "Sarah", email: "sarah@example.com", role: "Member" },
+              { name: "John", email: "john@example.com", role: "Member" },
+            ].map((member, idx) => (
+              <div
+                key={idx}
+                className="flex items-center justify-between p-3 bg-muted rounded-lg"
+              >
+                <div>
+                  <p className="font-medium text-sm">{member.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {member.email}
+                  </p>
                 </div>
-              )}
-
-              <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                  Storage Provider
-                </label>
-                <select
-                  value={storageConfig.provider_type}
-                  onChange={(e) => setStorageConfig({...storageConfig, provider_type: e.target.value as any})}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-background"
-                  disabled={storageLoading}
-                >
-                  <option value="minio">MinIO (Self-Hosted)</option>
-                  <option value="aws_s3">AWS S3</option>
-                  <option value="gcs">Google Cloud Storage</option>
-                </select>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {member.role}
+                  </span>
+                  {idx !== 0 && (
+                    <Button variant="ghost" size="sm" className="text-red-600">
+                      Remove
+                    </Button>
+                  )}
+                </div>
               </div>
+            ))}
+          </div>
 
-              <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                  Storage Endpoint
-                </label>
-                <Input
-                  value={storageConfig.endpoint}
-                  onChange={(e) => setStorageConfig({...storageConfig, endpoint: e.target.value})}
-                  placeholder="http://localhost:9000"
-                  disabled={storageLoading}
-                />
-              </div>
+          <Button variant="outline" className="w-full">
+            Add Family Member
+          </Button>
+        </Card>
 
-              <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                  Bucket Name
-                </label>
-                <Input
-                  value={storageConfig.bucket_name}
-                  onChange={(e) => setStorageConfig({...storageConfig, bucket_name: e.target.value})}
-                  placeholder="audiobooks"
-                  disabled={storageLoading}
-                />
-              </div>
+        {/* Audible Account Linking */}
+        <Card className="p-6 border border-border">
+          <div className="flex items-center gap-3 mb-6">
+            <BookOpen className="w-5 h-5 text-primary" />
+            <h2 className="text-xl font-semibold">Audible Account</h2>
+          </div>
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="use_ssl"
-                  checked={storageConfig.use_ssl}
-                  onChange={(e) => setStorageConfig({...storageConfig, use_ssl: e.target.checked})}
-                  disabled={storageLoading}
-                  className="rounded"
-                />
-                <label htmlFor="use_ssl" className="text-sm font-medium text-muted-foreground cursor-pointer">
-                  Use SSL/TLS
-                </label>
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleStorageUpdate}
-                  disabled={storageLoading}
-                  className="flex-1"
-                >
-                  {storageLoading ? "Saving..." : "Save Configuration"}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleTestConnection}
-                  disabled={storageLoading}
-                  className="flex-1"
-                >
-                  {storageLoading ? "Testing..." : "Test Connection"}
-                </Button>
-              </div>
-            </div>
-          </Card>
-
-          {/* Family Members */}
-          <Card className="p-6 border border-border">
-            <div className="flex items-center gap-3 mb-6">
-              <Users className="w-5 h-5 text-primary" />
-              <h2 className="text-xl font-semibold">Family Members</h2>
-            </div>
-
-            <div className="space-y-3 mb-4">
-              {[
-                { name: "You", email: user?.email || "user@example.com", role: "Owner" },
-                { name: "Sarah", email: "sarah@example.com", role: "Member" },
-                { name: "John", email: "john@example.com", role: "Member" },
-              ].map((member, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-3 bg-muted rounded-lg"
-                >
-                  <div>
-                    <p className="font-medium text-sm">{member.name}</p>
-                    <p className="text-xs text-muted-foreground">{member.email}</p>
-                  </div>
+          <div className="space-y-4">
+            {audibleConnected ? (
+              <>
+                <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      {member.role}
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
+                    <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                      Connected
                     </span>
-                    {idx !== 0 && (
-                      <Button variant="ghost" size="sm" className="text-red-600">
-                        Remove
-                      </Button>
-                    )}
                   </div>
                 </div>
-              ))}
-            </div>
 
-            <Button variant="outline" className="w-full">
-              Add Family Member
-            </Button>
-          </Card>
-
-          {/* Audible Account Linking */}
-          <Card className="p-6 border border-border">
-            <div className="flex items-center gap-3 mb-6">
-              <BookOpen className="w-5 h-5 text-primary" />
-              <h2 className="text-xl font-semibold">Audible Account</h2>
-            </div>
-
-            <div className="space-y-4">
-              {audibleConnected ? (
-                <>
-                  <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-5 h-5 text-green-600" />
-                      <span className="text-sm font-medium text-green-700 dark:text-green-400">
-                        Connected
-                      </span>
+                <div className="space-y-2 p-3 bg-muted rounded-lg">
+                  {audibleEmail && (
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground block">
+                        Email
+                      </label>
+                      <p className="text-sm font-medium">{audibleEmail}</p>
                     </div>
-                  </div>
+                  )}
+                  {audibleDeviceName && (
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground block">
+                        Device Name
+                      </label>
+                      <p className="text-sm font-medium">{audibleDeviceName}</p>
+                    </div>
+                  )}
+                </div>
 
-                  <div className="space-y-2 p-3 bg-muted rounded-lg">
-                    {audibleEmail && (
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground block">
-                          Email
-                        </label>
-                        <p className="text-sm font-medium">{audibleEmail}</p>
-                      </div>
-                    )}
-                    {audibleDeviceName && (
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground block">
-                          Device Name
-                        </label>
-                        <p className="text-sm font-medium">{audibleDeviceName}</p>
-                      </div>
-                    )}
-                  </div>
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  onClick={handleAudibleUnlink}
+                  disabled={audibleLoading}
+                >
+                  {audibleLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Unlinking...
+                    </>
+                  ) : (
+                    "Unlink Audible Account"
+                  )}
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-900">
+                  <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                    Connect your Audible account to access your audiobook
+                    library
+                  </p>
+                </div>
 
-                  <Button
-                    variant="destructive"
-                    className="w-full"
-                    onClick={handleAudibleUnlink}
-                    disabled={audibleLoading}
-                  >
-                    {audibleLoading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Unlinking...
-                      </>
-                    ) : (
-                      "Unlink Audible Account"
-                    )}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-900">
-                    <p className="text-sm text-yellow-700 dark:text-yellow-400">
-                      Connect your Audible account to access your audiobook library
-                    </p>
-                  </div>
-
-                  <Button
-                    className="w-full"
-                    onClick={handleAudibleLink}
-                    disabled={audibleLoading}
-                  >
-                    {audibleLoading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Linking...
-                      </>
-                    ) : (
-                      <>
-                        <LinkIcon className="w-4 h-4 mr-2" />
-                        Link Audible Account
-                      </>
-                    )}
-                  </Button>
-                </>
-              )}
-            </div>
-          </Card>
+                <Button
+                  className="w-full"
+                  onClick={handleAudibleLink}
+                  disabled={audibleLoading}
+                >
+                  {audibleLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Linking...
+                    </>
+                  ) : (
+                    <>
+                      <LinkIcon className="w-4 h-4 mr-2" />
+                      Link Audible Account
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
+          </div>
+        </Card>
       </div>
 
       {/* Notification Settings */}
@@ -567,12 +660,27 @@ export default function SettingsPage() {
 
         <div className="space-y-3">
           {[
-            { label: "New Books Available", desc: "Notify me when new books are added to the library" },
-            { label: "Sync Completed", desc: "Notify me when a library sync is complete" },
-            { label: "Download Updates", desc: "Notify me about download progress" },
-            { label: "Family Activity", desc: "Notify me about family member activity" },
+            {
+              label: "New Books Available",
+              desc: "Notify me when new books are added to the library",
+            },
+            {
+              label: "Sync Completed",
+              desc: "Notify me when a library sync is complete",
+            },
+            {
+              label: "Download Updates",
+              desc: "Notify me about download progress",
+            },
+            {
+              label: "Family Activity",
+              desc: "Notify me about family member activity",
+            },
           ].map((item, idx) => (
-            <div key={idx} className="flex items-center justify-between p-3 hover:bg-muted rounded-lg transition-colors">
+            <div
+              key={idx}
+              className="flex items-center justify-between p-3 hover:bg-muted rounded-lg transition-colors"
+            >
               <div>
                 <p className="font-medium text-sm">{item.label}</p>
                 <p className="text-xs text-muted-foreground">{item.desc}</p>
@@ -587,7 +695,10 @@ export default function SettingsPage() {
       <Card className="p-6 border border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900">
         <h2 className="text-xl font-semibold text-red-600 mb-4">Danger Zone</h2>
         <div className="space-y-3">
-          <Button variant="outline" className="w-full text-red-600 hover:bg-red-50 dark:hover:bg-red-950">
+          <Button
+            variant="outline"
+            className="w-full text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+          >
             Clear All Data
           </Button>
           <Button
@@ -605,12 +716,15 @@ export default function SettingsPage() {
           <DialogHeader>
             <DialogTitle>Change Email Address</DialogTitle>
             <DialogDescription>
-              Enter your new email address. We'll send a verification link to confirm the change.
+              Enter your new email address. We'll send a verification link to
+              confirm the change.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-2 block">New Email</label>
+              <label className="text-sm font-medium mb-2 block">
+                New Email
+              </label>
               <Input
                 type="email"
                 placeholder="your-new-email@example.com"
@@ -645,7 +759,9 @@ export default function SettingsPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-2 block">Current Password</label>
+              <label className="text-sm font-medium mb-2 block">
+                Current Password
+              </label>
               <Input
                 type="password"
                 placeholder="Enter your current password"
@@ -654,7 +770,9 @@ export default function SettingsPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-2 block">New Password</label>
+              <label className="text-sm font-medium mb-2 block">
+                New Password
+              </label>
               <Input
                 type="password"
                 placeholder="Enter your new password"
@@ -663,7 +781,9 @@ export default function SettingsPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-2 block">Confirm Password</label>
+              <label className="text-sm font-medium mb-2 block">
+                Confirm Password
+              </label>
               <Input
                 type="password"
                 placeholder="Confirm your new password"
@@ -688,38 +808,98 @@ export default function SettingsPage() {
       </Dialog>
 
       {/* Audible Linking Dialog */}
-      <Dialog open={audibleLinkDialogOpen} onOpenChange={setAudibleLinkDialogOpen}>
+      <Dialog
+        open={audibleLinkDialogOpen}
+        onOpenChange={setAudibleLinkDialogOpen}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Link Audible Account</DialogTitle>
             <DialogDescription>
-              You'll be redirected to Audible to authorize access to your account. After authorizing, you'll be redirected back to complete the linking process.
+              {audibleWaitingForCallback
+                ? "Paste the URL from your Audible login redirect to complete linking"
+                : "You'll be redirected to Audible to authorize access to your account. After authorizing, return here to complete the linking process."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
-              <p className="text-sm text-blue-700 dark:text-blue-400">
-                Click the button below to proceed with Audible authentication.
-              </p>
-            </div>
-            <div className="flex gap-3 justify-end">
-              <Button
-                variant="outline"
-                onClick={() => setAudibleLinkDialogOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  if (audibleAuthUrl) {
-                    window.location.href = audibleAuthUrl;
-                  }
-                }}
-              >
-                <LinkIcon className="w-4 h-4 mr-2" />
-                Proceed to Audible
-              </Button>
-            </div>
+            {audibleWaitingForCallback ? (
+              <>
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
+                  <p className="text-sm text-blue-700 dark:text-blue-400">
+                    After logging in with Audible, you'll be redirected to a
+                    URL. Copy and paste that entire URL below.
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Audible Callback URL
+                  </label>
+                  <Input
+                    placeholder="Paste the URL you were redirected to here"
+                    value={audibleCallbackUrl}
+                    onChange={(e) => setAudibleCallbackUrl(e.target.value)}
+                    disabled={audibleLoading}
+                  />
+                </div>
+                <div className="flex gap-3 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setAudibleWaitingForCallback(false);
+                      setAudibleCallbackUrl("");
+                    }}
+                    disabled={audibleLoading}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    onClick={handleAudibleCallbackSubmit}
+                    disabled={audibleLoading || !audibleCallbackUrl}
+                  >
+                    {audibleLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Completing...
+                      </>
+                    ) : (
+                      "Complete Linking"
+                    )}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
+                  <p className="text-sm text-blue-700 dark:text-blue-400">
+                    Click the button below to proceed with Audible
+                    authentication.
+                  </p>
+                </div>
+                <div className="flex gap-3 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => setAudibleLinkDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      console.log(
+                        "Redirecting to Audible auth URL:",
+                        audibleAuthUrl,
+                      );
+                      if (audibleAuthUrl) {
+                        window.open(audibleAuthUrl, "_blank");
+                        setAudibleWaitingForCallback(true);
+                      }
+                    }}
+                  >
+                    <LinkIcon className="w-4 h-4 mr-2" />
+                    Proceed to Audible
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
