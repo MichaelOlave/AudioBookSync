@@ -151,7 +151,7 @@ async def login(
         raise AuthenticationError("Invalid username or password")
 
     # Verify password
-    password_hash = user.password_hash
+    password_hash = str(user.password_hash)
     if not password_hash or not verify_password(form_data.password, password_hash):
         logger.warning(f"Login failed: Invalid password for user: {form_data.username}")
         raise AuthenticationError("Invalid username or password")

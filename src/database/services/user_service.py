@@ -78,7 +78,9 @@ async def get_user_by_username(db: AsyncSession, username: str) -> Optional[User
         User object if found, None otherwise
     """
     try:
+        logger.info(username)
         result = await db.execute(select(User).where(User.username == username))
+        logger.info(result)
         return result.scalar_one_or_none()
     except Exception as e:
         logger.error(f"Failed to get user by username: {e}")

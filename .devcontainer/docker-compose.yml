@@ -26,7 +26,7 @@ services:
         condition: service_healthy
     networks:
       - audiobooksync-network
-    command: sleep infinity
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
 
   postgres:
     image: postgres:15-alpine

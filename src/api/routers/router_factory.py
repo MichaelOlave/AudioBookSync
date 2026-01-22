@@ -243,14 +243,15 @@ class StatusRouterFactory:
         creation_failure_error = self.config.creation_failure_error
         pre_validator = self.config.pre_create_validator
         params_builder = self.config.create_status_params_builder
+        create_schema = self.config.create_schema
 
         @handle_route_errors(f"trigger {operation_name}")
         async def trigger_endpoint(
-            operation_data: self.config.create_schema,
+            operation_data: Any,
             background_tasks: BackgroundTasks,
             current_user: User = Depends(get_current_user),
             db: AsyncSession = Depends(get_db_session),
-        ) -> self.config.response_schema:
+        ):
             logger.info(
                 f"{operation_name.title()} triggered for {operation_data.asin} "
                 f"by user {current_user.user_id}"
@@ -350,7 +351,7 @@ class StatusRouterFactory:
                 le=50,
                 description="Number of items per page (1-50)",
             ),
-        ) -> self.config.list_schema:
+        ):
             result = await get_paginated_list(
                 get_items_func=get_items_method,
                 response_model=self.config.response_schema,
@@ -397,7 +398,7 @@ class StatusRouterFactory:
             id_param: str,
             current_user: User = Depends(get_current_user),
             db: AsyncSession = Depends(get_db_session),
-        ) -> self.config.response_schema:
+        ):
             logger.info(
                 f"Fetching {operation_name} status: {id_param} " f"for user {current_user.user_id}"
             )
@@ -437,7 +438,7 @@ def _enqueue_celery_task(
     if operation_name == "download":
         from src.celery_app.tasks.download_tasks import execute_download_task
 
-        execute_download_task.delay(
+        execute_download_task.delay(  # type: ignore[attr-defined]
             user_id=user_id,
             download_id=str(operation_id),
             book=book_data,
@@ -445,7 +446,7 @@ def _enqueue_celery_task(
     elif operation_name == "decryption":
         from src.celery_app.tasks.decrypt_tasks import execute_decrypt_task
 
-        execute_decrypt_task.delay(
+        execute_decrypt_task.delay(  # type: ignore[attr-defined]
             user_id=user_id,
             decryption_id=str(operation_id),
             book=book_data,
@@ -453,7 +454,7 @@ def _enqueue_celery_task(
     elif operation_name == "sync":
         from src.celery_app.tasks.library_tasks import execute_sync_library_task
 
-        execute_sync_library_task.delay(
+        execute_sync_library_task.delay(  # type: ignore[attr-defined]
             user_id=user_id,
             sync_type=book_data.get("sync_type", "full"),
         )
