@@ -1,6 +1,7 @@
 """User library endpoints."""
 
 import json
+from decimal import Decimal
 from typing import Any, Dict
 
 import audible
@@ -87,10 +88,10 @@ async def get_library(
 
 @router.get(
     "/audible/fetch",
-    summary="Fetch library from Audible",
-    description="Fetch user's audiobook library directly from Audible API",
+    summary="Fetch library from Audible and save to database",
+    description="Fetch user's audiobook library from Audible API and save books to database",
     responses={
-        200: {"description": "Library fetched successfully from Audible"},
+        200: {"description": "Library fetched and saved successfully"},
         401: {"description": "Not authenticated"},
         403: {"description": "Audible credentials not configured"},
         500: {"description": "Failed to fetch from Audible"},
@@ -113,18 +114,20 @@ async def fetch_audible_library(
     ),
 ) -> Dict[str, Any]:
     """
-    Fetch user's audiobook library directly from Audible API.
+    Fetch user's audiobook library from Audible API and save to database.
 
     Uses stored Audible credentials to retrieve the complete library
-    from Audible's servers.
+    from Audible's servers and saves book data to the database without
+    downloading the audiobook files.
 
     Args:
         current_user: Current authenticated user (from JWT token)
         db: Database session
         num_results: Number of books to fetch (default: 1000, max: 1000)
+        page: Page number to fetch (default: 1)
 
     Returns:
-        Dict with library items and metadata
+        Dict with save statistics including number of books saved
 
     Raises:
         HTTPException: If credentials not found or API call fails
@@ -151,7 +154,7 @@ async def fetch_audible_library(
     auth = audible.Authenticator.from_dict(auth_data)
 
     # Create async client and fetch library
-    logger.info(f"Fetching library from Audible (num_results={num_results})")
+    logger.info(f"Fetching library from Audible (num_results={num_results}, page={page})")
     async with audible.AsyncClient(auth=auth) as client:
         library_response = await client.get(
             "library",
@@ -164,11 +167,106 @@ async def fetch_audible_library(
     items = library_response.get("items", [])
     logger.info(f"Successfully fetched {len(items)} books from Audible for user {user_id}")
 
+    # Save books to database
+    books_saved = 0
+    books_failed = 0
+
+    for item in items:
+        try:
+            asin = item.get("asin")
+            if not asin:
+                logger.warning("Item missing ASIN, skipping")
+                books_failed += 1
+                continue
+
+            # Extract book metadata from Audible API response
+            title = item.get("title", "Unknown Title")
+            product_images = item.get("product_images", {})
+            cover_art_url = product_images.get("500") if product_images else None
+
+            # Extract runtime in minutes (Audible provides runtime_length_ms)
+            runtime_ms = item.get("runtime_length_ms")
+            runtime_min = int(runtime_ms / 60000) if runtime_ms else None
+
+            # Extract rating
+            rating_obj = item.get("rating", {})
+            rating_float = rating_obj.get("overall_distribution", {}).get("average_rating") if rating_obj else None
+            rating = Decimal(str(rating_float)) if rating_float is not None else None
+
+            # Extract purchase date
+            purchase_date = item.get("purchase_date")
+
+            # Extract authors
+            authors = item.get("authors", [])
+            author = ", ".join([a.get("name", "") for a in authors]) if authors else None
+
+            # Extract narrators
+            narrators = item.get("narrators", [])
+            narrator = ", ".join([n.get("name", "") for n in narrators]) if narrators else None
+
+            # Extract description
+            description = item.get("description")
+
+            # Extract series information
+            series_obj = item.get("series", {})
+            series_name = series_obj.get("title") if series_obj else None
+
+            # Extract publisher
+            publisher = item.get("publisher_name")
+
+            # Extract publication date
+            publication_date = item.get("publication_date_string")
+
+            # Extract language
+            language = item.get("language", "en-US")
+
+            # Extract review count
+            review_count = rating_obj.get("num_reviews") if rating_obj else 0
+
+            # Save book to database
+            success = await book_service.add_book(
+                db=db,
+                asin=asin,
+                user_id=user_id,
+                title=title,
+                purchase_date=purchase_date,
+                runtime_min=runtime_min,
+                author=author,
+                narrator=narrator,
+                series_name=series_name,
+                description=description,
+                rating=rating,
+                publisher=publisher,
+                publication_date=publication_date,
+                language=language,
+                review_count=review_count,
+                cover_art_url=cover_art_url,
+            )
+
+            if success:
+                books_saved += 1
+                logger.info(f"Saved book: {title} (ASIN: {asin})")
+            else:
+                books_failed += 1
+                logger.warning(f"Failed to save book: {title} (ASIN: {asin})")
+
+        except Exception as e:
+            books_failed += 1
+            logger.error(f"Error processing book item: {e}")
+
+    # Commit database changes
+    await db.commit()
+
+    logger.info(
+        f"Audible library fetch complete for user {user_id}: "
+        f"{books_saved} saved, {books_failed} failed"
+    )
+
     return {
-        "items": items,
-        "total": len(items),
+        "books_saved": books_saved,
+        "books_failed": books_failed,
+        "total_fetched": len(items),
         "user_id": user_id,
-        "num_results": num_results,
     }
 
 

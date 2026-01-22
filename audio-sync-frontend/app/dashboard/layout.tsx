@@ -20,6 +20,7 @@ import {
   LogOut,
   Home,
   Music,
+  Cloud,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/components/protected-route";
@@ -42,6 +43,11 @@ export default function DashboardLayout({
       title: "Library",
       icon: BookOpen,
       href: "/dashboard/library",
+    },
+    {
+      title: "Audible Library",
+      icon: Cloud,
+      href: "/dashboard/audible",
     },
     {
       title: "Now Playing",
@@ -67,46 +73,54 @@ export default function DashboardLayout({
       <SidebarProvider>
         <div className="flex h-screen bg-background">
           <Sidebar>
-          <SidebarHeader className="border-b">
-            <Link href="/dashboard" className="flex items-center gap-2 px-4 py-2">
-              <BookOpen className="w-6 h-6 text-primary" />
-              <span className="text-lg font-bold text-primary">AudioSync</span>
-            </Link>
-          </SidebarHeader>
+            <SidebarHeader className="border-b">
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-2 px-4 py-2"
+              >
+                <BookOpen className="w-6 h-6 text-primary" />
+                <span className="text-lg font-bold text-primary">
+                  AudioSync
+                </span>
+              </Link>
+            </SidebarHeader>
 
-          <SidebarContent>
-            <SidebarMenu>
-              {menuItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive(item.href)}
-                      className={isActive(item.href) ? "bg-accent" : ""}
-                    >
-                      <Link href={item.href} className="flex items-center gap-2">
-                        <Icon className="w-4 h-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarContent>
+            <SidebarContent>
+              <SidebarMenu>
+                {menuItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive(item.href)}
+                        className={isActive(item.href) ? "bg-accent" : ""}
+                      >
+                        <Link
+                          href={item.href}
+                          className="flex items-center gap-2"
+                        >
+                          <Icon className="w-4 h-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarContent>
 
-          <SidebarFooter className="border-t p-4">
-            <Button
-              variant="ghost"
-              className="w-full justify-start text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-              onClick={logout}
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </Button>
-          </SidebarFooter>
-        </Sidebar>
+            <SidebarFooter className="border-t p-4">
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                onClick={logout}
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign Out
+              </Button>
+            </SidebarFooter>
+          </Sidebar>
 
           <main className="flex-1 overflow-auto">
             <div className="p-8">{children}</div>

@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -58,7 +59,7 @@ class BookBase(BaseModel):
 class BookResponse(BookBase):
     """Book response with metadata."""
 
-    user_id: str = Field(
+    user_id: UUID = Field(
         ...,
         description="User UUID who owns this book",
     )
@@ -103,7 +104,7 @@ class BookResponse(BookBase):
                 "description": "An intimate, powerful, and inspiring memoir...",
                 "rating": 4.8,
                 "runtime_min": 1440,
-                "user_id": "user-uuid-123",
+                "user_id": "550e8400-e29b-41d4-a716-446655440000",
                 "purchase_date": "2023-01-15",
                 "is_downloaded": True,
                 "is_decrypted": True,

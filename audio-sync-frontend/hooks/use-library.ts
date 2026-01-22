@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
-import { getAPIClient, APIError } from '@/lib/api/client';
+import { useState, useCallback } from "react";
+import { getAPIClient, APIError } from "@/lib/api/client";
 
 export interface Book {
   asin: string;
@@ -23,6 +23,13 @@ export interface LibraryResponse {
   pages: number;
 }
 
+export interface SyncResponse {
+  books_failed: number;
+  books_saved: number;
+  total_fetched: number;
+  user_id: string;
+}
+
 interface UseLibraryState {
   books: Book[];
   loading: boolean;
@@ -30,6 +37,8 @@ interface UseLibraryState {
   total: number;
   page: number;
   pages: number;
+  syncing: boolean;
+  syncResult: SyncResponse | null;
 }
 
 export function useLibrary() {
@@ -40,6 +49,8 @@ export function useLibrary() {
     total: 0,
     page: 1,
     pages: 1,
+    syncing: false,
+    syncResult: null,
   });
 
   const apiClient = getAPIClient();
@@ -49,17 +60,22 @@ export function useLibrary() {
       setState((prev) => ({ ...prev, loading: true, error: null }));
 
       try {
-        const response = (await apiClient.getLibrary(pageNum, pageSize)) as LibraryResponse;
-        setState({
+        const response = (await apiClient.getLibrary(
+          pageNum,
+          pageSize,
+        )) as LibraryResponse;
+        setState((prev) => ({
+          ...prev,
           books: response.items,
           loading: false,
           error: null,
           total: response.total,
           page: response.page,
           pages: response.pages,
-        });
+        }));
       } catch (err) {
-        const error = err instanceof APIError ? err.message : 'Failed to fetch library';
+        const error =
+          err instanceof APIError ? err.message : "Failed to fetch library";
         setState((prev) => ({
           ...prev,
           loading: false,
@@ -67,7 +83,54 @@ export function useLibrary() {
         }));
       }
     },
-    [apiClient]
+    [apiClient],
+  );
+
+  const fetchEntireLibrary = useCallback(
+    async (pageSize: number = 100) => {
+      setState((prev) => ({ ...prev, loading: true, error: null }));
+
+      try {
+        let currentPage = 1;
+        let allBooks: Book[] = [];
+        let totalPages = 0;
+
+        while (true) {
+          const response = (await apiClient.getLibrary(
+            currentPage,
+            pageSize,
+          )) as LibraryResponse;
+
+          allBooks = [...allBooks, ...response.items];
+          totalPages = response.pages;
+
+          if (currentPage >= totalPages) {
+            break;
+          }
+
+          currentPage++;
+        }
+
+        setState((prev) => ({
+          ...prev,
+          books: allBooks,
+          loading: false,
+          error: null,
+          total: allBooks.length,
+          page: 1,
+          pages: 1,
+        }));
+      } catch (err) {
+        const error =
+          err instanceof APIError ? err.message : "Failed to fetch library";
+        setState((prev) => ({
+          ...prev,
+          loading: false,
+          error,
+        }));
+      }
+    },
+    [apiClient],
   );
 
   const getBook = useCallback(
@@ -75,12 +138,13 @@ export function useLibrary() {
       try {
         return await apiClient.getBook(asin);
       } catch (err) {
-        const error = err instanceof APIError ? err.message : 'Failed to fetch book';
+        const error =
+          err instanceof APIError ? err.message : "Failed to fetch book";
         setState((prev) => ({ ...prev, error }));
         throw err;
       }
     },
-    [apiClient]
+    [apiClient],
   );
 
   const deleteBook = useCallback(
@@ -92,13 +156,92 @@ export function useLibrary() {
           books: prev.books.filter((b) => b.asin !== asin),
         }));
       } catch (err) {
-        const error = err instanceof APIError ? err.message : 'Failed to delete book';
+        const error =
+          err instanceof APIError ? err.message : "Failed to delete book";
         setState((prev) => ({ ...prev, error }));
         throw err;
       }
     },
-    [apiClient]
+    [apiClient],
   );
+
+  const syncFromAudible = useCallback(async () => {
+    console.log("Starting syncFromAudible...");
+    setState((prev) => ({
+      ...prev,
+      syncing: true,
+      error: null,
+      syncResult: null,
+    }));
+
+    try {
+      let currentPage = 1;
+      let totalSaved = 0;
+      let totalFailed = 0;
+      const pageSize = 500;
+
+      console.log("Beginning pagination loop...");
+      // Keep fetching pages until all books are retrieved
+      while (true) {
+        console.log(`Fetching page ${currentPage}...`);
+        const response = (await apiClient.fetchFromAudible(
+          pageSize,
+          currentPage,
+        )) as SyncResponse;
+
+        console.log("Full response:", response);
+        const fetched = response.total_fetched || 0;
+        const saved = response.books_saved || 0;
+        const failed = response.books_failed || 0;
+
+        totalSaved += saved;
+        totalFailed += failed;
+
+        console.log(
+          `Fetched page ${currentPage}: ${fetched} books (saved: ${saved}, failed: ${failed}), cumulative: ${totalSaved} saved, ${totalFailed} failed`,
+        );
+
+        // Stop if no more books were fetched on this page
+        if (fetched === 0) {
+          console.log("Pagination complete");
+          break;
+        }
+
+        currentPage++;
+      }
+
+      console.log(
+        `Sync complete. Total saved: ${totalSaved}, Total failed: ${totalFailed}`,
+      );
+      const syncResult: SyncResponse = {
+        books_saved: totalSaved,
+        books_failed: totalFailed,
+        total_fetched: totalSaved + totalFailed,
+        user_id: "",
+      };
+
+      setState((prev) => ({
+        ...prev,
+        syncResult,
+      }));
+
+      // Refresh library after successful sync
+      await fetchLibrary(1, 50);
+    } catch (err) {
+      console.error("Error in syncFromAudible:", err);
+      const error =
+        err instanceof APIError ? err.message : "Failed to fetch from Audible";
+      setState((prev) => ({
+        ...prev,
+        error,
+      }));
+    } finally {
+      setState((prev) => ({
+        ...prev,
+        syncing: false,
+      }));
+    }
+  }, [apiClient, fetchLibrary]);
 
   return {
     books: state.books,
@@ -107,8 +250,12 @@ export function useLibrary() {
     total: state.total,
     page: state.page,
     pages: state.pages,
+    syncing: state.syncing,
+    syncResult: state.syncResult,
     fetchLibrary,
+    fetchEntireLibrary,
     getBook,
     deleteBook,
+    syncFromAudible,
   };
 }
