@@ -107,9 +107,9 @@ async def fetch_audible_library(
         description="Number of results to fetch (1-1000)",
     ),
     page: int = Query(
-        default=0,
-        ge=0,
-        description="Page number to fetch (starting from 0)",
+        default=1,
+        ge=1,
+        description="Page number to fetch (starting from 1)",
     ),
 ) -> Dict[str, Any]:
     """
@@ -138,13 +138,13 @@ async def fetch_audible_library(
     # Get user's Audible credentials from database
     user = await user_service.get_user_by_id(db, user_id)
 
-    if not user or not user.audible_auth_json:
+    if not user or user.audible_auth_json is None:
         logger.error(f"No Audible credentials found for user {user_id}")
         raise AuthorizationError(
             "Audible credentials not configured. Please authenticate with Audible first."
         )
 
-    auth_data = json.loads(user.audible_auth_json)
+    auth_data = json.loads(str(user.audible_auth_json))
 
     # Create Audible client from stored credentials
     logger.info("Creating Audible authenticator from stored credentials")
