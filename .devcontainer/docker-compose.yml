@@ -16,9 +16,13 @@ services:
       POSTGRES_DB: audiobooksync
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: dev_password
+      REDIS_HOST: redis
       LOG_LEVEL: INFO
+      USE_CELERY_TASKS: "true"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - audiobooksync-network
@@ -65,9 +69,78 @@ services:
       timeout: 10s
       retries: 3
 
+  redis:
+    image: redis:7-alpine
+    container_name: audiobooksync-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - audiobooksync-network
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  celery-worker:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    container_name: audiobooksync-celery-worker
+    working_dir: /workspace
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: audiobooksync
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev_password
+      REDIS_HOST: redis
+      CELERY_BROKER_URL: redis://redis:6379/0
+      LOG_LEVEL: INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - audiobooksync-network
+    command: celery -A src.celery_app worker -l info --concurrency=2
+    volumes:
+      - ..:/workspace
+
+  celery-beat:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    container_name: audiobooksync-celery-beat
+    working_dir: /workspace
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: audiobooksync
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev_password
+      REDIS_HOST: redis
+      CELERY_BROKER_URL: redis://redis:6379/0
+      LOG_LEVEL: INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - audiobooksync-network
+    command: celery -A src.celery_app beat -l info
+    volumes:
+      - ..:/workspace
+
 volumes:
   postgres_data:
   minio_data:
+  redis_data:
 
 networks:
   audiobooksync-network:

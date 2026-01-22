@@ -169,6 +169,44 @@ class Config:
         "yes",
     )
 
+    # ========================================================================
+    # Redis Configuration
+    # ========================================================================
+    REDIS_HOST = os.getenv("REDIS_HOST", "redis")
+    REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+    REDIS_DB = int(os.getenv("REDIS_DB", "0"))
+    REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "")
+    REDIS_URL = (
+        f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+        if REDIS_PASSWORD
+        else f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+    )
+
+    # ========================================================================
+    # Celery Configuration
+    # ========================================================================
+    CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", REDIS_URL)
+    CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
+    USE_CELERY_TASKS = os.getenv("USE_CELERY_TASKS", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
+    # Task Configuration
+    CELERY_MAX_RETRIES = int(os.getenv("CELERY_MAX_RETRIES", "3"))
+    CELERY_RETRY_DELAY = int(os.getenv("CELERY_RETRY_DELAY", "60"))
+    CELERY_TASK_TIME_LIMIT = int(os.getenv("CELERY_TASK_TIME_LIMIT", "7200"))
+
+    # Cleanup Retention (days)
+    CLEANUP_RETENTION_SYNC_DAYS = int(os.getenv("CLEANUP_RETENTION_SYNC_DAYS", "90"))
+    CLEANUP_RETENTION_ERROR_DAYS = int(
+        os.getenv("CLEANUP_RETENTION_ERROR_DAYS", "30")
+    )
+    CLEANUP_RETENTION_COMPLETED_DAYS = int(
+        os.getenv("CLEANUP_RETENTION_COMPLETED_DAYS", "7")
+    )
+
     @classmethod
     def ensure_directories(cls) -> None:
         """Create necessary directories if they don't exist."""

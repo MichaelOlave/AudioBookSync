@@ -34,6 +34,7 @@ from loguru import logger
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...core.config import Config
 from ...database.engine import get_db_session
 from ...database.models.user import User
 from ..middleware.error_handler import (
@@ -282,13 +283,23 @@ class StatusRouterFactory:
 
             await db.commit()
 
-            # Queue background task
-            background_tasks.add_task(
-                background_task_func,
-                user_id=str(current_user.user_id),
-                **{id_field: getattr(operation, id_field)},
-                book=operation_data.dict(),
-            )
+            # Queue background task based on feature flag
+            if Config.USE_CELERY_TASKS:
+                # Enqueue Celery task
+                _enqueue_celery_task(
+                    operation_name=operation_name,
+                    operation_id=getattr(operation, id_field),
+                    user_id=str(current_user.user_id),
+                    book_data=operation_data.dict(),
+                )
+            else:
+                # Use FastAPI BackgroundTasks
+                background_tasks.add_task(
+                    background_task_func,
+                    user_id=str(current_user.user_id),
+                    **{id_field: getattr(operation, id_field)},
+                    book=operation_data.dict(),
+                )
 
             logger.info(f"{operation_name.title()} queued: {getattr(operation, id_field)}")
 
@@ -408,3 +419,43 @@ class StatusRouterFactory:
             return self.config.response_schema.from_orm(operation)
 
         return get_status_endpoint
+
+
+def _enqueue_celery_task(
+    operation_name: str, operation_id: UUID, user_id: str, book_data: dict
+) -> None:
+    """
+    Enqueue a Celery task based on operation name.
+
+    Args:
+        operation_name: Name of operation (download, decryption, sync)
+        operation_id: ID of the operation record
+        user_id: ID of the user
+        book_data: Book data dictionary
+    """
+    # Import Celery tasks only if USE_CELERY_TASKS is enabled
+    if operation_name == "download":
+        from src.celery_app.tasks.download_tasks import execute_download_task
+
+        execute_download_task.delay(
+            user_id=user_id,
+            download_id=str(operation_id),
+            book=book_data,
+        )
+    elif operation_name == "decryption":
+        from src.celery_app.tasks.decrypt_tasks import execute_decrypt_task
+
+        execute_decrypt_task.delay(
+            user_id=user_id,
+            decryption_id=str(operation_id),
+            book=book_data,
+        )
+    elif operation_name == "sync":
+        from src.celery_app.tasks.library_tasks import execute_sync_library_task
+
+        execute_sync_library_task.delay(
+            user_id=user_id,
+            sync_type=book_data.get("sync_type", "full"),
+        )
+    else:
+        logger.warning(f"Unknown operation name for Celery: {operation_name}")

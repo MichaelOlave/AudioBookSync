@@ -1,9 +1,14 @@
 """WebSocket connection manager for real-time updates."""
 
-from typing import Any, Dict, Set
+import asyncio
+import json
+from typing import Any, Dict, Optional, Set
 
+import redis.asyncio as aioredis
 from fastapi import WebSocket
 from loguru import logger
+
+from src.core.config import Config
 
 
 class ConnectionManager:
@@ -18,6 +23,86 @@ class ConnectionManager:
         # active_connections[user_id] = Set[WebSocket]
         self.active_connections: Dict[str, Set[WebSocket]] = {}
         self.connection_metadata: Dict[WebSocket, Dict[str, Any]] = {}
+        self.redis_client: Optional[aioredis.Redis] = None
+        self.subscription_tasks: Dict[str, asyncio.Task] = {}  # user_id -> Task
+
+    async def initialize_redis(self) -> None:
+        """Initialize Redis connection for pub/sub."""
+        if Config.USE_CELERY_TASKS and self.redis_client is None:
+            try:
+                self.redis_client = await aioredis.from_url(
+                    Config.CELERY_BROKER_URL, decode_responses=True
+                )
+                logger.info("Redis pub/sub connection initialized")
+            except Exception as e:
+                logger.error(f"Failed to initialize Redis: {e}")
+
+    async def _subscribe_to_user_channel(self, user_id: str) -> None:
+        """
+        Subscribe to Redis pub/sub channel for user and forward to WebSockets.
+
+        Args:
+            user_id: The user ID to subscribe for
+        """
+        if self.redis_client is None:
+            await self.initialize_redis()
+
+        if self.redis_client is None:
+            logger.error("Redis client not available for subscription")
+            return
+
+        try:
+            pubsub = self.redis_client.pubsub()
+            await pubsub.subscribe(f"ws:user:{user_id}")
+            logger.info(f"Subscribed to Redis channel: ws:user:{user_id}")
+
+            async for message in pubsub.listen():
+                if message["type"] == "message":
+                    try:
+                        event_data = json.loads(message["data"])
+                        await self._send_to_user_websockets(
+                            user_id=user_id,
+                            event_type=event_data.get("type"),
+                            data=event_data.get("data"),
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to process Redis message: {e}")
+        except asyncio.CancelledError:
+            logger.info(f"Unsubscribing from Redis channel: ws:user:{user_id}")
+            try:
+                await pubsub.unsubscribe(f"ws:user:{user_id}")
+                await pubsub.close()
+            except Exception as e:
+                logger.warning(f"Error closing pubsub: {e}")
+        except Exception as e:
+            logger.error(f"Error in Redis subscription: {e}")
+
+    async def _send_to_user_websockets(
+        self, user_id: str, event_type: str, data: dict
+    ) -> None:
+        """
+        Send message to all WebSocket connections for user.
+
+        Args:
+            user_id: The user ID
+            event_type: Type of event
+            data: Event data payload
+        """
+        if user_id not in self.active_connections:
+            return
+
+        message = {"type": event_type, "data": data}
+        disconnected = set()
+
+        for websocket in self.active_connections[user_id]:
+            try:
+                await websocket.send_json(message)
+            except Exception as e:
+                logger.warning(f"Failed to send to WebSocket: {e}")
+                disconnected.add(websocket)
+
+        for websocket in disconnected:
+            self.disconnect(websocket, user_id)
 
     async def connect(self, websocket: WebSocket, user_id: str) -> None:
         """
@@ -47,6 +132,11 @@ class ConnectionManager:
             f"(active connections: {len(self.active_connections[user_id])})"
         )
 
+        # Start Redis subscription task if not already running
+        if Config.USE_CELERY_TASKS and user_id not in self.subscription_tasks:
+            task = asyncio.create_task(self._subscribe_to_user_channel(user_id))
+            self.subscription_tasks[user_id] = task
+
     def disconnect(self, websocket: WebSocket, user_id: str) -> None:
         """
         Unregister a WebSocket connection.
@@ -61,6 +151,11 @@ class ConnectionManager:
             # Clean up empty user sets
             if not self.active_connections[user_id]:
                 del self.active_connections[user_id]
+
+                # Cancel subscription task if no more connections for user
+                if user_id in self.subscription_tasks:
+                    self.subscription_tasks[user_id].cancel()
+                    del self.subscription_tasks[user_id]
 
         # Clean up metadata
         if websocket in self.connection_metadata:
