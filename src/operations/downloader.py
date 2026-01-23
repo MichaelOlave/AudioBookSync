@@ -157,8 +157,13 @@ async def download_book(
 
                                             # Emit progress at reasonable intervals (every 2.5 seconds = 5 checks at 500ms)
                                             if iterations % 5 == 0:
+                                                # Estimate total based on current file size
+                                                # Audiobooks typically range 500MB-2GB, so estimate at 1.5x current size
+                                                estimated_total = max(file_size * 1.5, 1.5 * 1024 * 1024 * 1024)
+                                                progress_percent = (file_size / estimated_total) * 100
+
                                                 logger.debug(
-                                                    f"[Monitor] File size {file_size / 1024 / 1024:.1f}MB -> {progress_percent:.1f}%"
+                                                    f"[Monitor] File size {file_size / 1024 / 1024:.1f}MB, estimated total {estimated_total / 1024 / 1024:.1f}MB -> {progress_percent:.1f}%"
                                                 )
                                                 await safe_progress_callback(
                                                     progress_callback,
@@ -167,7 +172,7 @@ async def download_book(
                                                     filename=book_title,
                                                     progress_percent=progress_percent,
                                                     bytes_downloaded=file_size,
-                                                    total_bytes=500 * 1024 * 1024,
+                                                    total_bytes=int(estimated_total),
                                                     speed_kbps=0.0,
                                                 )
                                                 progress_emitted = True
