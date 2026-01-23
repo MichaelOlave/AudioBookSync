@@ -1,7 +1,6 @@
 """Configuration management for AudioBookSync."""
 
 import os
-from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -28,10 +27,6 @@ class Config:
     # Audible Authentication
     AUTH_FILE = os.getenv("AUTH_FILE", "auth.json")
     ACTIVATION_BYTES = os.getenv("ACTIVATION_BYTES", "bytes_go_here")
-    # Directories
-    DOWNLOAD_DIR = os.getenv("DOWNLOAD_DIR", "audiobooks/downloaded")
-    DECRYPTED_DIR = os.getenv("DECRYPTED_DIR", "audiobooks/decrypted")
-    LOG_DIR = os.getenv("LOG_DIR", "logs")
 
     # Audible API
     AUDIBLE_NUM_RESULTS = int(os.getenv("AUDIBLE_NUM_RESULTS", "2"))
@@ -162,8 +157,10 @@ class Config:
         os.getenv("CLEANUP_RETENTION_COMPLETED_DAYS", "7")
     )
 
-    @classmethod
-    def ensure_directories(cls) -> None:
-        """Create necessary directories if they don't exist."""
-        for directory in [cls.DOWNLOAD_DIR, cls.DECRYPTED_DIR, cls.LOG_DIR]:
-            Path(directory).mkdir(parents=True, exist_ok=True)
+    # ========================================================================
+    # Log Retention Configuration
+    # ========================================================================
+    LOG_RETENTION_DAYS_DEBUG = int(os.getenv("LOG_RETENTION_DAYS_DEBUG", "7"))
+    LOG_RETENTION_DAYS_INFO = int(os.getenv("LOG_RETENTION_DAYS_INFO", "30"))
+    LOG_RETENTION_DAYS_WARNING = int(os.getenv("LOG_RETENTION_DAYS_WARNING", "90"))
+    LOG_RETENTION_DAYS_ERROR = int(os.getenv("LOG_RETENTION_DAYS_ERROR", "180"))

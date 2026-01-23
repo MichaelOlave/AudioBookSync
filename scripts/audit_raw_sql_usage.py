@@ -7,9 +7,8 @@ they can be safely removed without breaking functionality.
 
 import os
 import re
-from pathlib import Path
 from collections import defaultdict
-from typing import Dict, List, Set
+from typing import Dict, List
 
 
 # Raw SQL modules to audit

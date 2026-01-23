@@ -1,5 +1,6 @@
 """SQLAlchemy ORM models for AudioBookSync."""
 
+from src.database.models.application_log import ApplicationLog
 from src.database.models.base import Base, generate_uuid, get_current_timestamp
 from src.database.models.book import Book
 from src.database.models.book_availability import BookAvailability
@@ -16,6 +17,7 @@ from src.database.models.sync import SyncHistory
 from src.database.models.user import User
 
 __all__ = [
+    "ApplicationLog",
     "Base",
     "generate_uuid",
     "get_current_timestamp",

@@ -2,11 +2,9 @@
 """Comprehensive test script for all AudioBookSync API endpoints."""
 
 import requests
-import json
-import time
 import sys
 import uuid
-from typing import Dict, Any, Optional
+from typing import Dict
 
 BASE_URL = "http://localhost:8000/api/v1"
 TIMEOUT = 10

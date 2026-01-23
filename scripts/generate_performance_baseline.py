@@ -5,7 +5,6 @@ This script generates realistic performance benchmark data that simulates
 ORM vs SQL performance comparisons based on expected targets from the Phase 6 guide.
 """
 
-import json
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any

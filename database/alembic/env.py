@@ -5,7 +5,7 @@ from pathlib import Path
 
 import sqlalchemy as sa
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import create_async_engine
 
 # Import models for autogenerate to discover them

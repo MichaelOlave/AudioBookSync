@@ -2,7 +2,6 @@
 
 import asyncio
 from datetime import datetime, timedelta, timezone
-from uuid import UUID
 
 from loguru import logger
 from sqlalchemy import and_, select
@@ -173,4 +172,102 @@ async def _async_retry_decrypts() -> dict:
 
     except Exception as e:
         logger.error(f"Decryption retry failed: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+@celery_app.task(name="retry_failed_decrypts_from_minio")
+def retry_failed_decrypts_from_minio() -> dict:
+    """Retry failed decryptions with encrypted files stored in MinIO."""
+    return asyncio.run(_async_retry_decrypts_from_minio())
+
+
+async def _async_retry_decrypts_from_minio() -> dict:
+    """Async implementation of decryption retry from MinIO encrypted files."""
+    try:
+        logger.info("Starting failed decryption retry from MinIO encrypted files")
+
+        from src.database.models.book import Book
+        from src.operations.decryptor import decrypt_book
+        from src.infrastructure.storage_service import StorageService
+
+        async with AsyncSessionLocal() as db:
+            # Find decryptions with encrypted files stored in MinIO (failed decryptions)
+            result = await db.execute(
+                select(DecryptionStatus).where(
+                    and_(
+                        DecryptionStatus.encrypted_file_object_key.isnot(None),
+                        DecryptionStatus.status == "failed",
+                    )
+                )
+            )
+
+            failed_decrypts = result.scalars().all()
+
+            retry_count = 0
+            for decrypt_record in failed_decrypts:
+                try:
+                    # Get book info for retry
+                    book_result = await db.execute(
+                        select(Book).where(Book.asin == decrypt_record.asin)
+                    )
+                    book = book_result.scalars().first()
+
+                    if not book:
+                        logger.warning(f"Book not found for ASIN {decrypt_record.asin}")
+                        continue
+
+                    # Download encrypted file from MinIO
+                    storage_service = StorageService()
+                    encrypted_file_path = storage_service.get_file(
+                        user_id=str(book.user_id),
+                        object_key=decrypt_record.encrypted_file_object_key,
+                    )
+
+                    if not encrypted_file_path:
+                        logger.warning(
+                            f"Failed to download encrypted file from MinIO: "
+                            f"{decrypt_record.encrypted_file_object_key}"
+                        )
+                        continue
+
+                    # Attempt retry decryption
+                    book_data = [book.asin, book.title]
+                    decrypt_success = await decrypt_book(
+                        book=book_data,
+                        user_id=str(book.user_id),
+                        encrypted_file_path=encrypted_file_path,
+                        is_retry=True,
+                    )
+
+                    if decrypt_success:
+                        # Update status and clear encrypted_file_object_key
+                        decrypt_record.status = "completed"
+                        decrypt_record.encrypted_file_object_key = None
+                        await db.flush()
+                        retry_count += 1
+                        logger.info(f"Retry successful for ASIN {decrypt_record.asin}")
+
+                        # Delete encrypted file from MinIO
+                        try:
+                            storage_service.delete_file(
+                                user_id=str(book.user_id),
+                                object_key=decrypt_record.encrypted_file_object_key,
+                            )
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to delete encrypted file from MinIO: {e}"
+                            )
+                    else:
+                        logger.warning(f"Retry still failed for ASIN {decrypt_record.asin}")
+
+                except Exception as e:
+                    logger.error(f"Error retrying decryption for ASIN {decrypt_record.asin}: {e}")
+
+            await db.commit()
+
+        logger.info(f"Retried {retry_count} failed decryptions from MinIO")
+        return {"retry_count": retry_count}
+
+    except Exception as e:
+        logger.error(f"Decryption retry from MinIO failed: {e}", exc_info=True)
         return {"error": str(e)}

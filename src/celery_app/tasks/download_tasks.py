@@ -1,7 +1,6 @@
 """Download tasks for Celery."""
 
 import asyncio
-from typing import Optional
 from uuid import UUID
 
 from celery import Task

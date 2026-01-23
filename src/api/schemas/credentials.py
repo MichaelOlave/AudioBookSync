@@ -47,21 +47,6 @@ class AudibleAuthJsonRequest(BaseModel):
         return v
 
 
-class AudibleCredentialsRequest(BaseModel):
-    """Request to update Audible authentication credentials (deprecated - use AudibleAuthJsonRequest)."""
-
-    auth_file_path: Optional[str] = Field(
-        default=None,
-        description=("Path to Audible auth JSON file (usually auth.json) - DEPRECATED"),
-        json_schema_extra={"example": "/path/to/auth.json"},
-    )
-    activation_bytes: Optional[str] = Field(
-        default=None,
-        description="DRM activation bytes (hex string)",
-        json_schema_extra={"example": "1f2e3d4c5b6a7988"},
-    )
-
-
 class AudibleCredentialsResponse(BaseModel):
     """Response with Audible authentication credentials."""
 

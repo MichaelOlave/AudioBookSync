@@ -243,7 +243,6 @@ class StatusRouterFactory:
         creation_failure_error = self.config.creation_failure_error
         pre_validator = self.config.pre_create_validator
         params_builder = self.config.create_status_params_builder
-        create_schema = self.config.create_schema
 
         @handle_route_errors(f"trigger {operation_name}")
         async def trigger_endpoint(

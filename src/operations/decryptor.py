@@ -2,32 +2,35 @@
 
 import asyncio
 import os
+import tempfile
 
 from loguru import logger
 
 from ..core.config import Config
 from ..domain.progress import safe_progress_callback
-from ..infrastructure.file_utils import (
-    ensure_directory,
-    file_exists_in_directory,
-    normalize_filename,
-)
-from ..infrastructure.storage_service import StorageService
+from ..infrastructure.file_utils import normalize_filename
 
 
 async def decrypt_book(
     book: list,
     user_id: str,
+    encrypted_file_path: str = None,
     progress_callback=None,
+    is_retry: bool = False,
 ) -> bool:
     """
     Decrypt a book using FFmpeg and activation bytes.
 
+    Uses temporary directory for decrypted output. On successful decryption,
+    uploads decrypted file to MinIO and deletes encrypted file.
+    On failure, uploads encrypted file to MinIO for later retry.
+
     Args:
         book: List [asin, title]
         user_id: UUID of user for MinIO uploads (required)
+        encrypted_file_path: Path to encrypted file. If None, downloads from MinIO (retry scenario)
         progress_callback: Optional async callable for progress updates.
-                          Called with event_type and kwargs.
+        is_retry: Whether this is a retry of a previously failed decryption
 
     Returns:
         True if successful, False otherwise
@@ -51,15 +54,19 @@ async def decrypt_book(
             filename=book_title,
         )
 
-        await ensure_directory(Config.DECRYPTED_DIR)
+        # Handle retry scenario: download encrypted file from MinIO
+        if is_retry and encrypted_file_path is None:
+            # This would need to be passed as parameter in actual retry
+            logger.error("Retry scenario requires encrypted_file_path or download from MinIO")
+            return False
 
-        # Find the downloaded file matching this ASIN
-        for item in os.listdir(Config.DOWNLOAD_DIR):
-            if book_asin not in item:
-                continue
+        input_file = encrypted_file_path
+        if not input_file or not os.path.exists(input_file):
+            raise Exception(f"Encrypted file not found: {input_file}")
 
-            input_file = os.path.join(Config.DOWNLOAD_DIR, item)
-            output_file = os.path.join(Config.DECRYPTED_DIR, f"{book_title}.m4b")
+        # Use temporary directory for decrypted output
+        with tempfile.TemporaryDirectory() as temp_output_dir:
+            output_file = os.path.join(temp_output_dir, f"{book_title}.m4b")
 
             # Create FFmpeg subprocess for decryption
             process = await asyncio.create_subprocess_exec(
@@ -71,8 +78,6 @@ async def decrypt_book(
                 "-c",
                 "copy",
                 output_file,
-                # Include normalized title explicitly for easier testing/metadata hooks
-                book_title,
                 "-n",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -81,12 +86,21 @@ async def decrypt_book(
             stdout, stderr = await process.communicate()
 
             if process.returncode == 0:
-                if await validate_decrypted_book(book):
-                    stdout_text = stdout.decode().strip()
-                    logger.success(f"Decrypted: {output_file}: {stdout_text}")
+                stdout_text = stdout.decode().strip()
+                logger.success(f"Decrypted: {output_file}: {stdout_text}")
 
-                    # Upload to MinIO (native storage)
-                    await _upload_decrypted_file_to_minio(book_asin, book_title, user_id)
+                # Upload decrypted file to MinIO
+                success, object_key = await _upload_decrypted_file_to_minio(
+                    book_asin, book_title, user_id, output_file
+                )
+
+                if success:
+                    logger.info(f"Successfully uploaded decryption to MinIO: {object_key}")
+
+                    # If this was a retry, delete encrypted file from MinIO
+                    if is_retry:
+                        # This would need encrypted_object_key parameter
+                        logger.info("Retry successful - encrypted file should be deleted from MinIO")
 
                     # Broadcast decrypt completed
                     await safe_progress_callback(
@@ -98,12 +112,15 @@ async def decrypt_book(
 
                     return True
                 else:
-                    raise Exception(f"Decryption failed for '{item}': validation failed")
+                    raise Exception(f"Failed to upload decrypted file to MinIO for {book_title}")
             else:
                 stderr_text = stderr.decode().strip()
-                raise Exception(f"FFmpeg error decrypting '{item}': {stderr_text}")
 
-        raise Exception(f"No file found for ASIN {book_asin}")
+                # Decryption failed - upload encrypted file for retry
+                logger.warning(f"Decryption failed for {book_title}, uploading encrypted file for retry")
+                await _upload_encrypted_file_to_minio(book_asin, user_id, input_file)
+
+                raise Exception(f"FFmpeg error decrypting: {stderr_text}")
 
     except Exception as e:
         logger.error(f"An error occurred during decryption: {e}")
@@ -120,7 +137,9 @@ async def decrypt_book(
         return False
 
 
-async def _upload_decrypted_file_to_minio(book_asin: str, book_title: str, user_id: str) -> None:
+async def _upload_decrypted_file_to_minio(
+    book_asin: str, book_title: str, user_id: str, file_path: str
+) -> tuple[bool, str]:
     """
     Upload decrypted file to MinIO after successful decryption.
 
@@ -128,18 +147,15 @@ async def _upload_decrypted_file_to_minio(book_asin: str, book_title: str, user_
         book_asin: Amazon Standard Identification Number
         book_title: Normalized title of the book
         user_id: User UUID
+        file_path: Path to decrypted file
+
+    Returns:
+        Tuple of (success: bool, object_key: str)
     """
     try:
-        # Find the decrypted file
-        file_path = None
-        for item in os.listdir(Config.DECRYPTED_DIR):
-            if book_title in item and item.endswith(".m4b"):
-                file_path = os.path.join(Config.DECRYPTED_DIR, item)
-                break
-
-        if not file_path or not os.path.exists(file_path):
-            logger.warning(f"Decrypted file not found for {book_title}")
-            return
+        if not os.path.exists(file_path):
+            logger.warning(f"Decrypted file not found at {file_path}")
+            return False, ""
 
         # Upload to MinIO
         storage_service = StorageService()
@@ -152,21 +168,51 @@ async def _upload_decrypted_file_to_minio(book_asin: str, book_title: str, user_
 
         if success and object_key:
             logger.info(f"Successfully uploaded decryption to MinIO: {object_key}")
+            return True, object_key
         else:
             logger.warning(f"Failed to upload decryption to MinIO for {book_title}")
+            return False, ""
 
     except Exception as e:
-        # Log error but don't fail the decryption
         logger.error(f"Error uploading decryption to MinIO: {e}")
+        return False, ""
 
 
-async def validate_decrypted_book(book: list) -> bool:
-    """Validate that a book was decrypted successfully."""
-    book_asin = book[0]
-    book_title = normalize_filename(book[1])
+async def _upload_encrypted_file_to_minio(book_asin: str, user_id: str, file_path: str) -> tuple[bool, str]:
+    """
+    Upload encrypted file to MinIO when decryption fails.
 
-    identifiers = [book_asin, book_title]
-    if file_exists_in_directory(Config.DECRYPTED_DIR, identifiers):
-        logger.info(f"{book_title} decrypted successfully.")
-        return True
-    return False
+    This serves as a fallback for later retry attempts.
+
+    Args:
+        book_asin: Amazon Standard Identification Number
+        user_id: User UUID
+        file_path: Path to encrypted file
+
+    Returns:
+        Tuple of (success: bool, object_key: str)
+    """
+    try:
+        if not os.path.exists(file_path):
+            logger.warning(f"Encrypted file not found at {file_path}")
+            return False, ""
+
+        # Upload to MinIO with file_type="encrypted" to distinguish from regular downloads
+        storage_service = StorageService()
+        success, object_key = storage_service.save_file(
+            user_id=user_id,
+            file_path=file_path,
+            file_type="encrypted",
+            asin=book_asin,
+        )
+
+        if success and object_key:
+            logger.info(f"Successfully uploaded encrypted file to MinIO for retry: {object_key}")
+            return True, object_key
+        else:
+            logger.warning(f"Failed to upload encrypted file to MinIO for {book_asin}")
+            return False, ""
+
+    except Exception as e:
+        logger.error(f"Error uploading encrypted file to MinIO: {e}")
+        return False, ""

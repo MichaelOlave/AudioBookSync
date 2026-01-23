@@ -10,14 +10,14 @@ class TestWebSocketUpdates:
         """Test WebSocket requires authentication token."""
         with pytest.raises(Exception):
             # Should fail because no token provided
-            with client.websocket_connect("/api/v1/ws/updates") as websocket:
+            with client.websocket_connect("/api/v1/ws/updates"):
                 pass
 
     def test_websocket_invalid_token(self, client):
         """Test WebSocket with invalid token."""
         with pytest.raises(Exception):
             # Should fail with invalid token
-            with client.websocket_connect("/api/v1/ws/updates?token=invalid-token") as websocket:
+            with client.websocket_connect("/api/v1/ws/updates?token=invalid-token"):
                 pass
 
     def test_websocket_valid_connection(self, client, test_user_with_tokens):
@@ -41,7 +41,7 @@ class TestWebSocketUpdates:
         try:
             with client.websocket_connect(
                 f"/api/v1/ws/updates?token={test_user_with_tokens['access_token']}"
-            ) as websocket:
+            ):
                 # Connection opens and closes gracefully
                 pass
         except Exception:

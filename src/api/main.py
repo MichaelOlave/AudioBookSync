@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from ..core.config import Config
-from ..core.logging_config import configure_logging
+from ..core.logging_config import configure_logging, shutdown_logging
 from ..database.engine import engine as db_engine
 from .middleware.error_handler import add_exception_handlers
 from .middleware.logging import LoggingMiddleware
@@ -52,10 +52,6 @@ async def lifespan(app: FastAPI):
         configure_logging(log_level=Config.LOG_LEVEL)
         logger.info("Logging configured successfully")
 
-        # Ensure required directories exist
-        Config.ensure_directories()
-        logger.info("Required directories verified")
-
         logger.info("=" * 80)
         logger.info("AudioBookSync API Starting Up")
         logger.info("=" * 80)
@@ -76,6 +72,7 @@ async def lifespan(app: FastAPI):
     # ========== SHUTDOWN ==========
     try:
         logger.info("AudioBookSync API Shutting Down")
+        shutdown_logging()
         await db_engine.dispose()
         logger.info("Database connections closed")
     except Exception as e:
