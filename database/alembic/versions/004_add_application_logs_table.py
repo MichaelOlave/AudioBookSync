@@ -1,7 +1,7 @@
 """004_add_application_logs_table - Create table for storing application logs in database
 
 Revision ID: 004_add_application_logs
-Revises: 003_add_encrypted_file_fallback
+Revises: 003_encrypted_fallback
 Create Date: 2026-01-22 12:00:00.000000
 
 This migration creates the application_logs table for storing all application logs
@@ -23,7 +23,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = '004_add_application_logs'
-down_revision: Union[str, Sequence[str], None] = '003_add_encrypted_file_fallback'
+down_revision: Union[str, Sequence[str], None] = '003_encrypted_fallback'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
