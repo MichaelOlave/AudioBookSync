@@ -8,6 +8,7 @@ from src.database.services import (
     error_service,
     metadata_service,
     sync_service,
+    task_monitor_service,
     user_service,
 )
 
@@ -19,4 +20,5 @@ __all__ = [
     "sync_service",
     "error_service",
     "metadata_service",
+    "task_monitor_service",
 ]

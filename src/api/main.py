@@ -26,6 +26,7 @@ from .routers import (
     library,
     settings,
     sync,
+    tasks,
     users,
     websocket,
 )
@@ -203,6 +204,12 @@ def create_app() -> FastAPI:
         websocket.router,
         prefix="/api/v1/ws",
         tags=["WebSocket"],
+    )
+
+    app.include_router(
+        tasks.router,
+        prefix="/api/v1/tasks",
+        tags=["Tasks"],
     )
 
     app.include_router(
