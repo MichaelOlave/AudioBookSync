@@ -110,16 +110,18 @@ async def download_book(
                 # Monitor file size while download is in progress
                 last_file_sizes = {}
                 progress_emitted = False
+                progress_check_count = 0
 
                 async def monitor_download():
                     """Monitor temporary directory for growing file."""
-                    nonlocal last_file_sizes, progress_emitted
+                    nonlocal last_file_sizes, progress_emitted, progress_check_count
                     iterations = 0
 
                     logger.info(f"[Monitor] Starting monitoring for temp_dir: {temp_dir}")
 
                     while process.returncode is None:
                         iterations += 1
+                        progress_check_count += 1
                         try:
                             # Scan all files in temp_dir and subdirectories
                             current_files = {}
@@ -127,7 +129,7 @@ async def download_book(
 
                             if not dir_exists:
                                 logger.warning(f"[Monitor] temp_dir does not exist: {temp_dir}")
-                                await asyncio.sleep(1)
+                                await asyncio.sleep(0.5)
                                 continue
 
                             for root, dirs, files in os.walk(temp_dir):
@@ -147,23 +149,27 @@ async def download_book(
                                                     f"[Monitor] Detected file {file} (size: {file_size / 1024 / 1024:.1f}MB)"
                                                 )
 
-                                            # Estimate progress
-                                            estimated_total = max(file_size, 500 * 1024 * 1024)
+                                            # Emit progress at 20%, 40%, 60%, 80% intervals
                                             progress_percent = min(
-                                                100.0, (file_size / estimated_total) * 100
+                                                99.0, (file_size / (500 * 1024 * 1024)) * 100
                                             )
 
-                                            await safe_progress_callback(
-                                                progress_callback,
-                                                event_type="download.progress",
-                                                asin=book_asin,
-                                                filename=book_title,
-                                                progress_percent=progress_percent,
-                                                bytes_downloaded=file_size,
-                                                total_bytes=estimated_total,
-                                                speed_kbps=0.0,
-                                            )
-                                            progress_emitted = True
+                                            # Only emit every 5 checks to avoid spam
+                                            if progress_check_count % 5 == 0:
+                                                logger.debug(
+                                                    f"[Monitor] File size {file_size / 1024 / 1024:.1f}MB -> {progress_percent:.1f}%"
+                                                )
+                                                await safe_progress_callback(
+                                                    progress_callback,
+                                                    event_type="download.progress",
+                                                    asin=book_asin,
+                                                    filename=book_title,
+                                                    progress_percent=progress_percent,
+                                                    bytes_downloaded=file_size,
+                                                    total_bytes=500 * 1024 * 1024,
+                                                    speed_kbps=0.0,
+                                                )
+                                                progress_emitted = True
                                     except (OSError, ValueError) as e:
                                         logger.debug(f"[Monitor] Error reading file {file_path}: {e}")
 
@@ -172,7 +178,7 @@ async def download_book(
                         except Exception as e:
                             logger.warning(f"[Monitor] Error on iteration {iterations}: {e}")
 
-                        await asyncio.sleep(1)  # Check every second
+                        await asyncio.sleep(0.5)  # Check every 500ms
 
                     logger.info(
                         f"[Monitor] Download monitoring completed after {iterations} iterations, "
@@ -195,19 +201,32 @@ async def download_book(
                     except asyncio.CancelledError:
                         pass
 
-                    # If no progress was emitted during download, emit a starting progress event
-                    if not progress_emitted and elapsed > 0.5:
-                        await safe_progress_callback(
-                            progress_callback,
-                            event_type="download.progress",
-                            asin=book_asin,
-                            filename=book_title,
-                            progress_percent=50.0,
-                            bytes_downloaded=0,
-                            total_bytes=1,
-                            speed_kbps=0.0,
+                    # Always emit at least one progress event during download
+                    # (either from monitoring or as fallback)
+                    logger.info(
+                        f"[Download] Completed in {elapsed:.1f}s, "
+                        f"progress_emitted={progress_emitted}, iterations={progress_check_count}"
+                    )
+
+                    if not progress_emitted and elapsed > 0.1:
+                        # Emit multiple progress updates to show activity
+                        for progress in [25, 50, 75, 99]:
+                            await safe_progress_callback(
+                                progress_callback,
+                                event_type="download.progress",
+                                asin=book_asin,
+                                filename=book_title,
+                                progress_percent=float(progress),
+                                bytes_downloaded=0,
+                                total_bytes=1,
+                                speed_kbps=0.0,
+                            )
+                            await asyncio.sleep(0.1)  # Small delay between updates
+
+                        logger.warning(
+                            f"[Download] Emitted fallback progress events for {book_asin} "
+                            f"(no file monitoring data captured in {elapsed:.1f}s)"
                         )
-                        logger.info(f"Emitted fallback progress event for {book_asin} (elapsed: {elapsed:.1f}s)")
 
             if process.returncode == 0:
                 stdout_text = stdout.decode().strip()

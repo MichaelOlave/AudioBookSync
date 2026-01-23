@@ -62,11 +62,14 @@ export function useDownloadProgress() {
           const message = JSON.parse(event.data);
           console.log('WebSocket message:', message.type);
 
-          // Handle download.progress events (with dot notation)
+          // Keep connection alive on any message
+          setIsConnected(true);
+
+          // Handle download.progress events
           if (message.type === 'download.progress' || message.type === 'download_progress') {
             const data = message.data;
             if (data.asin) {
-              console.log(`Update progress for ${data.asin}: ${data.progress_percent}%`);
+              console.log(`✓ Update progress for ${data.asin}: ${data.progress_percent}%`);
               setProgress((prev) => ({
                 ...prev,
                 [data.asin]: data,
