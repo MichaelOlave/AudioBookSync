@@ -47,27 +47,36 @@ class DatabaseLoggingSink:
         self.running = False
         self._stop_event = threading.Event()
 
-    def write(self, message: str) -> None:
+    def write(self, message: Any) -> None:
         """
         Called by loguru for each log message.
 
         This is synchronous and must not block, so we immediately queue and return.
+        Works with loguru's Message objects.
 
         Args:
-            message: Loguru formatted log message
+            message: Loguru Message object
         """
         try:
-            # Parse loguru record from message
-            record = self._parse_message(message)
+            # Extract record from loguru message
+            if hasattr(message, "record"):
+                record = self._parse_record(message.record)
+            else:
+                # Fallback for string messages
+                record = self._parse_message(str(message))
 
             # Try to add to queue without blocking
             if not self.queue.full():
                 self.queue.put_nowait(record)
             else:
                 # Queue full - log to stderr and drop log
+                msg_text = (
+                    message.record.get("message") if hasattr(message, "record")
+                    else str(message)
+                )
                 print(
                     f"WARNING: Database logging queue full (max {self.max_queue_size}), "
-                    "dropping log: {record.get('message', 'unknown')}",
+                    f"dropping log: {msg_text}",
                     file=sys.stderr,
                 )
 
@@ -251,14 +260,26 @@ class DatabaseLoggingSink:
             if exception[2]:
                 stack_trace = "".join(traceback.format_tb(exception[2]))
 
+        # Extract level name - loguru record["level"] is a namedtuple with a 'name' attribute
+        level_obj = record.get("level")
+        level_name = level_obj.name if hasattr(level_obj, "name") else str(level_obj)
+
+        # Extract process name - loguru record["process"] is a namedtuple
+        process_obj = record.get("process")
+        process_name = process_obj.name if hasattr(process_obj, "name") else ""
+
+        # Extract thread info - loguru record["thread"] is a namedtuple
+        thread_obj = record.get("thread")
+        thread_id = str(thread_obj.id) if hasattr(thread_obj, "id") else ""
+
         return {
             "message": record.get("message", ""),
-            "level": record.get("level", {}).get("name", "INFO"),
+            "level": level_name,
             "module": record.get("name", ""),
             "function": record.get("function", ""),
             "line_number": str(record.get("line", "")),
-            "process_name": record.get("process", {}).get("name", ""),
-            "thread_id": str(record.get("thread", {}).get("id", "")),
+            "process_name": process_name,
+            "thread_id": thread_id,
             "extra_data": record.get("extra"),
             "exception_type": exception_type,
             "exception_message": exception_message,

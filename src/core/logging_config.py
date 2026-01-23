@@ -40,10 +40,16 @@ def configure_logging(log_level: str = "INFO", enable_database: bool = True) -> 
             _db_sink = DatabaseLoggingSink()
             _db_sink.start()
 
+            # Create a wrapper sink function for loguru
+            # Loguru passes a message object with a .record attribute
+            def db_sink_wrapper(message):
+                """Wrapper to convert loguru Message to our sink format."""
+                _db_sink.write(message)
+
             logger.add(
-                _db_sink.write_record,
+                db_sink_wrapper,
                 level=log_level,
-                format="{message}",  # Just pass the message, Record passed via record param
+                format="{message}",  # Format string (unused, we access record directly)
             )
         except Exception as e:
             logger.warning(f"Failed to configure database logging: {e}. Using file logging only.")
