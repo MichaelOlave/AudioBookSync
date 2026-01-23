@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import tempfile
+import time
 
 from loguru import logger
 
@@ -107,49 +108,85 @@ async def download_book(
                 )
 
                 # Monitor file size while download is in progress
+                last_file_sizes = {}
+                progress_emitted = False
+
                 async def monitor_download():
                     """Monitor temporary directory for growing file."""
-                    while process.returncode is None:
-                        try:
-                            for item in os.listdir(temp_dir):
-                                file_path = os.path.join(temp_dir, item)
-                                if os.path.isfile(file_path):
-                                    file_size = os.path.getsize(file_path)
-                                    if file_size > 0:
-                                        # Estimate progress as percentage
-                                        # Most audiobooks are 100-500MB, estimate max 500MB
-                                        estimated_total = max(file_size, 500 * 1024 * 1024)
-                                        progress_percent = min(
-                                            100.0, (file_size / estimated_total) * 100
-                                        )
+                    nonlocal last_file_sizes, progress_emitted
+                    iterations = 0
 
-                                        await safe_progress_callback(
-                                            progress_callback,
-                                            event_type="download.progress",
-                                            asin=book_asin,
-                                            filename=book_title,
-                                            progress_percent=progress_percent,
-                                            bytes_downloaded=file_size,
-                                            total_bytes=estimated_total,
-                                            speed_kbps=0.0,
-                                        )
+                    while process.returncode is None:
+                        iterations += 1
+                        try:
+                            # Scan all files in temp_dir and subdirectories
+                            current_files = {}
+                            for root, dirs, files in os.walk(temp_dir):
+                                for file in files:
+                                    file_path = os.path.join(root, file)
+                                    try:
+                                        file_size = os.path.getsize(file_path)
+                                        current_files[file_path] = file_size
+
+                                        if file_size > 0:
+                                            # Estimate progress
+                                            estimated_total = max(file_size, 500 * 1024 * 1024)
+                                            progress_percent = min(
+                                                100.0, (file_size / estimated_total) * 100
+                                            )
+
+                                            await safe_progress_callback(
+                                                progress_callback,
+                                                event_type="download.progress",
+                                                asin=book_asin,
+                                                filename=book_title,
+                                                progress_percent=progress_percent,
+                                                bytes_downloaded=file_size,
+                                                total_bytes=estimated_total,
+                                                speed_kbps=0.0,
+                                            )
+                                            progress_emitted = True
+                                    except (OSError, ValueError):
+                                        pass  # File might be locked or deleted
+
+                            last_file_sizes = current_files
+
                         except Exception as e:
-                            logger.debug(f"Error monitoring download: {e}")
+                            logger.warning(f"Error monitoring download (iteration {iterations}): {e}")
 
                         await asyncio.sleep(1)  # Check every second
 
+                    logger.debug(f"Download monitoring completed after {iterations} iterations, progress_emitted={progress_emitted}")
+
                 # Start monitoring task
                 monitor_task = asyncio.create_task(monitor_download())
+                start_time = time.time()
 
                 try:
                     stdout, stderr = await process.communicate()
                 finally:
                     # Stop monitoring when download completes
+                    elapsed = time.time() - start_time
+
                     monitor_task.cancel()
                     try:
                         await monitor_task
                     except asyncio.CancelledError:
                         pass
+
+                    # If no progress was emitted during download, emit a starting progress event
+                    if not progress_emitted and elapsed > 0.5:
+                        await safe_progress_callback(
+                            progress_callback,
+                            event_type="download.progress",
+                            asin=book_asin,
+                            filename=book_title,
+                            progress_percent=50.0,
+                            bytes_downloaded=0,
+                            total_bytes=1,
+                            speed_kbps=0.0,
+                        )
+                        logger.info(f"Emitted fallback progress event for {book_asin} (elapsed: {elapsed:.1f}s)")
 
             if process.returncode == 0:
                 stdout_text = stdout.decode().strip()
