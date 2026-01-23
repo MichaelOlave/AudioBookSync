@@ -5,6 +5,7 @@ from src.database.models.base import Base, generate_uuid, get_current_timestamp
 from src.database.models.book import Book
 from src.database.models.book_availability import BookAvailability
 from src.database.models.book_metadata import BookMetadataJson
+from src.database.models.chapter import Chapter
 from src.database.models.companion_material import CompanionMaterial
 from src.database.models.contributor import BookContributor, Contributor
 from src.database.models.decryption import DecryptionStatus
@@ -36,4 +37,5 @@ __all__ = [
     "BookAvailability",
     "CompanionMaterial",
     "BookMetadataJson",
+    "Chapter",
 ]

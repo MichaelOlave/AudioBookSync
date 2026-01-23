@@ -35,11 +35,17 @@ audible
 # Audible CLI (optional - for actual Audible functionality)
 # audible-cli has dependency issues, install separately if needed:
 # pip install audible-cli --no-deps
+# Audible CLI dependencies (installed with --no-deps)
+aiofiles
+questionary
+tabulate
+toml
+tqdm
 
 # Testing
 pytest==7.4.3
 pytest-asyncio==0.23.3
-httpx
+httpx==0.27.2
 
 # Linting and code quality
 black==24.1.1

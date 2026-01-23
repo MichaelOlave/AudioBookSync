@@ -9,7 +9,8 @@ from loguru import logger
 from src.celery_app import celery_app
 from src.celery_app.utils.progress import publish_progress
 from src.database.engine import AsyncSessionLocal
-from src.database.services import decryption_service, error_service
+from src.database.services import book_service, decryption_service, error_service, user_service
+from src.infrastructure.file_utils import normalize_filename
 from src.operations.decryptor import decrypt_book
 
 
@@ -61,20 +62,30 @@ async def _async_decrypt(
         async with AsyncSessionLocal() as db:
             await decryption_service.update_decryption_status(
                 db=db,
-                decryption_id=UUID(decryption_id),
+                entity_id=UUID(decryption_id),
                 status="decrypting",
             )
             await db.commit()
 
         # Create progress callback that publishes to Redis
-        def progress_callback(event_type: str, **data):
+        async def progress_callback(event_type: str, **data):
             data["decryption_id"] = decryption_id
             publish_progress(user_id=user_id, event_type=event_type, data=data)
+
+        async with AsyncSessionLocal() as db:
+            user = await user_service.get_user_by_id(db, user_id)
+            activation_bytes = user.activation_bytes if user else None
+
+        if not activation_bytes:
+            raise Exception("Activation bytes not configured for user")
 
         # Execute decrypt
         book_list = [asin, title]
         success = await decrypt_book(
-            book_list, user_id=user_id, progress_callback=progress_callback
+            book_list,
+            user_id=user_id,
+            progress_callback=progress_callback,
+            activation_bytes=activation_bytes,
         )
 
         if success:
@@ -82,7 +93,21 @@ async def _async_decrypt(
             async with AsyncSessionLocal() as db:
                 await decryption_service.complete_decryption(
                     db=db,
-                    decryption_id=UUID(decryption_id),
+                    entity_id=UUID(decryption_id),
+                )
+                normalized_title = normalize_filename(title)
+                if normalized_title:
+                    object_key = f"decrypted/{normalized_title}.m4b"
+                    await book_service.update_book_decryption_status(
+                        db=db,
+                        asin=asin,
+                        is_decrypted=True,
+                        decrypted_path=object_key,
+                    )
+                await book_service.update_book_download_status(
+                    db=db,
+                    asin=asin,
+                    is_downloaded=True,
                 )
                 await db.commit()
 
@@ -107,7 +132,7 @@ async def _async_decrypt(
         async with AsyncSessionLocal() as db:
             await decryption_service.fail_decryption(
                 db=db,
-                decryption_id=UUID(decryption_id),
+                entity_id=UUID(decryption_id),
                 error_message=str(e),
             )
             await db.commit()

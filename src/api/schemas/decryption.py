@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -13,7 +14,7 @@ class DecryptCreate(BookActionCreate):
 class DecryptResponse(BaseModel):
     """Decryption status response."""
 
-    decryption_id: str = Field(
+    decryption_id: UUID = Field(
         ...,
         description="Unique decryption identifier (UUID)",
     )
@@ -25,7 +26,7 @@ class DecryptResponse(BaseModel):
         ...,
         description="Decryption status: pending, decrypting, completed, failed, cancelled",
     )
-    download_id: Optional[str] = Field(
+    download_id: Optional[UUID] = Field(
         default=None,
         description="ID of associated download",
     )
@@ -59,6 +60,7 @@ class DecryptResponse(BaseModel):
     )
 
     model_config = ConfigDict(
+        from_attributes=True,
         json_schema_extra={
             "example": {
                 "decryption_id": "550e8400-e29b-41d4-a716-446655440000",

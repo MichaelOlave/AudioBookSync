@@ -4,6 +4,8 @@ from typing import Any, Awaitable, Callable, Optional
 
 from loguru import logger
 
+from ...database.engine import AsyncSessionLocal
+from ...database.services import user_service
 from ...domain.progress import safe_progress_callback
 from ..decryptor import decrypt_book
 from ..downloader import download_book
@@ -107,10 +109,28 @@ class BookProcessingHandler:
             title=title,
         )
 
+        async with AsyncSessionLocal() as db:
+            audible_auth = await user_service.get_audible_auth_json(
+                db,
+                user_id,
+                redact_secrets=False,
+            )
+            user = await user_service.get_user_by_id(db, user_id)
+            activation_bytes = user.activation_bytes if user else None
+
+        if not audible_auth:
+            logger.error("Audible credentials not configured for user")
+            return False
+        if not activation_bytes:
+            logger.error("Activation bytes not configured for user")
+            return False
+
         success = await download_book(
             [asin, title],
             user_id=user_id,
             progress_callback=progress_callback,
+            audible_auth=audible_auth,
+            activation_bytes=activation_bytes,
         )
 
         if success:
@@ -148,10 +168,19 @@ class BookProcessingHandler:
             title=title,
         )
 
+        async with AsyncSessionLocal() as db:
+            user = await user_service.get_user_by_id(db, user_id)
+            activation_bytes = user.activation_bytes if user else None
+
+        if not activation_bytes:
+            logger.error("Activation bytes not configured for user")
+            return False
+
         success = await decrypt_book(
             [asin, title],
             user_id=user_id,
             progress_callback=progress_callback,
+            activation_bytes=activation_bytes,
         )
 
         if success:

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -60,7 +61,7 @@ export default function AudibleLibraryPage() {
     error,
     syncing,
     syncResult,
-    fetchEntireLibrary,
+    fetchDashboard,
     syncFromAudible,
   } = useLibrary();
 
@@ -82,10 +83,10 @@ export default function AudibleLibraryPage() {
     checkAudibleLink();
   }, [apiClient]);
 
-  // Load entire library on mount
+  // Load dashboard library on mount
   useEffect(() => {
-    fetchEntireLibrary();
-  }, [fetchEntireLibrary]);
+    fetchDashboard();
+  }, [fetchDashboard]);
 
   const filteredBooks = books.filter((book) => {
     const matchesSearch =
@@ -341,6 +342,9 @@ export default function AudibleLibraryPage() {
                   <thead className="sticky top-0 bg-muted/50">
                     <tr className="border-b">
                       <th className="px-6 py-3 text-left text-sm font-semibold">
+                        Cover
+                      </th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold">
                         Title
                       </th>
                       <th className="px-6 py-3 text-left text-sm font-semibold">
@@ -369,6 +373,21 @@ export default function AudibleLibraryPage() {
                         key={book.asin}
                         className="border-b hover:bg-muted/30 transition-colors"
                       >
+                        <td className="px-6 py-4">
+                          {book.cover_art_url ? (
+                            <Image
+                              src={book.cover_art_url}
+                              alt={book.title}
+                              width={40}
+                              height={60}
+                              className="rounded object-cover"
+                            />
+                          ) : (
+                            <div className="w-10 h-16 bg-muted rounded flex items-center justify-center">
+                              <span className="text-xs text-muted-foreground">—</span>
+                            </div>
+                          )}
+                        </td>
                         <td className="px-6 py-4 text-sm font-medium">
                           {book.title}
                         </td>

@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Type
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, Query, status
 from loguru import logger
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -205,7 +205,7 @@ class StatusRouterFactory:
         )
 
         router.add_api_route(
-            f"/{{{{id_param}}}}",
+            "/{id_param}",
             self._generate_get_status_endpoint(),
             methods=["GET"],
             response_model=self.config.response_schema,
@@ -243,11 +243,12 @@ class StatusRouterFactory:
         creation_failure_error = self.config.creation_failure_error
         pre_validator = self.config.pre_create_validator
         params_builder = self.config.create_status_params_builder
+        create_schema = self.config.create_schema
 
         @handle_route_errors(f"trigger {operation_name}")
         async def trigger_endpoint(
-            operation_data: Any,
             background_tasks: BackgroundTasks,
+            operation_data: create_schema = Body(...),
             current_user: User = Depends(get_current_user),
             db: AsyncSession = Depends(get_db_session),
         ):
@@ -306,7 +307,7 @@ class StatusRouterFactory:
             # Return response
             return self.config.response_schema(
                 **{
-                    id_field: getattr(operation, id_field),
+                    id_field: str(getattr(operation, id_field)),
                     "asin": operation_data.asin,
                     "status": "pending",
                     "message": f"{operation_name.title()} initiated",
@@ -405,7 +406,7 @@ class StatusRouterFactory:
             # Get operation by ID with user authorization check
             operation = await get_by_id_method(
                 db=db,
-                **{id_field: UUID(id_param)},
+                entity_id=UUID(id_param),
                 user_id=str(current_user.user_id),
             )
 
@@ -416,7 +417,10 @@ class StatusRouterFactory:
                 raise ResourceNotFoundError(f"{operation_name.title()} '{id_param}' not found")
 
             logger.info(f"Retrieved {operation_name} details: {id_param}")
-            return self.config.response_schema.from_orm(operation)
+            response_schema = self.config.response_schema
+            if hasattr(response_schema, "model_validate"):
+                return response_schema.model_validate(operation, from_attributes=True)
+            return response_schema.from_orm(operation)
 
         return get_status_endpoint
 

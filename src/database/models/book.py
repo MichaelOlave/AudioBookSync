@@ -84,6 +84,12 @@ class Book(Base):
         cascade="all, delete-orphan",
         lazy="select",
     )
+    chapters = relationship(
+        "Chapter",
+        back_populates="book",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
 
     def __repr__(self) -> str:
         return f"<Book(asin={self.asin}, title={self.title}, author={self.author})>"

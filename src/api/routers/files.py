@@ -1,15 +1,14 @@
 """Audiobook file serving and streaming endpoints."""
 
 from typing import Optional
-from uuid import UUID
-
 from fastapi import APIRouter, Depends, Header
 from fastapi.responses import StreamingResponse
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...database.engine import get_db_session
-from ...database.services import book_service, decryption_service
+from ...database.services import book_service
+from ...infrastructure.file_utils import normalize_filename
 from ...infrastructure.storage_service import StorageService
 from ..middleware.error_handler import (
     AuthenticationError,
@@ -24,35 +23,35 @@ from ..utils.generic_handlers import verify_book_ownership
 router = APIRouter()
 
 
-async def _get_object_key_for_asin(
+async def _resolve_object_key(
     db: AsyncSession,
     user_id: str,
-    asin: str,
+    book,
+    storage_service: StorageService,
 ) -> Optional[str]:
-    """Get MinIO object_key for a specific ASIN from decryption status using ORM.
+    """Resolve MinIO object key for a book, with a MinIO existence fallback."""
+    if book.decrypted_path:
+        return book.decrypted_path
 
-    Args:
-        db: Database session
-        user_id: User ID
-        asin: Amazon Standard Identification Number
+    normalized_title = normalize_filename(book.title or "")
+    if not normalized_title:
+        return None
 
-    Returns:
-        object_key if found and not None, None otherwise
-    """
-    try:
-        # Get user's decryptions and find matching ASIN using ORM
-        decryptions = await decryption_service.get_decryptions_by_user(
+    candidate_key = f"decrypted/{normalized_title}.m4b"
+    bucket_name = f"user-{user_id}"
+
+    if storage_service.minio_client.file_exists(bucket_name, candidate_key):
+        updated = await book_service.update_book_decryption_status(
             db=db,
-            user_id=UUID(user_id),
-            limit=100,
+            asin=book.asin,
+            is_decrypted=True,
+            decrypted_path=candidate_key,
         )
-        for decryption in decryptions:
-            if decryption.asin == asin:
-                return decryption.object_key
-        return None
-    except Exception as e:
-        logger.warning(f"Failed to get object_key for {asin}: {e}")
-        return None
+        if updated:
+            await db.commit()
+        return candidate_key
+
+    return None
 
 
 @router.get(
@@ -121,14 +120,15 @@ async def stream_audiobook(
 
     verify_book_ownership(book, user_id, asin)
 
-    # Get MinIO object_key from decryption status (required) using ORM
-    object_key = await _get_object_key_for_asin(db, user_id, asin)
+    # Initialize storage service
+    storage_service = StorageService()
+
+    # Resolve MinIO object_key from book record or infer from MinIO
+    object_key = await _resolve_object_key(db, user_id, book, storage_service)
     if not object_key:
         logger.warning(f"MinIO object_key not available for {asin}")
         raise ResourceNotFoundError("Decrypted audiobook file not available")
 
-    # Initialize storage service
-    storage_service = StorageService()
     logger.debug(f"Retrieved object_key for {asin}: {object_key}")
 
     # Parse Range header if present (HTTP 206 Partial Content)

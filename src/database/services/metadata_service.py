@@ -5,13 +5,14 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from loguru import logger
-from sqlalchemy import and_, select
+from sqlalchemy import and_, delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
 from src.database.models.book_availability import BookAvailability
 from src.database.models.book_metadata import BookMetadataJson
+from src.database.models.chapter import Chapter
 from src.database.models.companion_material import CompanionMaterial
 from src.database.models.contributor import BookContributor, Contributor
 from src.database.models.media_info import MediaInfo
@@ -80,17 +81,33 @@ async def add_book_contributor(
 ) -> Optional[BookContributor]:
     """Add a contributor to a book."""
     try:
-        book_contrib = BookContributor(
+        stmt = insert(BookContributor).values(
             asin=asin,
             contributor_id=contributor_id,
             role=role,
             sequence_number=sequence_number,
         )
-        db.add(book_contrib)
+        stmt = stmt.on_conflict_do_nothing(
+            index_elements=["asin", "contributor_id", "role"],
+        )
+        result = await db.execute(stmt)
         await db.flush()
-        await db.refresh(book_contrib)
-        logger.info(f"Added contributor {contributor_id} to book {asin}")
-        return book_contrib
+
+        if result.rowcount:
+            logger.info(f"Added contributor {contributor_id} to book {asin}")
+        else:
+            logger.debug(f"Contributor already linked: {contributor_id} -> {asin} ({role})")
+
+        existing = await db.execute(
+            select(BookContributor).where(
+                and_(
+                    BookContributor.asin == asin,
+                    BookContributor.contributor_id == contributor_id,
+                    BookContributor.role == role,
+                )
+            )
+        )
+        return existing.scalar_one_or_none()
     except Exception as e:
         logger.error(f"Failed to add book contributor: {e}")
         return None
@@ -110,6 +127,24 @@ async def get_or_create_contributor(
     Uses name and type as unique identifier to prevent duplicates.
     """
     try:
+        if audible_asin:
+            result = await db.execute(
+                select(Contributor).where(Contributor.audible_asin == audible_asin)
+            )
+            contributor = result.scalar_one_or_none()
+            if contributor:
+                if name and contributor.name != name:
+                    contributor.name = name
+                if contributor_type and not contributor.type:
+                    contributor.type = contributor_type
+                if description and not contributor.description:
+                    contributor.description = description
+                if url and not contributor.url:
+                    contributor.url = url
+                await db.flush()
+                logger.debug(f"Found existing contributor by audible_asin: {audible_asin}")
+                return contributor
+
         # Try to find existing contributor
         result = await db.execute(
             select(Contributor).where(
@@ -123,6 +158,9 @@ async def get_or_create_contributor(
 
         if contributor:
             logger.debug(f"Found existing contributor: {name} ({contributor_type})")
+            if audible_asin and not contributor.audible_asin:
+                contributor.audible_asin = audible_asin
+                await db.flush()
             return contributor
 
         # Create new contributor if not found
@@ -262,6 +300,7 @@ async def create_reading_progress(
     user_id: UUID,
     percent_complete: int = 0,
     position_ms: int = 0,
+    is_finished: Optional[bool] = None,
 ) -> Optional[ReadingProgress]:
     """Create reading progress record."""
     try:
@@ -270,7 +309,10 @@ async def create_reading_progress(
             user_id=user_id,
             percent_complete=percent_complete,
             position_ms=position_ms,
+            is_finished=is_finished if is_finished is not None else False,
         )
+        if is_finished:
+            progress.date_finished = datetime.now(timezone.utc)
         db.add(progress)
         await db.flush()
         await db.refresh(progress)
@@ -345,8 +387,10 @@ async def create_book_availability(
     is_playable: bool = True,
     is_returnable: bool = True,
     is_removable: bool = True,
+    is_archived: bool = False,
     is_downloadable: bool = True,
     license_status: Optional[str] = None,
+    expires_at: Optional[datetime] = None,
 ) -> Optional[BookAvailability]:
     """Create book availability record."""
     try:
@@ -355,8 +399,10 @@ async def create_book_availability(
             is_playable=is_playable,
             is_returnable=is_returnable,
             is_removable=is_removable,
+            is_archived=is_archived,
             is_downloadable=is_downloadable,
             license_status=license_status,
+            expires_at=expires_at,
         )
         db.add(availability)
         await db.flush()
@@ -378,6 +424,56 @@ async def get_book_availability(db: AsyncSession, asin: str) -> Optional[BookAva
         return None
 
 
+async def upsert_book_availability(
+    db: AsyncSession,
+    asin: str,
+    is_playable: Optional[bool] = None,
+    is_returnable: Optional[bool] = None,
+    is_removable: Optional[bool] = None,
+    is_archived: Optional[bool] = None,
+    is_downloadable: Optional[bool] = None,
+    license_status: Optional[str] = None,
+    expires_at: Optional[datetime] = None,
+) -> bool:
+    """Create or update book availability without clobbering missing fields."""
+    try:
+        availability = await get_book_availability(db, asin)
+        if availability:
+            if is_playable is not None:
+                availability.is_playable = is_playable
+            if is_returnable is not None:
+                availability.is_returnable = is_returnable
+            if is_removable is not None:
+                availability.is_removable = is_removable
+            if is_archived is not None:
+                availability.is_archived = is_archived
+            if is_downloadable is not None:
+                availability.is_downloadable = is_downloadable
+            if license_status is not None:
+                availability.license_status = license_status
+            if expires_at is not None:
+                availability.expires_at = expires_at
+            await db.flush()
+            logger.info(f"Updated availability for {asin}")
+            return True
+
+        created = await create_book_availability(
+            db=db,
+            asin=asin,
+            is_playable=is_playable if is_playable is not None else True,
+            is_returnable=is_returnable if is_returnable is not None else True,
+            is_removable=is_removable if is_removable is not None else True,
+            is_archived=is_archived if is_archived is not None else False,
+            is_downloadable=is_downloadable if is_downloadable is not None else True,
+            license_status=license_status,
+            expires_at=expires_at,
+        )
+        return created is not None
+    except Exception as e:
+        logger.error(f"Failed to upsert book availability: {e}")
+        return False
+
+
 # ============================================================================
 # COMPANION MATERIAL OPERATIONS
 # ============================================================================
@@ -396,7 +492,7 @@ async def create_companion_material(
 ) -> Optional[CompanionMaterial]:
     """Create companion material record."""
     try:
-        material = CompanionMaterial(
+        stmt = insert(CompanionMaterial).values(
             asin=asin,
             material_type=material_type,
             url=url,
@@ -406,11 +502,26 @@ async def create_companion_material(
             sequence_number=sequence_number,
             description=description,
         )
-        db.add(material)
+        stmt = stmt.on_conflict_do_nothing(
+            index_elements=["asin", "url"],
+        )
+        result = await db.execute(stmt)
         await db.flush()
-        await db.refresh(material)
-        logger.info(f"Created companion material for {asin}: {title}")
-        return material
+
+        if result.rowcount:
+            logger.info(f"Created companion material for {asin}: {title}")
+        else:
+            logger.debug(f"Companion material already exists for {asin}: {url}")
+
+        existing = await db.execute(
+            select(CompanionMaterial).where(
+                and_(
+                    CompanionMaterial.asin == asin,
+                    CompanionMaterial.url == url,
+                )
+            )
+        )
+        return existing.scalar_one_or_none()
     except Exception as e:
         logger.error(f"Failed to create companion material: {e}")
         return None
@@ -431,6 +542,62 @@ async def get_companion_materials(db: AsyncSession, asin: str) -> List[Companion
 
 
 # ============================================================================
+# CHAPTER OPERATIONS
+# ============================================================================
+
+
+async def get_chapters_by_asin(db: AsyncSession, asin: str) -> List[Chapter]:
+    """Get chapters for a book ordered by sequence."""
+    try:
+        result = await db.execute(
+            select(Chapter)
+            .where(Chapter.asin == asin)
+            .order_by(Chapter.sequence_number)
+        )
+        return result.scalars().all()
+    except Exception as e:
+        logger.error(f"Failed to get chapters for {asin}: {e}")
+        return []
+
+
+async def replace_chapters(
+    db: AsyncSession,
+    asin: str,
+    chapters: List[Dict[str, Any]],
+) -> int:
+    """Replace all chapters for a book with the provided list."""
+    try:
+        await db.execute(delete(Chapter).where(Chapter.asin == asin))
+
+        if not chapters:
+            logger.info(f"Cleared chapters for {asin}")
+            return 0
+
+        deduped: Dict[int, Dict[str, Any]] = {}
+        for chapter in chapters:
+            seq = chapter.get("sequence_number")
+            if seq is None:
+                continue
+            payload = dict(chapter)
+            payload["asin"] = asin
+            deduped[seq] = payload
+
+        payload = list(deduped.values())
+        if not payload:
+            logger.info(f"No valid chapter sequence numbers for {asin}")
+            return 0
+
+        stmt = insert(Chapter).values(payload)
+        await db.execute(stmt)
+        await db.flush()
+        logger.info(f"Replaced chapters for {asin} ({len(payload)} rows)")
+        return len(payload)
+    except Exception as e:
+        logger.error(f"Failed to replace chapters for {asin}: {e}")
+        return 0
+
+
+# ============================================================================
 # BOOK METADATA JSON OPERATIONS
 # ============================================================================
 
@@ -438,6 +605,23 @@ async def get_companion_materials(db: AsyncSession, asin: str) -> List[Companion
 async def create_book_metadata(
     db: AsyncSession,
     asin: str,
+    title: Optional[str] = None,
+    subtitle: Optional[str] = None,
+    language: Optional[str] = None,
+    publisher_name: Optional[str] = None,
+    format_type: Optional[str] = None,
+    content_type: Optional[str] = None,
+    content_delivery_type: Optional[str] = None,
+    status: Optional[str] = None,
+    publication_datetime: Optional[datetime] = None,
+    release_date: Optional[datetime] = None,
+    issue_date: Optional[datetime] = None,
+    purchase_date: Optional[datetime] = None,
+    runtime_length_min: Optional[int] = None,
+    is_listenable: Optional[bool] = None,
+    is_purchasability_suppressed: Optional[bool] = None,
+    is_adult_product: Optional[bool] = None,
+    has_children: Optional[bool] = None,
     origin_asin: Optional[str] = None,
     brand: Optional[str] = None,
     periodical_info: Optional[dict] = None,
@@ -446,13 +630,39 @@ async def create_book_metadata(
     claim_code_url: Optional[str] = None,
     parent_asin: Optional[str] = None,
     sku: Optional[str] = None,
+    isbn: Optional[str] = None,
     rating_distribution: Optional[dict] = None,
     custom_metadata: Optional[dict] = None,
+    authors: Optional[list] = None,
+    narrators: Optional[list] = None,
+    rating: Optional[dict] = None,
+    product_images: Optional[dict] = None,
+    social_media_images: Optional[dict] = None,
+    available_codecs: Optional[list] = None,
+    library_status: Optional[dict] = None,
+    thesaurus_subject_keywords: Optional[list] = None,
 ) -> Optional[BookMetadataJson]:
     """Create book metadata JSON record."""
     try:
         metadata = BookMetadataJson(
             asin=asin,
+            title=title,
+            subtitle=subtitle,
+            language=language,
+            publisher_name=publisher_name,
+            format_type=format_type,
+            content_type=content_type,
+            content_delivery_type=content_delivery_type,
+            status=status,
+            publication_datetime=publication_datetime,
+            release_date=release_date,
+            issue_date=issue_date,
+            purchase_date=purchase_date,
+            runtime_length_min=runtime_length_min,
+            is_listenable=is_listenable,
+            is_purchasability_suppressed=is_purchasability_suppressed,
+            is_adult_product=is_adult_product,
+            has_children=has_children,
             origin_asin=origin_asin,
             brand=brand,
             periodical_info=periodical_info,
@@ -461,8 +671,17 @@ async def create_book_metadata(
             claim_code_url=claim_code_url,
             parent_asin=parent_asin,
             sku=sku,
+            isbn=isbn,
             rating_distribution=rating_distribution,
             custom_metadata=custom_metadata,
+            authors=authors,
+            narrators=narrators,
+            rating=rating,
+            product_images=product_images,
+            social_media_images=social_media_images,
+            available_codecs=available_codecs,
+            library_status=library_status,
+            thesaurus_subject_keywords=thesaurus_subject_keywords,
         )
         db.add(metadata)
         await db.flush()

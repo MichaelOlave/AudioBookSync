@@ -24,6 +24,7 @@ from .routers import (
     errors,
     files,
     library,
+    progress,
     settings,
     sync,
     tasks,
@@ -195,6 +196,12 @@ def create_app() -> FastAPI:
         files.router,
         prefix="/api/v1/files",
         tags=["Files"],
+    )
+
+    app.include_router(
+        progress.router,
+        prefix="/api/v1/progress",
+        tags=["Progress"],
     )
 
     app.include_router(

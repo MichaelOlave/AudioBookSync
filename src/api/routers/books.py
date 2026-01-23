@@ -6,14 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...database.engine import get_db_session
 from ...database.models.user import User
-from ...database.services import book_service
+from ...database.services import book_service, metadata_service
 from ..middleware.error_handler import (
     AuthorizationError,
     InternalServerError,
     ResourceNotFoundError,
     handle_route_errors,
 )
-from ..schemas.book import BookBase, BookResponse
+from ..schemas.book import BookBase, BookResponse, ChapterResponse
 from ..schemas.common import MessageResponse
 from ..security.auth import get_current_user
 from ..utils.auth_utils import get_user_id
@@ -163,3 +163,37 @@ async def delete_book(
         message=f"Book '{asin}' deleted successfully",
         success=True,
     )
+
+
+@router.get(
+    "/{asin}/chapters",
+    response_model=list[ChapterResponse],
+    summary="Get chapter metadata for a book",
+    description="Get chapter metadata for a book owned by the current user",
+    responses={
+        200: {"description": "Chapters retrieved successfully"},
+        401: {"description": "Not authenticated"},
+        403: {"description": "Not authorized to access this book"},
+        404: {"description": "Book not found"},
+    },
+)
+@handle_route_errors("get chapters")
+async def get_book_chapters(
+    asin: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[ChapterResponse]:
+    """Get chapter metadata for a book."""
+    user_id = get_user_id(current_user)
+    logger.info(f"Fetching chapters for book {asin} (user {user_id})")
+
+    book = await book_service.get_book_by_asin(db, asin)
+    if not book:
+        logger.warning(f"Book not found for chapters: {asin}")
+        raise ResourceNotFoundError(f"Book '{asin}' not found")
+    if str(book.user_id) != user_id:
+        logger.warning(f"Unauthorized chapter access for book {asin} by user {user_id}")
+        raise AuthorizationError("Not authorized to access this book")
+
+    chapters = await metadata_service.get_chapters_by_asin(db, asin)
+    return chapters

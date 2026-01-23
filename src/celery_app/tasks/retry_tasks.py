@@ -13,6 +13,7 @@ from src.core.config import Config
 from src.database.engine import AsyncSessionLocal
 from src.database.models.decryption import DecryptionStatus
 from src.database.models.download import DownloadStatus
+from src.database.services import user_service
 
 
 @celery_app.task(name="retry_failed_downloads")
@@ -230,6 +231,14 @@ async def _async_retry_decrypts_from_minio() -> dict:
                         )
                         continue
 
+                    user = await user_service.get_user_by_id(db, str(book.user_id))
+                    activation_bytes = user.activation_bytes if user else None
+                    if not activation_bytes:
+                        logger.warning(
+                            f"Activation bytes not configured for user {book.user_id}"
+                        )
+                        continue
+
                     # Attempt retry decryption
                     book_data = [book.asin, book.title]
                     decrypt_success = await decrypt_book(
@@ -237,6 +246,7 @@ async def _async_retry_decrypts_from_minio() -> dict:
                         user_id=str(book.user_id),
                         encrypted_file_path=encrypted_file_path,
                         is_retry=True,
+                        activation_bytes=activation_bytes,
                     )
 
                     if decrypt_success:

@@ -309,6 +309,16 @@ chapters[]                  → chapters_count
 is_audible_enhanced         → enhanced
 ```
 
+### Chapters → `chapters` table
+```
+API Field                   → DB Column
+chapters[].title            → title
+chapters[].start_offset_ms  → start_offset_ms
+chapters[].end_offset_ms    → end_offset_ms
+chapters[].length_ms        → length_ms
+chapters[]                  → sequence_number (order)
+```
+
 ### Availability → `book_availability` table
 ```
 API Field                   → DB Column

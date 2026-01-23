@@ -1,13 +1,18 @@
 """Book decryption functionality using FFmpeg."""
 
 import asyncio
+import json
 import os
 import tempfile
+from typing import Optional
 
 from loguru import logger
 
 from ..core.config import Config
+from ..database.engine import AsyncSessionLocal
+from ..database.services import book_service, metadata_service
 from ..domain.progress import safe_progress_callback
+from ..infrastructure.storage_service import StorageService
 from ..infrastructure.file_utils import normalize_filename
 
 
@@ -17,6 +22,7 @@ async def decrypt_book(
     encrypted_file_path: str = None,
     progress_callback=None,
     is_retry: bool = False,
+    activation_bytes: str | None = None,
 ) -> bool:
     """
     Decrypt a book using FFmpeg and activation bytes.
@@ -31,6 +37,7 @@ async def decrypt_book(
         encrypted_file_path: Path to encrypted file. If None, downloads from MinIO (retry scenario)
         progress_callback: Optional async callable for progress updates.
         is_retry: Whether this is a retry of a previously failed decryption
+        activation_bytes: Optional DRM activation bytes for FFmpeg.
 
     Returns:
         True if successful, False otherwise
@@ -41,6 +48,11 @@ async def decrypt_book(
     # Validate user_id is provided (required for MinIO)
     if not user_id:
         logger.error("user_id is required for MinIO storage")
+        return False
+
+    activation_value = activation_bytes or Config.ACTIVATION_BYTES
+    if not activation_value or activation_value == "bytes_go_here":
+        logger.error("Activation bytes not configured for decryption")
         return False
 
     try:
@@ -72,7 +84,7 @@ async def decrypt_book(
             process = await asyncio.create_subprocess_exec(
                 "ffmpeg",
                 "-activation_bytes",
-                Config.ACTIVATION_BYTES,
+                activation_value,
                 "-i",
                 input_file,
                 "-c",
@@ -96,6 +108,12 @@ async def decrypt_book(
 
                 if success:
                     logger.info(f"Successfully uploaded decryption to MinIO: {object_key}")
+
+                    chapters = await _extract_chapters_from_file(output_file)
+                    if chapters:
+                        await _store_chapters(book_asin, chapters)
+                    else:
+                        logger.info(f"No chapters detected for {book_asin}")
 
                     # If this was a retry, delete encrypted file from MinIO
                     if is_retry:
@@ -137,6 +155,139 @@ async def decrypt_book(
         return False
 
 
+def _parse_time_base(time_base: Optional[str]) -> Optional[float]:
+    """Parse FFmpeg time_base string into seconds-per-tick."""
+    if not time_base or not isinstance(time_base, str):
+        return None
+    try:
+        numerator, denominator = time_base.split("/")
+        return float(numerator) / float(denominator)
+    except (ValueError, ZeroDivisionError):
+        return None
+
+
+def _seconds_to_ms(value: Optional[object]) -> Optional[int]:
+    """Convert a seconds value (string/number) to milliseconds."""
+    if value is None:
+        return None
+    try:
+        return int(float(value) * 1000)
+    except (TypeError, ValueError):
+        return None
+
+
+async def _extract_chapters_from_file(file_path: str) -> list[dict]:
+    """Extract chapter metadata from a local audio file using ffprobe."""
+    try:
+        process = await asyncio.create_subprocess_exec(
+            "ffprobe",
+            "-print_format",
+            "json",
+            "-show_chapters",
+            "-i",
+            file_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await process.communicate()
+        if process.returncode != 0:
+            logger.warning(f"ffprobe failed: {stderr.decode().strip()}")
+            return []
+
+        payload = json.loads(stdout.decode())
+        chapters = payload.get("chapters") or []
+        normalized: list[dict] = []
+        for idx, chapter in enumerate(chapters):
+            if not isinstance(chapter, dict):
+                continue
+            time_base = _parse_time_base(chapter.get("time_base"))
+            start_ms = _seconds_to_ms(chapter.get("start_time"))
+            end_ms = _seconds_to_ms(chapter.get("end_time"))
+            if start_ms is None and time_base is not None:
+                start = chapter.get("start")
+                start_ms = int(float(start) * time_base * 1000) if start is not None else None
+            if end_ms is None and time_base is not None:
+                end = chapter.get("end")
+                end_ms = int(float(end) * time_base * 1000) if end is not None else None
+
+            length_ms = None
+            if start_ms is not None and end_ms is not None:
+                length_ms = end_ms - start_ms
+
+            tags = chapter.get("tags") or {}
+            title = tags.get("title") or tags.get("TITLE")
+            normalized.append(
+                {
+                    "sequence_number": idx + 1,
+                    "title": title,
+                    "start_offset_ms": start_ms,
+                    "end_offset_ms": end_ms,
+                    "length_ms": length_ms,
+                    "raw_metadata": chapter,
+                }
+            )
+        return normalized
+    except Exception as e:
+        logger.warning(f"Failed to extract chapters with ffprobe: {e}")
+        return []
+
+
+async def _store_chapters(asin: str, chapters: list[dict]) -> None:
+    """Persist extracted chapters for a book."""
+    try:
+        async with AsyncSessionLocal() as db:
+            await metadata_service.replace_chapters(db, asin=asin, chapters=chapters)
+            media = await metadata_service.get_media_info(db, asin)
+            if media:
+                media.chapters_count = len(chapters)
+            else:
+                await metadata_service.create_media_info(
+                    db,
+                    asin=asin,
+                    chapters_count=len(chapters),
+                )
+            await db.commit()
+    except Exception as e:
+        logger.warning(f"Failed to store chapters for {asin}: {e}")
+
+
+async def _update_book_paths(
+    asin: str,
+    *,
+    is_downloaded: bool | None = None,
+    download_path: str | None = None,
+    is_decrypted: bool | None = None,
+    decrypted_path: str | None = None,
+) -> None:
+    """Persist download/decryption paths to the books table."""
+    if is_downloaded is None and is_decrypted is None:
+        return
+
+    try:
+        async with AsyncSessionLocal() as db:
+            if is_downloaded is not None:
+                updated = await book_service.update_book_download_status(
+                    db=db,
+                    asin=asin,
+                    is_downloaded=is_downloaded,
+                    download_path=download_path,
+                )
+                if not updated:
+                    logger.warning(f"Failed to update download status for book {asin}")
+            if is_decrypted is not None:
+                updated = await book_service.update_book_decryption_status(
+                    db=db,
+                    asin=asin,
+                    is_decrypted=is_decrypted,
+                    decrypted_path=decrypted_path,
+                )
+                if not updated:
+                    logger.warning(f"Failed to update decryption status for book {asin}")
+            await db.commit()
+    except Exception as e:
+        logger.warning(f"Failed to update book paths for {asin}: {e}")
+
+
 async def _upload_decrypted_file_to_minio(
     book_asin: str, book_title: str, user_id: str, file_path: str
 ) -> tuple[bool, str]:
@@ -168,6 +319,12 @@ async def _upload_decrypted_file_to_minio(
 
         if success and object_key:
             logger.info(f"Successfully uploaded decryption to MinIO: {object_key}")
+            await _update_book_paths(
+                book_asin,
+                is_downloaded=True,
+                is_decrypted=True,
+                decrypted_path=object_key,
+            )
             return True, object_key
         else:
             logger.warning(f"Failed to upload decryption to MinIO for {book_title}")
@@ -197,17 +354,22 @@ async def _upload_encrypted_file_to_minio(book_asin: str, user_id: str, file_pat
             logger.warning(f"Encrypted file not found at {file_path}")
             return False, ""
 
-        # Upload to MinIO with file_type="encrypted" to distinguish from regular downloads
+        # Upload to MinIO as a downloaded/encrypted artifact for retry
         storage_service = StorageService()
         success, object_key = storage_service.save_file(
             user_id=user_id,
             file_path=file_path,
-            file_type="encrypted",
+            file_type="downloaded",
             asin=book_asin,
         )
 
         if success and object_key:
             logger.info(f"Successfully uploaded encrypted file to MinIO for retry: {object_key}")
+            await _update_book_paths(
+                book_asin,
+                is_downloaded=True,
+                download_path=object_key,
+            )
             return True, object_key
         else:
             logger.warning(f"Failed to upload encrypted file to MinIO for {book_asin}")

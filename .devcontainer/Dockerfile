@@ -16,6 +16,7 @@ WORKDIR /workspace
 # Copy and install Python dependencies
 COPY requirements.txt .
 RUN pip install -r requirements.txt
+RUN pip install audible-cli --no-deps
 
 # Copy application code
 COPY . .

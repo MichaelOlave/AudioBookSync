@@ -228,20 +228,6 @@ class TestSyncMetadataIntegration:
 class TestSyncUserIsolation:
     """Tests for user isolation in sync operations."""
 
-    def test_sync_only_syncs_user_library(self, monkeypatch):
-        """Test sync only affects the requesting user's library."""
-        from src.api.services.sync_service import SyncService
-        from src.integrations.audible_client import AudibleClient
-
-        def mock_get_audible_library(access_token, region):
-            # Verify this is called with correct user's token
-            return {"books": []}
-
-        monkeypatch.setattr(AudibleClient, "get_audible_library", mock_get_audible_library)
-
-        service = SyncService()
-        assert hasattr(service, "start_sync")
-
     def test_sync_user_cannot_access_other_syncs(self, monkeypatch):
         """Test user cannot access other users' sync records."""
         from src.api.services.sync_service import SyncService

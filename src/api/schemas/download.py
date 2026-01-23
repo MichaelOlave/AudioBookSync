@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -13,7 +14,7 @@ class DownloadCreate(BookActionCreate):
 class DownloadResponse(BaseModel):
     """Download status response."""
 
-    download_id: str = Field(
+    download_id: UUID = Field(
         ...,
         description="Unique download identifier (UUID)",
     )
@@ -51,6 +52,7 @@ class DownloadResponse(BaseModel):
     )
 
     model_config = ConfigDict(
+        from_attributes=True,
         json_schema_extra={
             "example": {
                 "download_id": "550e8400-e29b-41d4-a716-446655440000",

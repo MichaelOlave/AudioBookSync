@@ -2,7 +2,7 @@
 
 ## Summary
 
-The AudioBookSync database has been enhanced to support comprehensive metadata from the Audible API. The schema now includes normalized tables for contributors, media information, reading progress, book availability, companion materials, and flexible JSON storage for additional metadata.
+The AudioBookSync database has been enhanced to support comprehensive metadata from the Audible API. The schema now includes normalized tables for contributors, media information, chapters, reading progress, book availability, companion materials, and flexible JSON storage for additional metadata.
 
 ## Configuration Changes
 
@@ -133,7 +133,24 @@ Supplementary materials (PDFs, images, transcripts, etc.)
 
 **Benefit**: Captures all companion materials available with a book
 
-#### 7. `book_metadata_json` Table
+#### 7. `chapters` Table
+Normalized per-chapter metadata for audiobooks.
+
+**Columns**:
+- `chapter_id` (UUID, PRIMARY KEY)
+- `asin` (FK to books)
+- `sequence_number` (INTEGER) - Chapter ordering
+- `title` (VARCHAR(500))
+- `start_offset_ms`, `end_offset_ms` (BIGINT) - Offsets in milliseconds
+- `length_ms` (BIGINT)
+- `raw_metadata` (JSONB) - Original chapter payload
+- `created_at`, `updated_at` (TIMESTAMP)
+
+**Unique Constraint**: asin + sequence_number
+
+**Benefit**: Stores chapter-level data for precise navigation and display
+
+#### 8. `book_metadata_json` Table
 Flexible JSON storage for additional metadata
 
 **Columns**:

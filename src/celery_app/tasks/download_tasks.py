@@ -9,7 +9,8 @@ from loguru import logger
 from src.celery_app import celery_app
 from src.celery_app.utils.progress import publish_progress
 from src.database.engine import AsyncSessionLocal
-from src.database.services import download_service, error_service
+from src.database.services import book_service, download_service, error_service, user_service
+from src.infrastructure.file_utils import normalize_filename
 from src.operations.downloader import download_book
 
 
@@ -61,20 +62,39 @@ async def _async_download(
         async with AsyncSessionLocal() as db:
             await download_service.update_download_status(
                 db=db,
-                download_id=UUID(download_id),
+                entity_id=UUID(download_id),
                 status="downloading",
             )
             await db.commit()
 
         # Create progress callback that publishes to Redis
-        def progress_callback(event_type: str, **data):
+        async def progress_callback(event_type: str, **data):
             data["download_id"] = download_id
             publish_progress(user_id=user_id, event_type=event_type, data=data)
+
+        # Fetch Audible auth from database
+        async with AsyncSessionLocal() as db:
+            audible_auth = await user_service.get_audible_auth_json(
+                db,
+                user_id,
+                redact_secrets=False,
+            )
+            user = await user_service.get_user_by_id(db, user_id)
+            activation_bytes = user.activation_bytes if user else None
+
+        if not audible_auth:
+            raise Exception("Audible credentials not configured for user")
+        if not activation_bytes:
+            raise Exception("Activation bytes not configured for user")
 
         # Execute download
         book_list = [asin, title]
         success = await download_book(
-            book_list, user_id=user_id, progress_callback=progress_callback
+            book_list,
+            user_id=user_id,
+            progress_callback=progress_callback,
+            audible_auth=audible_auth,
+            activation_bytes=activation_bytes,
         )
 
         if success:
@@ -82,7 +102,22 @@ async def _async_download(
             async with AsyncSessionLocal() as db:
                 await download_service.complete_download(
                     db=db,
-                    download_id=UUID(download_id),
+                    entity_id=UUID(download_id),
+                )
+
+                normalized_title = normalize_filename(title)
+                if normalized_title:
+                    object_key = f"decrypted/{normalized_title}.m4b"
+                    await book_service.update_book_decryption_status(
+                        db=db,
+                        asin=asin,
+                        is_decrypted=True,
+                        decrypted_path=object_key,
+                    )
+                await book_service.update_book_download_status(
+                    db=db,
+                    asin=asin,
+                    is_downloaded=True,
                 )
                 await db.commit()
 
@@ -107,7 +142,7 @@ async def _async_download(
         async with AsyncSessionLocal() as db:
             await download_service.fail_download(
                 db=db,
-                download_id=UUID(download_id),
+                entity_id=UUID(download_id),
                 error_message=str(e),
             )
             await db.commit()

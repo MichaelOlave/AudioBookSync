@@ -13,6 +13,7 @@ export interface Book {
   purchase_date?: string;
   is_downloaded: boolean;
   is_decrypted: boolean;
+  cover_art_url?: string;
 }
 
 export interface LibraryResponse {
@@ -123,6 +124,39 @@ export function useLibrary() {
       } catch (err) {
         const error =
           err instanceof APIError ? err.message : "Failed to fetch library";
+        setState((prev) => ({
+          ...prev,
+          loading: false,
+          error,
+        }));
+      }
+    },
+    [apiClient],
+  );
+
+  const fetchDashboard = useCallback(
+    async (downloadOnly?: boolean) => {
+      setState((prev) => ({ ...prev, loading: true, error: null }));
+
+      try {
+        const response = (await apiClient.getDashboard(downloadOnly)) as Array<{
+          book: Book;
+          metadata?: unknown;
+        }>;
+        const allBooks = response.map((item) => item.book) || [];
+
+        setState((prev) => ({
+          ...prev,
+          books: allBooks,
+          loading: false,
+          error: null,
+          total: allBooks.length,
+          page: 1,
+          pages: 1,
+        }));
+      } catch (err) {
+        const error =
+          err instanceof APIError ? err.message : "Failed to fetch dashboard";
         setState((prev) => ({
           ...prev,
           loading: false,
@@ -254,6 +288,7 @@ export function useLibrary() {
     syncResult: state.syncResult,
     fetchLibrary,
     fetchEntireLibrary,
+    fetchDashboard,
     getBook,
     deleteBook,
     syncFromAudible,

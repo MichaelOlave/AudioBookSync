@@ -18,11 +18,11 @@ import { useLibrary } from "@/hooks/use-library";
 export default function LibraryPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
-  const { books, loading, error, fetchLibrary } = useLibrary();
+  const { books, loading, error, fetchDashboard } = useLibrary();
 
   useEffect(() => {
-    fetchLibrary(1, 50);
-  }, []);
+    fetchDashboard(true);
+  }, [fetchDashboard]);
 
   const filteredBooks = books.filter((book) => {
     const matchesSearch =
@@ -138,10 +138,13 @@ export default function LibraryPage() {
               title={book.title}
               author={book.author}
               narrator={book.narrator}
-              cover=""
+              cover={book.cover_art_url || ""}
               duration={`${Math.round(book.runtime_min / 60)}h ${book.runtime_min % 60}m`}
               category={book.series_name || "General"}
               downloaded={book.is_downloaded}
+              description={book.description}
+              rating={book.rating}
+              purchaseDate={book.purchase_date}
             />
           ))}
         </div>

@@ -15,7 +15,12 @@ from uuid import UUID
 from loguru import logger
 
 from ...database.engine import AsyncSessionLocal
-from ...database.services import decryption_service, download_service, error_service
+from ...database.services import (
+    decryption_service,
+    download_service,
+    error_service,
+    user_service,
+)
 from ...operations.decryptor import decrypt_book
 from ...operations.downloader import download_book
 from ...operations.library_sync import sync_library
@@ -242,10 +247,26 @@ class DownloadExecutor(OperationExecutor):
 
     async def _execute_operation(self, book_list: list, progress_callback) -> bool:
         """Execute download operation."""
+        async with AsyncSessionLocal() as db:
+            audible_auth = await user_service.get_audible_auth_json(
+                db,
+                self.user_id,
+                redact_secrets=False,
+            )
+            user = await user_service.get_user_by_id(db, self.user_id)
+            activation_bytes = user.activation_bytes if user else None
+
+        if not audible_auth:
+            raise ValueError("Audible credentials not configured for user")
+        if not activation_bytes:
+            raise ValueError("Activation bytes not configured for user")
+
         return await download_book(
             book_list,
             user_id=self.user_id,
             progress_callback=progress_callback,
+            audible_auth=audible_auth,
+            activation_bytes=activation_bytes,
         )
 
     async def _update_status(self, status: str, **kwargs) -> None:
@@ -254,7 +275,7 @@ class DownloadExecutor(OperationExecutor):
             async with AsyncSessionLocal() as db:
                 await download_service.update_download_status(
                     db=db,
-                    download_id=UUID(self.operation_id),
+                    entity_id=UUID(self.operation_id),
                     status=status,
                     **kwargs,
                 )
@@ -288,10 +309,18 @@ class DecryptExecutor(OperationExecutor):
 
     async def _execute_operation(self, book_list: list, progress_callback) -> bool:
         """Execute decrypt operation."""
+        async with AsyncSessionLocal() as db:
+            user = await user_service.get_user_by_id(db, self.user_id)
+            activation_bytes = user.activation_bytes if user else None
+
+        if not activation_bytes:
+            raise ValueError("Activation bytes not configured for user")
+
         return await decrypt_book(
             book_list,
             user_id=self.user_id,
             progress_callback=progress_callback,
+            activation_bytes=activation_bytes,
         )
 
     async def _update_status(self, status: str, **kwargs) -> None:
@@ -300,7 +329,7 @@ class DecryptExecutor(OperationExecutor):
             async with AsyncSessionLocal() as db:
                 await decryption_service.update_decryption_status(
                     db=db,
-                    decryption_id=UUID(self.operation_id),
+                    entity_id=UUID(self.operation_id),
                     status=status,
                     **kwargs,
                 )

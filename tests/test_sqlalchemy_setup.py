@@ -284,6 +284,8 @@ class TestServices:
             "get_book_availability",
             "create_companion_material",
             "get_companion_materials",
+            "get_chapters_by_asin",
+            "replace_chapters",
             "create_book_metadata",
             "get_book_metadata",
             "update_book_metadata",
