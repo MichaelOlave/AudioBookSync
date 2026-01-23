@@ -39,6 +39,7 @@ class DecryptionStatus(Base):
     duration_seconds = Column(Integer, nullable=True)
     error_message = Column(Text, nullable=True)
     error_details = Column(JSON, nullable=True)
+    encrypted_file_object_key = Column(String(1000), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), default=get_current_timestamp, nullable=False)
     updated_at = Column(
         DateTime(timezone=True),

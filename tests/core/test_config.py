@@ -37,29 +37,6 @@ class TestConfigDefaults:
 
             assert ConfigReloaded.ACTIVATION_BYTES == "c3f80507"
 
-    def test_default_download_dir(self):
-        """Test default DOWNLOAD_DIR value."""
-        with patch.dict(os.environ, {}, clear=False):
-            import importlib
-
-            import src.core.config
-
-            importlib.reload(src.core.config)
-            from src.core.config import Config as ConfigReloaded
-
-            assert ConfigReloaded.DOWNLOAD_DIR == "audiobooks/downloaded"
-
-    def test_default_decrypted_dir(self):
-        """Test default DECRYPTED_DIR value."""
-        with patch.dict(os.environ, {}, clear=False):
-            import importlib
-
-            import src.core.config
-
-            importlib.reload(src.core.config)
-            from src.core.config import Config as ConfigReloaded
-
-            assert ConfigReloaded.DECRYPTED_DIR == "audiobooks/decrypted"
 
     def test_default_log_dir(self):
         """Test default LOG_DIR value."""
@@ -115,17 +92,6 @@ class TestConfigEnvironmentVariables:
 
         assert ConfigReloaded.ACTIVATION_BYTES == "abcdef1234567890"
 
-    def test_download_dir_from_env(self, monkeypatch):
-        """Test DOWNLOAD_DIR can be set from environment variable."""
-        monkeypatch.setenv("DOWNLOAD_DIR", "/custom/downloads")
-        import importlib
-
-        import src.core.config
-
-        importlib.reload(src.core.config)
-        from src.core.config import Config as ConfigReloaded
-
-        assert ConfigReloaded.DOWNLOAD_DIR == "/custom/downloads"
 
     def test_num_results_from_env(self, monkeypatch):
         """Test AUDIBLE_NUM_RESULTS can be set from environment variable."""
@@ -145,76 +111,47 @@ class TestConfigEnvironmentVariables:
 class TestConfigEnsureDirectories:
     """Test ensure_directories method."""
 
-    def test_ensure_directories_creates_missing_dirs(self, temp_dir):
-        """Test that ensure_directories creates missing directories."""
-        download_dir = temp_dir / "downloads"
-        decrypted_dir = temp_dir / "decrypted"
+    def test_ensure_directories_creates_missing_log_dir(self, temp_dir):
+        """Test that ensure_directories creates missing LOG_DIR."""
         log_dir = temp_dir / "logs"
 
-        assert not download_dir.exists()
-        assert not decrypted_dir.exists()
         assert not log_dir.exists()
 
-        with (
-            patch.object(Config, "DOWNLOAD_DIR", str(download_dir)),
-            patch.object(Config, "DECRYPTED_DIR", str(decrypted_dir)),
-            patch.object(Config, "LOG_DIR", str(log_dir)),
-        ):
+        with patch.object(Config, "LOG_DIR", str(log_dir)):
             Config.ensure_directories()
 
-        assert download_dir.exists()
-        assert decrypted_dir.exists()
         assert log_dir.exists()
 
-    def test_ensure_directories_with_existing_dirs(self, temp_dir):
-        """Test that ensure_directories works with existing directories."""
-        download_dir = temp_dir / "downloads"
-        decrypted_dir = temp_dir / "decrypted"
+    def test_ensure_directories_with_existing_log_dir(self, temp_dir):
+        """Test that ensure_directories works with existing LOG_DIR."""
         log_dir = temp_dir / "logs"
-
-        download_dir.mkdir(parents=True, exist_ok=True)
-        decrypted_dir.mkdir(parents=True, exist_ok=True)
         log_dir.mkdir(parents=True, exist_ok=True)
 
-        with (
-            patch.object(Config, "DOWNLOAD_DIR", str(download_dir)),
-            patch.object(Config, "DECRYPTED_DIR", str(decrypted_dir)),
-            patch.object(Config, "LOG_DIR", str(log_dir)),
-        ):
+        with patch.object(Config, "LOG_DIR", str(log_dir)):
             Config.ensure_directories()
 
-        assert download_dir.exists()
-        assert decrypted_dir.exists()
         assert log_dir.exists()
 
-    def test_ensure_directories_creates_nested_dirs(self, temp_dir):
-        """Test that ensure_directories creates nested directories."""
+    def test_ensure_directories_creates_nested_log_dirs(self, temp_dir):
+        """Test that ensure_directories creates nested LOG_DIR."""
         nested_dir = temp_dir / "a" / "b" / "c"
 
         assert not nested_dir.exists()
 
-        with (
-            patch.object(Config, "DOWNLOAD_DIR", str(nested_dir)),
-            patch.object(Config, "DECRYPTED_DIR", str(temp_dir / "d")),
-            patch.object(Config, "LOG_DIR", str(temp_dir / "e")),
-        ):
+        with patch.object(Config, "LOG_DIR", str(nested_dir)):
             Config.ensure_directories()
 
         assert nested_dir.exists()
 
     def test_ensure_directories_idempotent(self, temp_dir):
         """Test that ensure_directories can be called multiple times safely."""
-        download_dir = temp_dir / "downloads"
+        log_dir = temp_dir / "logs"
 
-        with (
-            patch.object(Config, "DOWNLOAD_DIR", str(download_dir)),
-            patch.object(Config, "DECRYPTED_DIR", str(temp_dir / "d")),
-            patch.object(Config, "LOG_DIR", str(temp_dir / "e")),
-        ):
+        with patch.object(Config, "LOG_DIR", str(log_dir)):
             Config.ensure_directories()
-            assert download_dir.exists()
+            assert log_dir.exists()
             Config.ensure_directories()
-            assert download_dir.exists()
+            assert log_dir.exists()
 
 
 @pytest.mark.unit

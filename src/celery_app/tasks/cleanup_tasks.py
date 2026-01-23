@@ -49,6 +49,14 @@ async def _async_cleanup_minio() -> dict:
             )
             expected_paths.update(row[0] for row in result.fetchall() if row[0])
 
+            # Query decryption_status for encrypted file fallback paths
+            result = await db.execute(
+                select(DecryptionStatus.encrypted_file_object_key).where(
+                    DecryptionStatus.encrypted_file_object_key.isnot(None)
+                )
+            )
+            expected_paths.update(row[0] for row in result.fetchall() if row[0])
+
         # List all objects in MinIO
         all_objects = storage_service.list_all_objects()
         orphaned_files = [obj for obj in all_objects if obj not in expected_paths]

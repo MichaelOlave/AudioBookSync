@@ -84,8 +84,6 @@ def mock_env_vars(monkeypatch):
     test_env = {
         "AUDIBLE_AUTH_FILE": "/tmp/auth.json",
         "AUDIBLE_ACTIVATION_BYTES": "1234567890abcdef",
-        "DOWNLOAD_DIR": "/tmp/downloads",
-        "DECRYPTED_DIR": "/tmp/decrypted",
         "LOG_DIR": "/tmp/logs",
         "AUDIBLE_NUM_RESULTS": "100",
         "DATABASE_URL": "postgresql://test:test@localhost/audibooksync_test",
