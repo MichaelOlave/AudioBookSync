@@ -62,6 +62,7 @@ async def download_book(
 
         # Use temporary directory for encrypted file
         with tempfile.TemporaryDirectory() as temp_dir:
+            logger.info(f"[Download] Using temp directory: {temp_dir}")
             # Create isolated audible-cli config + auth file from DB auth
             with tempfile.TemporaryDirectory() as auth_dir:
                 auth_path = os.path.join(auth_dir, "auth.json")
@@ -117,7 +118,7 @@ async def download_book(
                     nonlocal last_file_sizes, progress_emitted, progress_check_count
                     iterations = 0
 
-                    logger.info(f"[Monitor] Starting monitoring for temp_dir: {temp_dir}")
+                    logger.warning(f"[Monitor] STARTING monitoring for temp_dir: {temp_dir}")  # Use warning for visibility
 
                     while process.returncode is None:
                         iterations += 1
@@ -154,8 +155,8 @@ async def download_book(
                                                 99.0, (file_size / (500 * 1024 * 1024)) * 100
                                             )
 
-                                            # Only emit every 5 checks to avoid spam
-                                            if progress_check_count % 5 == 0:
+                                            # Emit progress at reasonable intervals (every 2.5 seconds = 5 checks at 500ms)
+                                            if iterations % 5 == 0:
                                                 logger.debug(
                                                     f"[Monitor] File size {file_size / 1024 / 1024:.1f}MB -> {progress_percent:.1f}%"
                                                 )
@@ -186,7 +187,9 @@ async def download_book(
                     )
 
                 # Start monitoring task
+                logger.warning(f"[Download] Creating monitor task for {book_asin}")
                 monitor_task = asyncio.create_task(monitor_download())
+                logger.warning(f"[Download] Monitor task created: {monitor_task}")
                 start_time = time.time()
 
                 try:
@@ -203,14 +206,17 @@ async def download_book(
 
                     # Always emit at least one progress event during download
                     # (either from monitoring or as fallback)
-                    logger.info(
-                        f"[Download] Completed in {elapsed:.1f}s, "
-                        f"progress_emitted={progress_emitted}, iterations={progress_check_count}"
+                    logger.warning(
+                        f"[Download] COMPLETED in {elapsed:.1f}s, "
+                        f"progress_emitted={progress_emitted}, monitor_iterations={iterations}, "
+                        f"files_found={len(last_file_sizes)}"
                     )
 
-                    if not progress_emitted and elapsed > 0.1:
+                    if not progress_emitted:
                         # Emit multiple progress updates to show activity
-                        for progress in [25, 50, 75, 99]:
+                        logger.warning(f"[Download] Emitting FALLBACK progress for {book_asin}")
+                        for idx, progress in enumerate([25, 50, 75, 99]):
+                            logger.debug(f"[Download] Fallback progress {idx+1}/4: {progress}%")
                             await safe_progress_callback(
                                 progress_callback,
                                 event_type="download.progress",
@@ -221,12 +227,7 @@ async def download_book(
                                 total_bytes=1,
                                 speed_kbps=0.0,
                             )
-                            await asyncio.sleep(0.1)  # Small delay between updates
-
-                        logger.warning(
-                            f"[Download] Emitted fallback progress events for {book_asin} "
-                            f"(no file monitoring data captured in {elapsed:.1f}s)"
-                        )
+                            await asyncio.sleep(0.05)  # Small delay between updates
 
             if process.returncode == 0:
                 stdout_text = stdout.decode().strip()
