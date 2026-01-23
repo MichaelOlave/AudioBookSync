@@ -116,12 +116,24 @@ async def download_book(
                     nonlocal last_file_sizes, progress_emitted
                     iterations = 0
 
+                    logger.info(f"[Monitor] Starting monitoring for temp_dir: {temp_dir}")
+
                     while process.returncode is None:
                         iterations += 1
                         try:
                             # Scan all files in temp_dir and subdirectories
                             current_files = {}
+                            dir_exists = os.path.isdir(temp_dir)
+
+                            if not dir_exists:
+                                logger.warning(f"[Monitor] temp_dir does not exist: {temp_dir}")
+                                await asyncio.sleep(1)
+                                continue
+
                             for root, dirs, files in os.walk(temp_dir):
+                                if files and iterations == 1:
+                                    logger.info(f"[Monitor] Found files in {root}: {files}")
+
                                 for file in files:
                                     file_path = os.path.join(root, file)
                                     try:
@@ -129,6 +141,12 @@ async def download_book(
                                         current_files[file_path] = file_size
 
                                         if file_size > 0:
+                                            # Log first detection
+                                            if file_path not in last_file_sizes:
+                                                logger.info(
+                                                    f"[Monitor] Detected file {file} (size: {file_size / 1024 / 1024:.1f}MB)"
+                                                )
+
                                             # Estimate progress
                                             estimated_total = max(file_size, 500 * 1024 * 1024)
                                             progress_percent = min(
@@ -146,17 +164,20 @@ async def download_book(
                                                 speed_kbps=0.0,
                                             )
                                             progress_emitted = True
-                                    except (OSError, ValueError):
-                                        pass  # File might be locked or deleted
+                                    except (OSError, ValueError) as e:
+                                        logger.debug(f"[Monitor] Error reading file {file_path}: {e}")
 
                             last_file_sizes = current_files
 
                         except Exception as e:
-                            logger.warning(f"Error monitoring download (iteration {iterations}): {e}")
+                            logger.warning(f"[Monitor] Error on iteration {iterations}: {e}")
 
                         await asyncio.sleep(1)  # Check every second
 
-                    logger.debug(f"Download monitoring completed after {iterations} iterations, progress_emitted={progress_emitted}")
+                    logger.info(
+                        f"[Monitor] Download monitoring completed after {iterations} iterations, "
+                        f"progress_emitted={progress_emitted}, final_files={len(last_file_sizes)}"
+                    )
 
                 # Start monitoring task
                 monitor_task = asyncio.create_task(monitor_download())
