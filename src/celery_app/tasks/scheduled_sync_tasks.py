@@ -63,7 +63,11 @@ async def _enqueue_missing_downloads(user_id: str) -> dict:
     async with AsyncSessionLocal() as db:
         missing_books = await book_service.get_not_downloaded_books(db, user_id)
         for book in missing_books:
-            latest = await download_service.get_latest_download(db, book.asin)
+            latest = await download_service.get_latest_download(
+                db,
+                book.asin,
+                user_id=user_id,
+            )
             if latest and latest.status in ("pending", "downloading"):
                 skipped += 1
                 continue
@@ -72,6 +76,7 @@ async def _enqueue_missing_downloads(user_id: str) -> dict:
                 db=db,
                 asin=book.asin,
                 status="pending",
+                user_id=user_id,
             )
             if not download_status:
                 continue

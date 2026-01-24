@@ -135,12 +135,14 @@ async def _async_download(
                         db=db,
                         asin=asin,
                         is_decrypted=True,
+                        user_id=user_id,
                         decrypted_path=object_key,
                     )
                 await book_service.update_book_download_status(
                     db=db,
                     asin=asin,
                     is_downloaded=True,
+                    user_id=user_id,
                 )
                 await db.commit()
 

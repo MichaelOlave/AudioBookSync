@@ -54,6 +54,12 @@ class User(Base):
         cascade="all, delete-orphan",
         lazy="select",
     )
+    user_books = relationship(
+        "UserBook",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
     sync_history = relationship(
         "SyncHistory",
         back_populates="user",
@@ -72,7 +78,12 @@ class User(Base):
         cascade="all, delete-orphan",
         lazy="select",
     )
-    family = relationship("Family", back_populates="members", lazy="select")
+    family = relationship(
+        "Family",
+        back_populates="members",
+        foreign_keys=[family_id],
+        lazy="select",
+    )
 
     def __repr__(self) -> str:
         return f"<User(user_id={self.user_id}, username={self.username}, email={self.email})>"

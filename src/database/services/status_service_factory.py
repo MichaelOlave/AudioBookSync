@@ -9,7 +9,7 @@ from loguru import logger
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database.models.book import Book
+from src.database.models.user_book import UserBook
 from src.database.services.base_service import get_by_id, update_entity
 
 
@@ -79,13 +79,21 @@ class StatusServiceFactory:
     def _create_get_by_asin_function(self) -> Callable:
         """Create a function to get all entities for a given ASIN."""
 
-        async def get_by_asin_func(db: AsyncSession, asin: str) -> List[Any]:
+        async def get_by_asin_func(
+            db: AsyncSession, asin: str, user_id: Optional[str] = None
+        ) -> List[Any]:
             try:
-                result = await db.execute(
-                    select(self.model)
-                    .where(self.model.asin == asin)
-                    .order_by(self.model.created_at.desc())
-                )
+                query = select(self.model).where(self.model.asin == asin)
+                if user_id:
+                    if hasattr(self.model, "user_id"):
+                        query = query.where(self.model.user_id == user_id)
+                    else:
+                        query = (
+                            query.join(UserBook, self.model.asin == UserBook.asin)
+                            .where(UserBook.user_id == user_id)
+                        )
+                query = query.order_by(self.model.created_at.desc())
+                result = await db.execute(query)
                 return result.scalars().all()  # type: ignore
             except Exception as e:
                 logger.error(f"Failed to get {self.model_name}s for ASIN: {e}")
@@ -96,14 +104,21 @@ class StatusServiceFactory:
     def _create_get_latest_function(self) -> Callable:
         """Create a function to get the latest entity for a given ASIN."""
 
-        async def get_latest_func(db: AsyncSession, asin: str) -> Optional[Any]:
+        async def get_latest_func(
+            db: AsyncSession, asin: str, user_id: Optional[str] = None
+        ) -> Optional[Any]:
             try:
-                result = await db.execute(
-                    select(self.model)
-                    .where(self.model.asin == asin)
-                    .order_by(self.model.created_at.desc())
-                    .limit(1)
-                )
+                query = select(self.model).where(self.model.asin == asin)
+                if user_id:
+                    if hasattr(self.model, "user_id"):
+                        query = query.where(self.model.user_id == user_id)
+                    else:
+                        query = (
+                            query.join(UserBook, self.model.asin == UserBook.asin)
+                            .where(UserBook.user_id == user_id)
+                        )
+                query = query.order_by(self.model.created_at.desc()).limit(1)
+                result = await db.execute(query)
                 return result.scalar_one_or_none()
             except Exception as e:
                 logger.error(f"Failed to get latest {self.model_name}: {e}")
@@ -285,11 +300,14 @@ class StatusServiceFactory:
             offset: int = 0,
         ) -> List[Any]:
             try:
-                query = (
-                    select(self.model)
-                    .join(Book, self.model.asin == Book.asin)
-                    .where(Book.user_id == user_id)
-                )
+                if hasattr(self.model, "user_id"):
+                    query = select(self.model).where(self.model.user_id == user_id)
+                else:
+                    query = (
+                        select(self.model)
+                        .join(UserBook, self.model.asin == UserBook.asin)
+                        .where(UserBook.user_id == user_id)
+                    )
 
                 if status:
                     query = query.where(self.model.status == status)  # type: ignore
@@ -316,11 +334,14 @@ class StatusServiceFactory:
         ) -> int:
             try:
                 id_attr = getattr(self.model, self.id_column)
-                query = (
-                    select(func.count(id_attr))
-                    .join(Book, self.model.asin == Book.asin)
-                    .where(Book.user_id == user_id)
-                )
+                if hasattr(self.model, "user_id"):
+                    query = select(func.count(id_attr)).where(self.model.user_id == user_id)
+                else:
+                    query = (
+                        select(func.count(id_attr))
+                        .join(UserBook, self.model.asin == UserBook.asin)
+                        .where(UserBook.user_id == user_id)
+                    )
 
                 if status:
                     query = query.where(self.model.status == status)  # type: ignore
@@ -344,16 +365,26 @@ class StatusServiceFactory:
             user_id: str,
         ) -> Optional[Any]:
             try:
-                result = await db.execute(
-                    select(self.model)
-                    .join(Book, self.model.asin == Book.asin)
-                    .where(
-                        and_(
-                            getattr(self.model, self.id_column) == entity_id,
-                            Book.user_id == user_id,
+                if hasattr(self.model, "user_id"):
+                    result = await db.execute(
+                        select(self.model).where(
+                            and_(
+                                getattr(self.model, self.id_column) == entity_id,
+                                self.model.user_id == user_id,
+                            )
                         )
                     )
-                )
+                else:
+                    result = await db.execute(
+                        select(self.model)
+                        .join(UserBook, self.model.asin == UserBook.asin)
+                        .where(
+                            and_(
+                                getattr(self.model, self.id_column) == entity_id,
+                                UserBook.user_id == user_id,
+                            )
+                        )
+                    )
                 return result.scalar_one_or_none()
             except Exception as e:
                 logger.error(f"Failed to get {self.model_name} by ID for user {user_id}: {e}")

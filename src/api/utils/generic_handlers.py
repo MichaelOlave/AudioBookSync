@@ -5,12 +5,15 @@ Provides reusable handlers for paginated list endpoints and other common pattern
 """
 
 import inspect
-from typing import Callable, Optional, Type, TypeVar, Union
+from typing import Any, Callable, Optional, Type, TypeVar, Union
 
 from fastapi import Query
 from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...database.services import book_service, user_service
 from ..middleware.error_handler import AuthorizationError
+from .auth_utils import get_user_id
 from .pagination import calculate_pages, paginate_list, validate_page
 
 T = TypeVar("T")
@@ -37,6 +40,40 @@ def verify_book_ownership(book: Union[dict, object], user_id: str, asin: str) ->
     if book_user_id != user_id:
         logger.warning(f"Unauthorized access attempt to audiobook {asin} by user {user_id}")
         raise AuthorizationError("Not authorized to access this book")
+
+
+async def verify_book_access(
+    db: AsyncSession,
+    asin: str,
+    current_user: Any,
+) -> tuple[Any, Any]:
+    """
+    Verify the current user can access a book, including shared family libraries.
+
+    Returns (UserBook, Book) when access is allowed.
+    """
+    user_id = get_user_id(current_user)
+    family_id = None
+    if hasattr(current_user, "family_id"):
+        family_id = current_user.family_id
+    elif isinstance(current_user, dict):
+        family_id = current_user.get("family_id")
+
+    accessible_user_ids = await user_service.get_accessible_user_ids(
+        db=db,
+        user_id=user_id,
+        family_id=family_id,
+    )
+    user_book_with_book = await book_service.get_user_book_for_user_ids(
+        db,
+        accessible_user_ids,
+        asin,
+    )
+    if not user_book_with_book:
+        logger.warning(f"Unauthorized access attempt to audiobook {asin} by user {user_id}")
+        raise AuthorizationError("Not authorized to access this book")
+
+    return user_book_with_book
 
 
 def get_pagination_params(
@@ -181,10 +218,10 @@ async def get_paginated_list(
         # Handle both ORM models (with .from_orm()) and dict models (with **)
         converted_items = []
         for item in response_items:
-            if hasattr(response_model, "from_orm"):
-                converted_items.append(response_model.from_orm(item))
-            elif isinstance(item, dict):
+            if isinstance(item, dict):
                 converted_items.append(response_model(**item))
+            elif hasattr(response_model, "from_orm"):
+                converted_items.append(response_model.from_orm(item))
             else:
                 converted_items.append(item)
     except Exception as e:

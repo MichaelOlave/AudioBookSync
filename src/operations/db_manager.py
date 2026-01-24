@@ -114,7 +114,11 @@ class LibraryManager:
             True if successful, False otherwise
         """
         try:
-            success = await book_service.delete_book(db=self.db, asin=asin)
+            success = await book_service.delete_book(
+                db=self.db,
+                asin=asin,
+                user_id=self.user_id,
+            )
             if success:
                 logger.info(f"Removed book from library: {asin}")
             return success
@@ -131,20 +135,7 @@ class LibraryManager:
         try:
             books = await book_service.get_books_by_user(db=self.db, user_id=self.user_id)
             logger.info(f"Retrieved {len(books)} books for user")
-            # Convert ORM Book objects to dictionaries
-            return [
-                {
-                    "asin": book.asin,
-                    "title": book.title,
-                    "author": book.author,
-                    "narrator": book.narrator,
-                    "is_downloaded": book.is_downloaded,
-                    "is_decrypted": book.is_decrypted,
-                    "purchase_date": book.purchase_date,
-                    "runtime_min": book.runtime_min,
-                }
-                for book in books
-            ]
+            return books
         except Exception as e:
             logger.error(f"Failed to get user books: {e}")
             return []
@@ -181,8 +172,12 @@ class LibraryManager:
             True if book exists, False otherwise
         """
         try:
-            book = await book_service.get_book_by_asin(db=self.db, asin=asin)
-            return book is not None
+            user_book = await book_service.get_user_book(
+                db=self.db,
+                user_id=self.user_id,
+                asin=asin,
+            )
+            return user_book is not None
         except Exception as e:
             logger.error(f"Failed to check if book exists: {e}")
             return False

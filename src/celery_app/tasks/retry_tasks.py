@@ -217,10 +217,18 @@ async def _async_retry_decrypts_from_minio() -> dict:
                         logger.warning(f"Book not found for ASIN {decrypt_record.asin}")
                         continue
 
+                    if not decrypt_record.user_id:
+                        logger.warning(
+                            f"Missing user_id for decryption {decrypt_record.decryption_id}"
+                        )
+                        continue
+
+                    user_id = str(decrypt_record.user_id)
+
                     # Download encrypted file from MinIO
                     storage_service = StorageService()
                     encrypted_file_path = storage_service.get_file(
-                        user_id=str(book.user_id),
+                        user_id=user_id,
                         object_key=decrypt_record.encrypted_file_object_key,
                     )
 
@@ -231,11 +239,11 @@ async def _async_retry_decrypts_from_minio() -> dict:
                         )
                         continue
 
-                    user = await user_service.get_user_by_id(db, str(book.user_id))
+                    user = await user_service.get_user_by_id(db, user_id)
                     activation_bytes = user.activation_bytes if user else None
                     if not activation_bytes:
                         logger.warning(
-                            f"Activation bytes not configured for user {book.user_id}"
+                            f"Activation bytes not configured for user {user_id}"
                         )
                         continue
 
@@ -243,7 +251,7 @@ async def _async_retry_decrypts_from_minio() -> dict:
                     book_data = [book.asin, book.title]
                     decrypt_success = await decrypt_book(
                         book=book_data,
-                        user_id=str(book.user_id),
+                        user_id=user_id,
                         encrypted_file_path=encrypted_file_path,
                         is_retry=True,
                         activation_bytes=activation_bytes,
@@ -260,7 +268,7 @@ async def _async_retry_decrypts_from_minio() -> dict:
                         # Delete encrypted file from MinIO
                         try:
                             storage_service.delete_file(
-                                user_id=str(book.user_id),
+                                user_id=user_id,
                                 object_key=decrypt_record.encrypted_file_object_key,
                             )
                         except Exception as e:

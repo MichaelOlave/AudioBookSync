@@ -2,12 +2,14 @@
 
 import json
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
+from uuid import UUID
 
 from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.database.models.family import Family
 from src.database.models.user import User
 from src.database.services.base_service import delete_entity, get_by_id, update_entity
 
@@ -49,6 +51,33 @@ async def create_user(
         return user
     except Exception as e:
         logger.error(f"User creation failed: {e}")
+        return None
+
+
+async def create_family(
+    db: AsyncSession,
+    name: Optional[str],
+    owner_user_id: Optional[Union[str, UUID]] = None,
+) -> Optional[Family]:
+    """
+    Create a new family.
+
+    Args:
+        db: Database session
+        name: Optional family name
+
+    Returns:
+        Created Family object if successful, None otherwise
+    """
+    try:
+        family = Family(name=name, owner_user_id=owner_user_id)
+        db.add(family)
+        await db.flush()
+        await db.refresh(family)
+        logger.info(f"Created family: {family.family_id}")
+        return family
+    except Exception as e:
+        logger.error(f"Family creation failed: {e}")
         return None
 
 
@@ -106,6 +135,27 @@ async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
         return None
 
 
+async def get_family_members(db: AsyncSession, family_id: Union[str, UUID]) -> list[User]:
+    """
+    Get all members of a family.
+
+    Args:
+        db: Database session
+        family_id: Family UUID
+
+    Returns:
+        List of User objects
+    """
+    try:
+        result = await db.execute(
+            select(User).where(User.family_id == family_id).order_by(User.username)
+        )
+        return result.scalars().all()
+    except Exception as e:
+        logger.error(f"Failed to get family members: {e}")
+        return []
+
+
 async def get_user_by_audible_email(db: AsyncSession, audible_email: str) -> Optional[User]:
     """
     Get user by Audible email.
@@ -139,6 +189,112 @@ async def update_user_password(db: AsyncSession, user_id: str, password_hash: st
     """
     user = await get_user_by_id(db, user_id)
     return await update_entity(db, user, {"password_hash": password_hash}, entity_id=user_id)
+
+
+async def get_family_by_id(db: AsyncSession, family_id: str) -> Optional[Family]:
+    """
+    Get family by ID.
+
+    Args:
+        db: Database session
+        family_id: Family UUID
+
+    Returns:
+        Family object if found, None otherwise
+    """
+    return await get_by_id(db, Family, family_id, id_column="family_id")
+
+
+async def update_family(
+    db: AsyncSession,
+    family_id: str,
+    updates: Dict[str, Any],
+) -> Optional[Family]:
+    """
+    Update a family's fields.
+
+    Args:
+        db: Database session
+        family_id: Family UUID
+        updates: Fields to update
+
+    Returns:
+        Updated Family object if successful, None otherwise
+    """
+    family = await get_family_by_id(db, family_id)
+    success = await update_entity(db, family, updates, entity_id=family_id)
+    if not success:
+        return None
+    return family
+
+
+async def delete_family(db: AsyncSession, family_id: str) -> bool:
+    """
+    Delete a family.
+
+    Args:
+        db: Database session
+        family_id: Family UUID
+
+    Returns:
+        True if successful, False otherwise
+    """
+    family = await get_family_by_id(db, family_id)
+    return await delete_entity(db, family, entity_id=family_id)
+
+
+async def update_user_family_settings(
+    db: AsyncSession,
+    user_id: str,
+    updates: Dict[str, Any],
+) -> Optional[User]:
+    """
+    Update user's family membership and sharing settings.
+
+    Args:
+        db: Database session
+        user_id: User's UUID
+        updates: Fields to update (family_id, share_library_with_family)
+
+    Returns:
+        Updated User object if successful, None otherwise
+    """
+    user = await get_user_by_id(db, user_id)
+    success = await update_entity(db, user, updates, entity_id=user_id)
+    if not success:
+        return None
+    return user
+
+
+async def get_accessible_user_ids(
+    db: AsyncSession,
+    user_id: str,
+    family_id: Optional[Union[str, UUID]],
+) -> list[str]:
+    """
+    Get list of user IDs whose books are visible to the current user.
+
+    Includes the current user and any family members who share their libraries.
+    """
+    user_ids = [user_id]
+    if not family_id:
+        return user_ids
+
+    try:
+        result = await db.execute(
+            select(User.user_id).where(
+                User.family_id == family_id,
+                User.share_library_with_family.is_(True),
+            )
+        )
+        shared_ids = [str(shared_id) for shared_id in result.scalars().all()]
+        for shared_id in shared_ids:
+            if shared_id not in user_ids:
+                user_ids.append(shared_id)
+    except Exception as e:
+        logger.error(f"Failed to get accessible user IDs: {e}")
+
+    return user_ids
 
 
 async def update_user_email(db: AsyncSession, user_id: str, email: str) -> bool:

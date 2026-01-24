@@ -28,6 +28,7 @@ config = RouterConfig(
     trigger_summary="Trigger book download",
     list_summary="List user's downloads",
     get_status_summary="Get download status",
+    include_user_id=True,
 )
 
 # Create router using factory

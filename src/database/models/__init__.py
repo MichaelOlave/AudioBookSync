@@ -18,6 +18,7 @@ from src.database.models.reading_progress import ReadingProgress
 from src.database.models.sync_schedule import SyncSchedule
 from src.database.models.sync import SyncHistory
 from src.database.models.user import User
+from src.database.models.user_book import UserBook
 
 __all__ = [
     "ApplicationLog",
@@ -25,6 +26,7 @@ __all__ = [
     "generate_uuid",
     "get_current_timestamp",
     "User",
+    "UserBook",
     "Book",
     "DownloadStatus",
     "DecryptionStatus",

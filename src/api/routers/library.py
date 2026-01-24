@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...database.engine import get_db_session
 from ...database.models.user import User
-from ...database.services import book_service
+from ...database.services import book_service, user_service
 from ..services.audible_library_service import fetch_audible_library_to_db
 from ..middleware.error_handler import ResourceNotFoundError, handle_route_errors
 from ..schemas.book import BookDashboardResponse, BookList, BookResponse
@@ -17,7 +17,7 @@ from ..utils.auth_utils import get_user_id
 from ..utils.generic_handlers import (
     get_paginated_list,
     get_pagination_params,
-    verify_book_ownership,
+    verify_book_access,
 )
 
 router = APIRouter()
@@ -30,7 +30,7 @@ _lib_page, _lib_page_size = get_pagination_params(page_size_default=50, page_siz
     "/",
     response_model=BookList,
     summary="Get user's library",
-    description="Get paginated list of books in user's library",
+    description="Get paginated list of books in user's library, including shared family books",
     responses={
         200: {"description": "Library retrieved successfully"},
         401: {"description": "Not authenticated"},
@@ -46,7 +46,7 @@ async def get_library(
     """
     Get user's audiobook library with pagination.
 
-    Retrieves all books owned by the current user, ordered by purchase date.
+    Retrieves all books owned by the current user plus shared family libraries.
 
     Args:
         current_user: Current authenticated user (from JWT token)
@@ -61,15 +61,25 @@ async def get_library(
         GET /api/v1/library?page=1&page_size=50
     """
 
+    family_id = current_user.family_id
+    accessible_user_ids = await user_service.get_accessible_user_ids(
+        db=db,
+        user_id=get_user_id(current_user),
+        family_id=family_id,
+    )
+
     async def get_books(**kwargs):
-        return await book_service.get_books_by_user(kwargs["db"], kwargs["user_id"])
+        return await book_service.get_books_by_user_ids(
+            kwargs["db"],
+            kwargs["user_ids"],
+        )
 
     result = await get_paginated_list(
         get_items_func=get_books,
         response_model=BookResponse,
         get_items_kwargs={
             "db": db,
-            "user_id": get_user_id(current_user),
+            "user_ids": accessible_user_ids,
         },
         user_id=get_user_id(current_user),
         page=page,
@@ -166,16 +176,25 @@ async def get_dashboard_books(
     Optionally filters to downloaded books when requested.
     """
     user_id = get_user_id(current_user)
+    family_id = current_user.family_id
+    accessible_user_ids = await user_service.get_accessible_user_ids(
+        db=db,
+        user_id=user_id,
+        family_id=family_id,
+    )
     logger.info(f"Fetching dashboard books for user: {user_id}")
 
-    rows = await book_service.get_books_with_metadata_by_user(
+    rows = await book_service.get_books_with_metadata_by_user_ids(
         db,
-        user_id,
+        accessible_user_ids,
         downloaded_only=downloaded_only,
     )
     return [
-        BookDashboardResponse(book=book, metadata=metadata)
-        for book, metadata in rows
+        BookDashboardResponse(
+            book=book_service.build_dashboard_book_data(book, user_book),
+            metadata=metadata,
+        )
+        for user_book, book, metadata in rows
     ]
 
 
@@ -201,7 +220,7 @@ async def get_book_details(
     Get detailed information about a specific audiobook.
 
     Retrieves book details by ASIN (Amazon Standard Identification Number).
-    User can only access their own books.
+    User can access their own books and shared family books.
 
     Args:
         asin: Amazon Standard Identification Number (10-character code)
@@ -221,14 +240,12 @@ async def get_book_details(
     user_id = get_user_id(current_user)
     logger.info(f"Fetching book details: {asin} for user: {user_id}")
 
-    # Get book by ASIN
     book = await book_service.get_book_by_asin(db, asin)
-
     if not book:
         logger.warning(f"Book not found: {asin}")
         raise ResourceNotFoundError(f"Book '{asin}' not found")
 
-    verify_book_ownership(book, user_id, asin)
+    user_book, book = await verify_book_access(db, asin, current_user)
 
     logger.info(f"Retrieved book details: {asin}")
-    return BookResponse.from_orm(book)
+    return BookResponse(**book_service.build_book_response_data(book, user_book))

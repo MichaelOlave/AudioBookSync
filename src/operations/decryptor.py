@@ -257,6 +257,7 @@ async def _store_chapters(asin: str, chapters: list[dict]) -> None:
 
 async def _update_book_paths(
     asin: str,
+    user_id: str,
     *,
     is_downloaded: bool | None = None,
     download_path: str | None = None,
@@ -275,6 +276,7 @@ async def _update_book_paths(
                     asin=asin,
                     is_downloaded=is_downloaded,
                     download_path=download_path,
+                    user_id=user_id,
                 )
                 if not updated:
                     logger.warning(f"Failed to update download status for book {asin}")
@@ -284,6 +286,7 @@ async def _update_book_paths(
                     asin=asin,
                     is_decrypted=is_decrypted,
                     decrypted_path=decrypted_path,
+                    user_id=user_id,
                 )
                 if not updated:
                     logger.warning(f"Failed to update decryption status for book {asin}")
@@ -325,6 +328,7 @@ async def _upload_decrypted_file_to_minio(
             logger.info(f"Successfully uploaded decryption to MinIO: {object_key}")
             await _update_book_paths(
                 book_asin,
+                user_id,
                 is_downloaded=True,
                 is_decrypted=True,
                 decrypted_path=object_key,
@@ -371,6 +375,7 @@ async def _upload_encrypted_file_to_minio(book_asin: str, user_id: str, file_pat
             logger.info(f"Successfully uploaded encrypted file to MinIO for retry: {object_key}")
             await _update_book_paths(
                 book_asin,
+                user_id,
                 is_downloaded=True,
                 download_path=object_key,
             )

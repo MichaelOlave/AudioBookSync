@@ -66,6 +66,12 @@ class Book(Base):
 
     # Relationships
     user = relationship("User", back_populates="books", lazy="select")
+    user_books = relationship(
+        "UserBook",
+        back_populates="book",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
     download_status = relationship(
         "DownloadStatus",
         back_populates="book",

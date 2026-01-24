@@ -38,7 +38,11 @@ async def validate_download_exists(
     logger.info(f"Validating download exists for {create_data.asin}")
 
     # Verify download exists and is completed
-    download = await download_service.get_latest_download(db, create_data.asin)
+    download = await download_service.get_latest_download(
+        db,
+        create_data.asin,
+        user_id=str(current_user.user_id),
+    )
     if not download:
         logger.warning(f"Download not found for {create_data.asin}")
         raise ResourceNotFoundError("Book must be downloaded before decryption")
@@ -82,6 +86,7 @@ config = RouterConfig(
     trigger_summary="Trigger book decryption",
     list_summary="List user's decryptions",
     get_status_summary="Get decryption status",
+    include_user_id=True,
     # Add validators
     pre_create_validator=validate_download_exists,
     create_status_params_builder=build_decryption_params,

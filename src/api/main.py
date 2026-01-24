@@ -22,6 +22,7 @@ from .routers import (
     decryptions,
     downloads,
     errors,
+    families,
     files,
     library,
     progress,
@@ -154,6 +155,12 @@ def create_app() -> FastAPI:
         users.router,
         prefix="/api/v1/users",
         tags=["Users"],
+    )
+
+    app.include_router(
+        families.router,
+        prefix="/api/v1/families",
+        tags=["Families"],
     )
 
     app.include_router(

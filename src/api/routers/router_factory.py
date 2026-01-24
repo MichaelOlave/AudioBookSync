@@ -96,6 +96,7 @@ class RouterConfig:
     # Optional hooks
     pre_create_validator: Optional[Callable] = None
     create_status_params_builder: Optional[Callable] = None
+    include_user_id: bool = False
 
     # Error handling
     creation_failure_error: Type[AudioBookSyncException] = ResourceNotFoundError
@@ -267,6 +268,8 @@ class StatusRouterFactory:
                 "asin": operation_data.asin,
                 "status": "pending",
             }
+            if self.config.include_user_id:
+                creation_params["user_id"] = str(current_user.user_id)
 
             # Add extra parameters if builder is configured
             if params_builder:

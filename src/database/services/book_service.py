@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models.book import Book
 from src.database.models.book_metadata import BookMetadataJson
+from src.database.models.user_book import UserBook
 from src.database.services import metadata_service
 
 
@@ -70,17 +71,14 @@ async def add_book(
         publication_date_obj = _parse_date_value(publication_date)
 
         if existing_book:
-            # Update existing book
+            # Update existing book metadata (do not overwrite ownership)
             existing_book.title = title
-            existing_book.user_id = user_id
             if author:
                 existing_book.author = author
             if narrator:
                 existing_book.narrator = narrator
             if runtime_min is not None:
                 existing_book.runtime_min = runtime_min
-            if purchase_date_obj:
-                existing_book.purchase_date = purchase_date_obj
             if subtitle:
                 existing_book.subtitle = subtitle
             if description:
@@ -113,7 +111,6 @@ async def add_book(
                 author=author,
                 narrator=narrator,
                 runtime_min=runtime_min,
-                purchase_date=purchase_date_obj,
                 subtitle=subtitle,
                 description=description,
                 rating=rating,
@@ -128,6 +125,19 @@ async def add_book(
             db.add(book)
             await db.flush()
             logger.info(f"Added book: {title} (ASIN: {asin})")
+
+        user_book = await get_user_book(db, user_id, asin)
+        if user_book:
+            if purchase_date_obj:
+                user_book.purchase_date = purchase_date_obj
+        else:
+            user_book = UserBook(
+                user_id=user_id,
+                asin=asin,
+                purchase_date=purchase_date_obj,
+            )
+            db.add(user_book)
+            await db.flush()
 
         return True
     except Exception as e:
@@ -154,7 +164,76 @@ async def get_book_by_asin(db: AsyncSession, asin: str) -> Optional[Book]:
         return None
 
 
-async def get_books_by_user(db: AsyncSession, user_id: str) -> List[Book]:
+async def get_user_book(db: AsyncSession, user_id: str, asin: str) -> Optional[UserBook]:
+    """
+    Get a user book entry by user and ASIN.
+
+    Args:
+        db: Database session
+        user_id: User UUID
+        asin: Amazon Standard Identification Number
+
+    Returns:
+        UserBook object if found, None otherwise
+    """
+    try:
+        result = await db.execute(
+            select(UserBook).where(
+                and_(UserBook.user_id == user_id, UserBook.asin == asin)
+            )
+        )
+        return result.scalar_one_or_none()
+    except Exception as e:
+        logger.error(f"Failed to get user book: {e}")
+        return None
+
+
+async def get_user_book_with_book(
+    db: AsyncSession, user_id: str, asin: str
+) -> Optional[Tuple[UserBook, Book]]:
+    """
+    Get a user book entry and its book metadata.
+    """
+    try:
+        result = await db.execute(
+            select(UserBook, Book)
+            .join(Book, UserBook.asin == Book.asin)
+            .where(and_(UserBook.user_id == user_id, UserBook.asin == asin))
+        )
+        row = result.first()
+        if not row:
+            return None
+        return row[0], row[1]
+    except Exception as e:
+        logger.error(f"Failed to get user book with book: {e}")
+        return None
+
+
+async def get_user_book_for_user_ids(
+    db: AsyncSession, user_ids: List[str], asin: str
+) -> Optional[Tuple[UserBook, Book]]:
+    """
+    Get a user book entry for any user in a set of user IDs.
+    """
+    if not user_ids:
+        return None
+
+    try:
+        result = await db.execute(
+            select(UserBook, Book)
+            .join(Book, UserBook.asin == Book.asin)
+            .where(and_(UserBook.user_id.in_(user_ids), UserBook.asin == asin))
+        )
+        row = result.first()
+        if not row:
+            return None
+        return row[0], row[1]
+    except Exception as e:
+        logger.error(f"Failed to get user book for user list: {e}")
+        return None
+
+
+async def get_books_by_user(db: AsyncSession, user_id: str) -> List[dict]:
     """
     Get all books for a user.
 
@@ -166,10 +245,48 @@ async def get_books_by_user(db: AsyncSession, user_id: str) -> List[Book]:
         List of Book objects
     """
     try:
-        result = await db.execute(select(Book).where(Book.user_id == user_id).order_by(Book.title))
-        return result.scalars().all()
+        result = await db.execute(
+            select(Book, UserBook)
+            .join(UserBook, UserBook.asin == Book.asin)
+            .where(UserBook.user_id == user_id)
+            .order_by(Book.title)
+        )
+        return [
+            build_book_response_data(book, user_book)
+            for book, user_book in result.all()
+        ]
     except Exception as e:
         logger.error(f"Failed to get books for user: {e}")
+        return []
+
+
+async def get_books_by_user_ids(db: AsyncSession, user_ids: List[str]) -> List[dict]:
+    """
+    Get all books for a list of users.
+
+    Args:
+        db: Database session
+        user_ids: List of user UUIDs
+
+    Returns:
+        List of Book objects
+    """
+    if not user_ids:
+        return []
+
+    try:
+        result = await db.execute(
+            select(Book, UserBook)
+            .join(UserBook, UserBook.asin == Book.asin)
+            .where(UserBook.user_id.in_(user_ids))
+            .order_by(Book.title)
+        )
+        return [
+            build_book_response_data(book, user_book)
+            for book, user_book in result.all()
+        ]
+    except Exception as e:
+        logger.error(f"Failed to get books for user list: {e}")
         return []
 
 
@@ -177,7 +294,7 @@ async def get_books_with_metadata_by_user(
     db: AsyncSession,
     user_id: str,
     downloaded_only: bool = False,
-) -> List[Tuple[Book, Optional[BookMetadataJson]]]:
+) -> List[Tuple[UserBook, Book, Optional[BookMetadataJson]]]:
     """
     Get all books for a user with optional metadata.
 
@@ -187,22 +304,60 @@ async def get_books_with_metadata_by_user(
         downloaded_only: If True, only return downloaded books
 
     Returns:
-        List of (Book, BookMetadataJson|None) tuples
+        List of (UserBook, Book, BookMetadataJson|None) tuples
     """
     try:
         stmt = (
-            select(Book, BookMetadataJson)
+            select(UserBook, Book, BookMetadataJson)
+            .join(Book, UserBook.asin == Book.asin)
             .outerjoin(BookMetadataJson, BookMetadataJson.asin == Book.asin)
-            .where(Book.user_id == user_id)
+            .where(UserBook.user_id == user_id)
             .order_by(Book.title)
         )
         if downloaded_only:
-            stmt = stmt.where(Book.is_downloaded)
+            stmt = stmt.where(UserBook.is_downloaded)
 
         result = await db.execute(stmt)
         return result.all()
     except Exception as e:
         logger.error(f"Failed to get books with metadata for user: {e}")
+        return []
+
+
+async def get_books_with_metadata_by_user_ids(
+    db: AsyncSession,
+    user_ids: List[str],
+    downloaded_only: bool = False,
+) -> List[Tuple[UserBook, Book, Optional[BookMetadataJson]]]:
+    """
+    Get all books for a list of users with optional metadata.
+
+    Args:
+        db: Database session
+        user_ids: List of user UUIDs
+        downloaded_only: If True, only return downloaded books
+
+    Returns:
+        List of (UserBook, Book, BookMetadataJson|None) tuples
+    """
+    if not user_ids:
+        return []
+
+    try:
+        stmt = (
+            select(UserBook, Book, BookMetadataJson)
+            .join(Book, UserBook.asin == Book.asin)
+            .outerjoin(BookMetadataJson, BookMetadataJson.asin == Book.asin)
+            .where(UserBook.user_id.in_(user_ids))
+            .order_by(Book.title)
+        )
+        if downloaded_only:
+            stmt = stmt.where(UserBook.is_downloaded)
+
+        result = await db.execute(stmt)
+        return result.all()
+    except Exception as e:
+        logger.error(f"Failed to get books with metadata for user list: {e}")
         return []
 
 
@@ -220,10 +375,11 @@ async def get_downloaded_books(db: AsyncSession, user_id: str) -> List[Book]:
     try:
         result = await db.execute(
             select(Book)
+            .join(UserBook, UserBook.asin == Book.asin)
             .where(
                 and_(
-                    Book.user_id == user_id,
-                    Book.is_downloaded,
+                    UserBook.user_id == user_id,
+                    UserBook.is_downloaded,
                 )
             )
             .order_by(Book.title)
@@ -248,10 +404,11 @@ async def get_not_downloaded_books(db: AsyncSession, user_id: str) -> List[Book]
     try:
         result = await db.execute(
             select(Book)
+            .join(UserBook, UserBook.asin == Book.asin)
             .where(
                 and_(
-                    Book.user_id == user_id,
-                    Book.is_downloaded.is_(False),
+                    UserBook.user_id == user_id,
+                    UserBook.is_downloaded.is_(False),
                 )
             )
             .order_by(Book.title)
@@ -276,10 +433,11 @@ async def get_decrypted_books(db: AsyncSession, user_id: str) -> List[Book]:
     try:
         result = await db.execute(
             select(Book)
+            .join(UserBook, UserBook.asin == Book.asin)
             .where(
                 and_(
-                    Book.user_id == user_id,
-                    Book.is_decrypted,
+                    UserBook.user_id == user_id,
+                    UserBook.is_decrypted,
                 )
             )
             .order_by(Book.title)
@@ -294,6 +452,7 @@ async def update_book_download_status(
     db: AsyncSession,
     asin: str,
     is_downloaded: bool,
+    user_id: Optional[str] = None,
     download_path: Optional[str] = None,
     file_size_bytes: Optional[int] = None,
 ) -> bool:
@@ -311,15 +470,26 @@ async def update_book_download_status(
         True if successful, False otherwise
     """
     try:
-        book = await get_book_by_asin(db, asin)
-        if not book:
-            return False
+        if user_id:
+            user_book = await get_user_book(db, user_id, asin)
+            if not user_book:
+                return False
 
-        book.is_downloaded = is_downloaded
-        if download_path:
-            book.download_path = download_path
-        if file_size_bytes:
-            book.file_size_bytes = file_size_bytes
+            user_book.is_downloaded = is_downloaded
+            if download_path:
+                user_book.download_path = download_path
+            if file_size_bytes is not None:
+                user_book.file_size_bytes = file_size_bytes
+        else:
+            book = await get_book_by_asin(db, asin)
+            if not book:
+                return False
+
+            book.is_downloaded = is_downloaded
+            if download_path:
+                book.download_path = download_path
+            if file_size_bytes is not None:
+                book.file_size_bytes = file_size_bytes
 
         await db.flush()
         logger.info(f"Updated download status for book: {asin}")
@@ -333,6 +503,7 @@ async def update_book_decryption_status(
     db: AsyncSession,
     asin: str,
     is_decrypted: bool,
+    user_id: Optional[str] = None,
     decrypted_path: Optional[str] = None,
 ) -> bool:
     """
@@ -348,13 +519,22 @@ async def update_book_decryption_status(
         True if successful, False otherwise
     """
     try:
-        book = await get_book_by_asin(db, asin)
-        if not book:
-            return False
+        if user_id:
+            user_book = await get_user_book(db, user_id, asin)
+            if not user_book:
+                return False
 
-        book.is_decrypted = is_decrypted
-        if decrypted_path:
-            book.decrypted_path = decrypted_path
+            user_book.is_decrypted = is_decrypted
+            if decrypted_path:
+                user_book.decrypted_path = decrypted_path
+        else:
+            book = await get_book_by_asin(db, asin)
+            if not book:
+                return False
+
+            book.is_decrypted = is_decrypted
+            if decrypted_path:
+                book.decrypted_path = decrypted_path
 
         await db.flush()
         logger.info(f"Updated decryption status for book: {asin}")
@@ -364,7 +544,7 @@ async def update_book_decryption_status(
         return False
 
 
-async def delete_book(db: AsyncSession, asin: str) -> bool:
+async def delete_book(db: AsyncSession, asin: str, user_id: str) -> bool:
     """
     Delete a book (cascades to download and decryption records).
 
@@ -376,13 +556,22 @@ async def delete_book(db: AsyncSession, asin: str) -> bool:
         True if successful, False otherwise
     """
     try:
-        book = await get_book_by_asin(db, asin)
-        if not book:
+        user_book = await get_user_book(db, user_id, asin)
+        if not user_book:
             return False
 
-        await db.delete(book)
+        await db.delete(user_book)
         await db.flush()
-        logger.info(f"Deleted book: {asin}")
+        remaining = await db.execute(
+            select(UserBook.user_book_id).where(UserBook.asin == asin).limit(1)
+        )
+        if remaining.scalar_one_or_none() is None:
+            book = await get_book_by_asin(db, asin)
+            if book:
+                await db.delete(book)
+                await db.flush()
+
+        logger.info(f"Deleted book for user: {asin}")
         return True
     except Exception as e:
         logger.error(f"Failed to delete book: {e}")
@@ -409,9 +598,10 @@ async def search_books(
         query_lower = f"%{query.lower()}%"
         result = await db.execute(
             select(Book)
+            .join(UserBook, UserBook.asin == Book.asin)
             .where(
                 and_(
-                    Book.user_id == user_id,
+                    UserBook.user_id == user_id,
                     (
                         Book.title.ilike(query_lower)
                         | Book.author.ilike(query_lower)
@@ -446,9 +636,10 @@ async def get_books_by_series(
     try:
         result = await db.execute(
             select(Book)
+            .join(UserBook, UserBook.asin == Book.asin)
             .where(
                 and_(
-                    Book.user_id == user_id,
+                    UserBook.user_id == user_id,
                     Book.series_name == series_name,
                 )
             )
@@ -1143,6 +1334,59 @@ def _coerce_bool(value: Any) -> Optional[bool]:
         if lowered in {"false", "0", "no"}:
             return False
     return bool(value)
+
+
+def build_book_response_data(book: Book, user_book: UserBook) -> Dict[str, Any]:
+    """Build a BookResponse payload from book metadata and user ownership."""
+    return {
+        "asin": book.asin,
+        "title": book.title,
+        "author": book.author,
+        "narrator": book.narrator,
+        "series_name": book.series_name,
+        "description": book.description,
+        "rating": float(book.rating) if book.rating is not None else None,
+        "runtime_min": book.runtime_min,
+        "user_id": user_book.user_id,
+        "purchase_date": user_book.purchase_date,
+        "is_downloaded": user_book.is_downloaded,
+        "is_decrypted": user_book.is_decrypted,
+        "download_path": user_book.download_path,
+        "decrypted_path": user_book.decrypted_path,
+        "created_at": user_book.created_at,
+        "updated_at": user_book.updated_at,
+    }
+
+
+def build_dashboard_book_data(book: Book, user_book: UserBook) -> Dict[str, Any]:
+    """Build a BookDashboardBook payload from book metadata and user ownership."""
+    return {
+        "asin": book.asin,
+        "user_id": user_book.user_id,
+        "title": book.title,
+        "subtitle": book.subtitle,
+        "author": book.author,
+        "narrator": book.narrator,
+        "series_name": book.series_name,
+        "series_sequence": book.series_sequence,
+        "publisher": book.publisher,
+        "publication_date": book.publication_date,
+        "purchase_date": user_book.purchase_date,
+        "description": book.description,
+        "language": book.language,
+        "runtime_min": book.runtime_min,
+        "rating": float(book.rating) if book.rating is not None else None,
+        "review_count": book.review_count,
+        "cover_art_url": book.cover_art_url,
+        "file_size_bytes": user_book.file_size_bytes,
+        "checksum": user_book.checksum,
+        "is_downloaded": user_book.is_downloaded,
+        "is_decrypted": user_book.is_decrypted,
+        "download_path": user_book.download_path,
+        "decrypted_path": user_book.decrypted_path,
+        "created_at": user_book.created_at,
+        "updated_at": user_book.updated_at,
+    }
 
 
 def _parse_date_value(value: Optional[Union[str, date, datetime]]) -> Optional[date]:

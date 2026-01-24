@@ -17,6 +17,7 @@ from ..schemas.book import BookBase, BookResponse, ChapterResponse
 from ..schemas.common import MessageResponse
 from ..security.auth import get_current_user
 from ..utils.auth_utils import get_user_id
+from ..utils.generic_handlers import verify_book_access
 
 router = APIRouter()
 
@@ -87,15 +88,19 @@ async def create_book(
         logger.error(f"Failed to add book {book_data.asin}")
         raise ResourceNotFoundError(f"Failed to add book {book_data.asin}")
 
-    # Fetch and return the added book
-    book = await book_service.get_book_by_asin(db, book_data.asin)
-    if not book:
+    user_book_with_book = await book_service.get_user_book_with_book(
+        db,
+        user_id,
+        book_data.asin,
+    )
+    if not user_book_with_book:
         logger.error(f"Added book not found: {book_data.asin}")
         raise ResourceNotFoundError(f"Added book not found: {book_data.asin}")
+    user_book, book = user_book_with_book
 
     await db.commit()
     logger.info(f"Book added successfully: {book_data.asin} for user {user_id}")
-    return BookResponse.from_orm(book)
+    return BookResponse(**book_service.build_book_response_data(book, user_book))
 
 
 @router.delete(
@@ -146,13 +151,13 @@ async def delete_book(
         logger.warning(f"Book not found: {asin}")
         raise ResourceNotFoundError(f"Book '{asin}' not found")
 
-    # Verify ownership
-    if str(book.user_id) != user_id:
+    user_book = await book_service.get_user_book(db, user_id, asin)
+    if not user_book:
         logger.warning(f"Unauthorized delete attempt for book {asin} by user {user_id}")
         raise AuthorizationError("Not authorized to delete this book")
 
     # Delete the book
-    success = await book_service.delete_book(db, asin)
+    success = await book_service.delete_book(db, asin, user_id)
     if not success:
         logger.error(f"Failed to delete book {asin}")
         raise InternalServerError(f"Failed to delete book {asin}")
@@ -169,7 +174,7 @@ async def delete_book(
     "/{asin}/chapters",
     response_model=list[ChapterResponse],
     summary="Get chapter metadata for a book",
-    description="Get chapter metadata for a book owned by the current user",
+    description="Get chapter metadata for a book owned by the current user or shared by family",
     responses={
         200: {"description": "Chapters retrieved successfully"},
         401: {"description": "Not authenticated"},
@@ -191,9 +196,7 @@ async def get_book_chapters(
     if not book:
         logger.warning(f"Book not found for chapters: {asin}")
         raise ResourceNotFoundError(f"Book '{asin}' not found")
-    if str(book.user_id) != user_id:
-        logger.warning(f"Unauthorized chapter access for book {asin} by user {user_id}")
-        raise AuthorizationError("Not authorized to access this book")
+    await verify_book_access(db, asin, current_user)
 
     chapters = await metadata_service.get_chapters_by_asin(db, asin)
     return chapters

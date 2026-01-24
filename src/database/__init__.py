@@ -37,6 +37,7 @@ from .services import (
 from .models import (
     User,
     Book,
+    UserBook,
     Contributor,
     SyncHistory,
     DownloadStatus,
@@ -60,6 +61,7 @@ __all__ = [
     # Models
     "User",
     "Book",
+    "UserBook",
     "Contributor",
     "SyncHistory",
     "DownloadStatus",

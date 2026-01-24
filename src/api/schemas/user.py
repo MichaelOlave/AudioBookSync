@@ -50,6 +50,19 @@ class UserUpdate(BaseModel):
     )
 
 
+class UserFamilyUpdate(BaseModel):
+    """Schema for updating family membership and sharing preferences."""
+
+    family_id: Optional[UUID] = Field(
+        default=None,
+        description="Family identifier (null to leave family)",
+    )
+    share_library_with_family: Optional[bool] = Field(
+        default=None,
+        description="Whether to share library with family members",
+    )
+
+
 class UserResponse(UserBase):
     """Schema for user response (no sensitive data)."""
 
@@ -60,6 +73,14 @@ class UserResponse(UserBase):
     is_active: bool = Field(
         default=True,
         description="Whether user account is active",
+    )
+    family_id: Optional[UUID] = Field(
+        default=None,
+        description="Family identifier if assigned",
+    )
+    share_library_with_family: bool = Field(
+        default=False,
+        description="Whether the user's library is shared with family members",
     )
     last_sync_date: Optional[datetime] = Field(
         default=None,

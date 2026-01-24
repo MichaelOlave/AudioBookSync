@@ -31,7 +31,7 @@ async def get_active_tasks_by_user(db: AsyncSession, user_id: str) -> Dict[str, 
         .join(Book, DownloadStatus.asin == Book.asin)
         .where(
             and_(
-                Book.user_id == UUID(user_id),
+                DownloadStatus.user_id == UUID(user_id),
                 DownloadStatus.status == "downloading",
             )
         )
@@ -60,7 +60,7 @@ async def get_active_tasks_by_user(db: AsyncSession, user_id: str) -> Dict[str, 
         .join(Book, DecryptionStatus.asin == Book.asin)
         .where(
             and_(
-                Book.user_id == UUID(user_id),
+                DecryptionStatus.user_id == UUID(user_id),
                 DecryptionStatus.status == "decrypting",
             )
         )
@@ -137,14 +137,10 @@ async def cancel_task(
     """
 
     # Try to find in downloads
-    download_query = (
-        select(DownloadStatus)
-        .join(Book, DownloadStatus.asin == Book.asin)
-        .where(
-            and_(
-                DownloadStatus.download_id == task_id,
-                Book.user_id == UUID(user_id),
-            )
+    download_query = select(DownloadStatus).where(
+        and_(
+            DownloadStatus.download_id == task_id,
+            DownloadStatus.user_id == UUID(user_id),
         )
     )
     result = await db.execute(download_query)
@@ -165,14 +161,10 @@ async def cancel_task(
         return True, "download", "cancelled", "Task cancelled successfully"
 
     # Try to find in decryptions
-    decryption_query = (
-        select(DecryptionStatus)
-        .join(Book, DecryptionStatus.asin == Book.asin)
-        .where(
-            and_(
-                DecryptionStatus.decryption_id == task_id,
-                Book.user_id == UUID(user_id),
-            )
+    decryption_query = select(DecryptionStatus).where(
+        and_(
+            DecryptionStatus.decryption_id == task_id,
+            DecryptionStatus.user_id == UUID(user_id),
         )
     )
     result = await db.execute(decryption_query)

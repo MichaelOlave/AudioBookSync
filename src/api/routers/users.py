@@ -12,6 +12,8 @@ from ..middleware.error_handler import (
     AuthorizationError,
     ConflictError,
     InternalServerError,
+    ResourceNotFoundError,
+    ValidationError,
     handle_route_errors,
 )
 from ..schemas.common import MessageResponse
@@ -19,6 +21,7 @@ from ..schemas.user import (
     EmailChangeRequest,
     EmailChangeResponse,
     PasswordChangeRequest,
+    UserFamilyUpdate,
     UserResponse,
 )
 from ..security.auth import get_current_user
@@ -69,6 +72,8 @@ async def get_current_user_profile(
             "username": "john_doe",
             "email": "john@example.com",
             "is_active": true,
+            "family_id": null,
+            "share_library_with_family": false,
             "last_sync_date": "2025-01-20T15:30:00",
             "created_at": "2025-01-15T10:00:00",
             "updated_at": "2025-01-20T15:30:00"
@@ -255,3 +260,59 @@ async def change_email(
         success=True,
         email=email_data.new_email,
     )
+
+
+@router.patch(
+    "/me/family",
+    response_model=UserResponse,
+    summary="Update family settings",
+    description="Update family membership and sharing preferences",
+    responses={
+        200: {"description": "Family settings updated successfully"},
+        422: {"description": "Invalid update payload"},
+        401: {"description": "Not authenticated"},
+        404: {"description": "Family not found"},
+    },
+)
+@handle_route_errors("update family settings")
+async def update_family_settings(
+    payload: UserFamilyUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+) -> UserResponse:
+    """
+    Update family membership and sharing preferences.
+
+    Allows the user to join/leave a family and toggle library sharing.
+    """
+    updates = payload.model_dump(exclude_unset=True)
+    if not updates:
+        raise ValidationError("Provide at least one family setting to update")
+
+    if "family_id" in updates and current_user.family_id:
+        family = await user_service.get_family_by_id(db, str(current_user.family_id))
+        if (
+            family
+            and family.owner_user_id
+            and str(family.owner_user_id) == str(current_user.user_id)
+        ):
+            new_family_id = updates.get("family_id")
+            if new_family_id is None or str(new_family_id) != str(current_user.family_id):
+                raise ValidationError("Family head cannot leave the family")
+
+    if "family_id" in updates and updates["family_id"] is not None:
+        family = await user_service.get_family_by_id(db, str(updates["family_id"]))
+        if not family:
+            raise ResourceNotFoundError("Family not found")
+
+    updated_user = await user_service.update_user_family_settings(
+        db,
+        str(current_user.user_id),
+        updates,
+    )
+    if not updated_user:
+        raise InternalServerError("Failed to update family settings")
+
+    await db.commit()
+    await db.refresh(updated_user)
+    return UserResponse.from_orm(updated_user)

@@ -18,33 +18,35 @@ from ..middleware.error_handler import (
 )
 from ..security.auth import get_current_user
 from ..utils.auth_utils import get_user_id
-from ..utils.generic_handlers import verify_book_ownership
+from ..utils.generic_handlers import verify_book_access
 
 router = APIRouter()
 
 
 async def _resolve_object_key(
     db: AsyncSession,
-    user_id: str,
+    owner_user_id: str,
     book,
+    user_book,
     storage_service: StorageService,
 ) -> Optional[str]:
     """Resolve MinIO object key for a book, with a MinIO existence fallback."""
-    if book.decrypted_path:
-        return book.decrypted_path
+    if user_book.decrypted_path:
+        return user_book.decrypted_path
 
     normalized_title = normalize_filename(book.title or "")
     if not normalized_title:
         return None
 
     candidate_key = f"decrypted/{normalized_title}.m4b"
-    bucket_name = f"user-{user_id}"
+    bucket_name = f"user-{owner_user_id}"
 
     if storage_service.minio_client.file_exists(bucket_name, candidate_key):
         updated = await book_service.update_book_decryption_status(
             db=db,
             asin=book.asin,
             is_decrypted=True,
+            user_id=owner_user_id,
             decrypted_path=candidate_key,
         )
         if updated:
@@ -85,7 +87,7 @@ async def stream_audiobook(
 
     Streams the decrypted audiobook file with support for HTTP Range requests,
     which allows audio players to seek through the file without downloading
-    the entire file.
+    the entire file. Shared family books are available when enabled by the owner.
 
     Args:
         asin: Amazon Standard Identification Number
@@ -112,19 +114,26 @@ async def stream_audiobook(
 
     logger.info(f"Audio stream requested for {asin} by user {user_id}")
 
-    # Verify book exists and belongs to user using ORM
+    # Verify book exists and the user can access it (including shared family libraries)
     book = await book_service.get_book_by_asin(db, asin)
     if not book:
         logger.warning(f"Book not found: {asin}")
         raise ResourceNotFoundError(f"Book '{asin}' not found")
 
-    verify_book_ownership(book, user_id, asin)
+    user_book, book = await verify_book_access(db, asin, current_user)
+    owner_user_id = str(user_book.user_id)
 
     # Initialize storage service
     storage_service = StorageService()
 
     # Resolve MinIO object_key from book record or infer from MinIO
-    object_key = await _resolve_object_key(db, user_id, book, storage_service)
+    object_key = await _resolve_object_key(
+        db,
+        owner_user_id,
+        book,
+        user_book,
+        storage_service,
+    )
     if not object_key:
         logger.warning(f"MinIO object_key not available for {asin}")
         raise ResourceNotFoundError("Decrypted audiobook file not available")
@@ -165,7 +174,7 @@ async def stream_audiobook(
     )
 
     data = storage_service.stream_file(
-        user_id=user_id,
+        user_id=owner_user_id,
         object_key=object_key,
         offset=start,
         length=content_length,

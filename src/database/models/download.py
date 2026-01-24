@@ -25,6 +25,12 @@ class DownloadStatus(Base):
     asin = Column(
         String(10), ForeignKey("books.asin", ondelete="CASCADE"), nullable=False, index=True
     )
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     status = Column(String(20), default="pending", nullable=False, index=True)
     download_path = Column(String(1000), nullable=True)
     download_started_at = Column(DateTime(timezone=True), nullable=True)

@@ -1,6 +1,7 @@
 """Reading progress endpoints."""
 
 from datetime import datetime, timezone
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends
@@ -19,7 +20,7 @@ from ..middleware.error_handler import (
 from ..schemas.progress import ReadingProgressResponse, ReadingProgressUpdate
 from ..security.auth import get_current_user
 from ..utils.auth_utils import get_user_id
-from ..utils.generic_handlers import verify_book_ownership
+from ..utils.generic_handlers import verify_book_access
 
 router = APIRouter()
 
@@ -35,13 +36,13 @@ def _has_update_fields(payload: ReadingProgressUpdate) -> bool:
     )
 
 
-async def _get_book_or_404(db: AsyncSession, user_id: str, asin: str):
+async def _get_book_or_404(db: AsyncSession, current_user: Any, asin: str):
     book = await book_service.get_book_by_asin(db, asin)
     if not book:
         logger.warning(f"Book not found: {asin}")
         raise ResourceNotFoundError(f"Book '{asin}' not found")
 
-    verify_book_ownership(book, user_id, asin)
+    await verify_book_access(db, asin, current_user)
     return book
 
 
@@ -49,7 +50,7 @@ async def _get_book_or_404(db: AsyncSession, user_id: str, asin: str):
     "/{asin}",
     response_model=ReadingProgressResponse,
     summary="Get reading progress",
-    description="Get reading progress for a specific book",
+    description="Get reading progress for a specific book, including shared family books",
     responses={
         200: {"description": "Reading progress retrieved successfully"},
         401: {"description": "Not authenticated"},
@@ -69,7 +70,7 @@ async def get_reading_progress(
         logger.error("User ID not found in token")
         raise AuthenticationError("Invalid authentication token")
 
-    await _get_book_or_404(db, user_id, asin)
+    await _get_book_or_404(db, current_user, asin)
 
     progress = await metadata_service.get_reading_progress(db, asin, UUID(user_id))
     if not progress:
@@ -92,7 +93,7 @@ async def get_reading_progress(
     "/{asin}",
     response_model=ReadingProgressResponse,
     summary="Update reading progress",
-    description="Update reading progress for a specific book",
+    description="Update reading progress for a specific book, including shared family books",
     responses={
         200: {"description": "Reading progress updated successfully"},
         400: {"description": "Invalid progress data"},
@@ -117,7 +118,7 @@ async def update_reading_progress(
         logger.error("User ID not found in token")
         raise AuthenticationError("Invalid authentication token")
 
-    await _get_book_or_404(db, user_id, asin)
+    await _get_book_or_404(db, current_user, asin)
 
     progress = await metadata_service.get_reading_progress(db, asin, UUID(user_id))
     if progress:

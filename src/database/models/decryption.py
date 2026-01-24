@@ -25,6 +25,12 @@ class DecryptionStatus(Base):
     asin = Column(
         String(10), ForeignKey("books.asin", ondelete="CASCADE"), nullable=False, index=True
     )
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     download_id = Column(
         UUID(as_uuid=True),
         ForeignKey("download_status.download_id", ondelete="SET NULL"),
