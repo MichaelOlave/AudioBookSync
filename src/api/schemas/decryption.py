@@ -8,8 +8,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .common import BookActionCreate, PaginatedResponse
 
+
 class DecryptCreate(BookActionCreate):
     """Request to initiate book decryption."""
+
 
 class DecryptResponse(BaseModel):
     """Decryption status response."""
@@ -70,8 +72,9 @@ class DecryptResponse(BaseModel):
                 "message": "Decryption initiated",
                 "decryption_started_at": "2024-12-22T10:30:00",
             }
-        }
+        },
     )
+
 
 DecryptList = PaginatedResponse[DecryptResponse]
 """Type alias for paginated decryption list response."""

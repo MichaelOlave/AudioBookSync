@@ -1,6 +1,7 @@
 """Audiobook file serving and streaming endpoints."""
 
 from typing import Optional
+
 from fastapi import APIRouter, Depends, Header
 from fastapi.responses import StreamingResponse
 from loguru import logger
@@ -76,7 +77,7 @@ async def _resolve_object_key(
     },
 )
 @handle_route_errors("stream audiobook")
-async def stream_audiobook(
+async def stream_audiobook(  # noqa: C901
     asin: str,
     current_user: dict = Depends(get_current_user),
     range_header: Optional[str] = Header(default=None),

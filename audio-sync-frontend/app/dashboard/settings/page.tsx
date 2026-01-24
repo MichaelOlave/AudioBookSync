@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/use-auth";
 import { useFamilies } from "@/hooks/use-families";
 import { apiClient } from "@/lib/api/client";
+import type { StorageConfig, AudibleStatusResponse, AudibleAuthStartResponse, StorageTestResponse } from "@/lib/api/types";
 import {
   Bell,
   Lock,
@@ -186,7 +187,7 @@ export default function SettingsPage() {
 
   const fetchStorageConfig = async () => {
     try {
-      const data = await apiClient.request<any>("GET", "/settings/storage");
+      const data = await apiClient.request<StorageConfig>("GET", "/settings/storage");
       setStorageConfig({
         provider_type: data.provider_type,
         endpoint: data.endpoint,
@@ -202,7 +203,7 @@ export default function SettingsPage() {
 
   const fetchAudibleStatus = async () => {
     try {
-      const data = await apiClient.request<any>(
+      const data = await apiClient.request<AudibleStatusResponse>(
         "GET",
         "/settings/audible-credentials",
       );
@@ -221,7 +222,7 @@ export default function SettingsPage() {
     setAudibleLoading(true);
     setError("");
     try {
-      const data = await apiClient.request<any>("POST", "/auth/start", {
+      const data = await apiClient.request<AudibleAuthStartResponse>("POST", "/auth/start", {
         body: {
           country_code: "us",
         },
@@ -312,7 +313,7 @@ export default function SettingsPage() {
     setStorageLoading(true);
     setError("");
     try {
-      const data = await apiClient.request<any>("PUT", "/settings/storage", {
+      const data = await apiClient.request<StorageConfig>("PUT", "/settings/storage", {
         body: storageConfig,
       });
       setStorageConnected(data.is_connected);
@@ -330,7 +331,7 @@ export default function SettingsPage() {
     setStorageLoading(true);
     setError("");
     try {
-      const data = await apiClient.request<any>(
+      const data = await apiClient.request<StorageTestResponse>(
         "POST",
         "/settings/storage/test",
         {
@@ -583,7 +584,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setStorageConfig({
                     ...storageConfig,
-                    provider_type: e.target.value as any,
+                    provider_type: e.target.value,
                   })
                 }
                 className="w-full px-3 py-2 rounded-lg border border-border bg-background"
@@ -685,7 +686,7 @@ export default function SettingsPage() {
           ) : !family ? (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                You haven't created a family yet. Create one to share your
+                You haven&apos;t created a family yet. Create one to share your
                 library with family members.
               </p>
               <Button
@@ -752,7 +753,7 @@ export default function SettingsPage() {
                                 Owner
                               </span>
                             )}
-                            {member.user_id === (user?.id || (user as any)?.user_id) && member.user_id !== family?.owner_user_id && (
+                            {member.user_id === user?.id && member.user_id !== family?.owner_user_id && (
                               <span className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200 px-2 py-1 rounded">
                                 You
                               </span>
@@ -763,7 +764,7 @@ export default function SettingsPage() {
                           </p>
                         </div>
                         <div className="flex items-center gap-3">
-                          {member.user_id === ((user?.id || (user as any)?.user_id) || (user as any)?.user_id) ? (
+                          {member.user_id === user?.id ? (
                             <div className="flex items-center gap-2">
                               <Checkbox
                                 id={`share-${member.user_id}`}
@@ -791,7 +792,7 @@ export default function SettingsPage() {
                               Library Not Shared
                             </span>
                           )}
-                          {member.user_id !== (user?.id || (user as any)?.user_id) && member.user_id !== family?.owner_user_id && (
+                          {member.user_id !== user?.id && member.user_id !== family?.owner_user_id && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -983,7 +984,7 @@ export default function SettingsPage() {
           <DialogHeader>
             <DialogTitle>Change Email Address</DialogTitle>
             <DialogDescription>
-              Enter your new email address. We'll send a verification link to
+              Enter your new email address. We&apos;ll send a verification link to
               confirm the change.
             </DialogDescription>
           </DialogHeader>
@@ -1124,7 +1125,7 @@ export default function SettingsPage() {
           <DialogHeader>
             <DialogTitle>Edit Family Name</DialogTitle>
             <DialogDescription>
-              Update your family's name.
+              Update your family&apos;s name.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1385,7 +1386,7 @@ export default function SettingsPage() {
             <DialogDescription>
               {audibleWaitingForCallback
                 ? "Paste the URL from your Audible login redirect to complete linking"
-                : "You'll be redirected to Audible to authorize access to your account. After authorizing, return here to complete the linking process."}
+                : "You&apos;ll be redirected to Audible to authorize access to your account. After authorizing, return here to complete the linking process."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1393,7 +1394,7 @@ export default function SettingsPage() {
               <>
                 <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
                   <p className="text-sm text-blue-700 dark:text-blue-400">
-                    After logging in with Audible, you'll be redirected to a
+                    After logging in with Audible, you&apos;ll be redirected to a
                     URL. Copy and paste that entire URL below.
                   </p>
                 </div>

@@ -1,5 +1,6 @@
 """Tests for SyncService."""
 
+
 class TestSyncService:
     """Tests for sync service."""
 
@@ -70,6 +71,7 @@ class TestSyncService:
         service = SyncService()
         assert hasattr(service, "fail_sync")
 
+
 class TestSyncProgressBroadcasting:
     """Tests for broadcasting sync progress via WebSocket."""
 
@@ -114,6 +116,7 @@ class TestSyncProgressBroadcasting:
         # Verify service structure
         assert service is not None
 
+
 class TestSyncDownloadIntegration:
     """Tests for sync triggering downloads."""
 
@@ -148,6 +151,7 @@ class TestSyncDownloadIntegration:
         service = SyncService()
         assert hasattr(service, "start_sync")
 
+
 class TestSyncRetryLogic:
     """Tests for sync retry logic."""
 
@@ -171,6 +175,7 @@ class TestSyncRetryLogic:
 
         service = SyncService()
         assert service is not None
+
 
 class TestSyncMetadataIntegration:
     """Tests for metadata integration during sync."""
@@ -225,6 +230,7 @@ class TestSyncMetadataIntegration:
         service = SyncService()
         assert service is not None
 
+
 class TestSyncUserIsolation:
     """Tests for user isolation in sync operations."""
 
@@ -243,6 +249,7 @@ class TestSyncUserIsolation:
 
         service = SyncService()
         assert service is not None
+
 
 class TestSyncStatistics:
     """Tests for sync statistics and reporting."""

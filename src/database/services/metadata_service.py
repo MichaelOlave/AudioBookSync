@@ -550,9 +550,7 @@ async def get_chapters_by_asin(db: AsyncSession, asin: str) -> List[Chapter]:
     """Get chapters for a book ordered by sequence."""
     try:
         result = await db.execute(
-            select(Chapter)
-            .where(Chapter.asin == asin)
-            .order_by(Chapter.sequence_number)
+            select(Chapter).where(Chapter.asin == asin).order_by(Chapter.sequence_number)
         )
         return result.scalars().all()
     except Exception as e:

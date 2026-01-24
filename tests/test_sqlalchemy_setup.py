@@ -40,6 +40,7 @@ from src.database.services import (
 # MODEL TESTS
 # ============================================================================
 
+
 class TestModels:
     """Test SQLAlchemy model definitions."""
 
@@ -142,9 +143,11 @@ class TestModels:
             assert hasattr(model, "__tablename__")
             assert isinstance(model.__tablename__, str)
 
+
 # ============================================================================
 # SERVICE TESTS
 # ============================================================================
+
 
 class TestServices:
     """Test service modules are properly defined."""
@@ -294,9 +297,11 @@ class TestServices:
             assert hasattr(metadata_service, func_name), f"Missing function: {func_name}"
             assert callable(getattr(metadata_service, func_name))
 
+
 # ============================================================================
 # INFRASTRUCTURE TESTS
 # ============================================================================
+
 
 class TestInfrastructure:
     """Test database infrastructure."""
@@ -314,9 +319,11 @@ class TestInfrastructure:
         assert Base is not None
         assert hasattr(Base, "metadata")
 
+
 # ============================================================================
 # INTEGRATION TESTS (no DB required)
 # ============================================================================
+
 
 class TestServiceIntegration:
     """Test that services work together."""
@@ -363,5 +370,6 @@ class TestServiceIntegration:
         for func_name in functions:
             func = getattr(book_service, func_name)
             assert inspect.iscoroutinefunction(func), f"{func_name} is not async"
+
 
 # Run tests with: pytest tests/test_sqlalchemy_setup.py -v

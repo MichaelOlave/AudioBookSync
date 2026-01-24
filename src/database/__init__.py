@@ -22,28 +22,28 @@ Models (for schema access):
 # Engine exports
 from .engine import create_async_engine, get_db_session
 
-# Service exports
-from .services import (
-    user_service,
-    book_service,
-    metadata_service,
-    sync_service,
-    download_service,
-    decryption_service,
-    error_service,
-)
-
 # Models (for schema access if needed)
 from .models import (
-    User,
     Book,
-    UserBook,
     Contributor,
-    SyncHistory,
-    DownloadStatus,
     DecryptionStatus,
+    DownloadStatus,
     MediaInfo,
     ReadingProgress,
+    SyncHistory,
+    User,
+    UserBook,
+)
+
+# Service exports
+from .services import (
+    book_service,
+    decryption_service,
+    download_service,
+    error_service,
+    metadata_service,
+    sync_service,
+    user_service,
 )
 
 __all__ = [

@@ -27,9 +27,7 @@ async def _async_retry_downloads() -> dict:
     try:
         logger.info("Starting failed download retry")
 
-        retry_cutoff = datetime.now(timezone.utc) - timedelta(
-            seconds=Config.CELERY_RETRY_DELAY
-        )
+        retry_cutoff = datetime.now(timezone.utc) - timedelta(seconds=Config.CELERY_RETRY_DELAY)
 
         async with AsyncSessionLocal() as db:
             # Find failed downloads eligible for retry
@@ -61,9 +59,7 @@ async def _async_retry_downloads() -> dict:
             ) in failed_downloads:
                 # Find the download record and update it
                 download_record = await db.execute(
-                    select(DownloadStatus).where(
-                        DownloadStatus.download_id == download_id
-                    )
+                    select(DownloadStatus).where(DownloadStatus.download_id == download_id)
                 )
                 download = download_record.scalars().first()
 
@@ -75,7 +71,7 @@ async def _async_retry_downloads() -> dict:
                     await db.flush()
 
                     # Enqueue new download task with exponential backoff
-                    backoff = Config.CELERY_RETRY_DELAY * (2 ** attempt_number)
+                    backoff = Config.CELERY_RETRY_DELAY * (2**attempt_number)
                     execute_download_task.apply_async(
                         args=[
                             str(user_id),
@@ -107,9 +103,7 @@ async def _async_retry_decrypts() -> dict:
     try:
         logger.info("Starting failed decryption retry")
 
-        retry_cutoff = datetime.now(timezone.utc) - timedelta(
-            seconds=Config.CELERY_RETRY_DELAY
-        )
+        retry_cutoff = datetime.now(timezone.utc) - timedelta(seconds=Config.CELERY_RETRY_DELAY)
 
         async with AsyncSessionLocal() as db:
             # Find failed decryptions eligible for retry
@@ -141,9 +135,7 @@ async def _async_retry_decrypts() -> dict:
             ) in failed_decrypts:
                 # Find the decryption record and update it
                 decrypt_record = await db.execute(
-                    select(DecryptionStatus).where(
-                        DecryptionStatus.decryption_id == decryption_id
-                    )
+                    select(DecryptionStatus).where(DecryptionStatus.decryption_id == decryption_id)
                 )
                 decrypt = decrypt_record.scalars().first()
 
@@ -155,7 +147,7 @@ async def _async_retry_decrypts() -> dict:
                     await db.flush()
 
                     # Enqueue new decrypt task with exponential backoff
-                    backoff = Config.CELERY_RETRY_DELAY * (2 ** attempt_number)
+                    backoff = Config.CELERY_RETRY_DELAY * (2**attempt_number)
                     execute_decrypt_task.apply_async(
                         args=[
                             str(user_id),
@@ -182,14 +174,14 @@ def retry_failed_decrypts_from_minio() -> dict:
     return asyncio.run(_async_retry_decrypts_from_minio())
 
 
-async def _async_retry_decrypts_from_minio() -> dict:
+async def _async_retry_decrypts_from_minio() -> dict:  # noqa: C901
     """Async implementation of decryption retry from MinIO encrypted files."""
     try:
         logger.info("Starting failed decryption retry from MinIO encrypted files")
 
         from src.database.models.book import Book
-        from src.operations.decryptor import decrypt_book
         from src.infrastructure.storage_service import StorageService
+        from src.operations.decryptor import decrypt_book
 
         async with AsyncSessionLocal() as db:
             # Find decryptions with encrypted files stored in MinIO (failed decryptions)
@@ -242,9 +234,7 @@ async def _async_retry_decrypts_from_minio() -> dict:
                     user = await user_service.get_user_by_id(db, user_id)
                     activation_bytes = user.activation_bytes if user else None
                     if not activation_bytes:
-                        logger.warning(
-                            f"Activation bytes not configured for user {user_id}"
-                        )
+                        logger.warning(f"Activation bytes not configured for user {user_id}")
                         continue
 
                     # Attempt retry decryption
@@ -272,9 +262,7 @@ async def _async_retry_decrypts_from_minio() -> dict:
                                 object_key=decrypt_record.encrypted_file_object_key,
                             )
                         except Exception as e:
-                            logger.warning(
-                                f"Failed to delete encrypted file from MinIO: {e}"
-                            )
+                            logger.warning(f"Failed to delete encrypted file from MinIO: {e}")
                     else:
                         logger.warning(f"Retry still failed for ASIN {decrypt_record.asin}")
 

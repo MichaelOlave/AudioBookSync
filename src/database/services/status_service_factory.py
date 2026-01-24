@@ -88,9 +88,8 @@ class StatusServiceFactory:
                     if hasattr(self.model, "user_id"):
                         query = query.where(self.model.user_id == user_id)
                     else:
-                        query = (
-                            query.join(UserBook, self.model.asin == UserBook.asin)
-                            .where(UserBook.user_id == user_id)
+                        query = query.join(UserBook, self.model.asin == UserBook.asin).where(
+                            UserBook.user_id == user_id
                         )
                 query = query.order_by(self.model.created_at.desc())
                 result = await db.execute(query)
@@ -113,9 +112,8 @@ class StatusServiceFactory:
                     if hasattr(self.model, "user_id"):
                         query = query.where(self.model.user_id == user_id)
                     else:
-                        query = (
-                            query.join(UserBook, self.model.asin == UserBook.asin)
-                            .where(UserBook.user_id == user_id)
+                        query = query.join(UserBook, self.model.asin == UserBook.asin).where(
+                            UserBook.user_id == user_id
                         )
                 query = query.order_by(self.model.created_at.desc()).limit(1)
                 result = await db.execute(query)

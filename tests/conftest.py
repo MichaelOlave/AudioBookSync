@@ -31,7 +31,8 @@ async def test_async_engine():
     """
     # Get test database URL - use separate test database
     test_db_url = os.getenv(
-        "TEST_DATABASE_URL", "postgresql+asyncpg://postgres:dev_password@localhost/audibooksync_test"
+        "TEST_DATABASE_URL",
+        "postgresql+asyncpg://postgres:dev_password@localhost/audibooksync_test",
     )
 
     engine = create_async_engine(

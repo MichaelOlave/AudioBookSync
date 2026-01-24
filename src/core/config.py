@@ -150,12 +150,8 @@ class Config:
 
     # Cleanup Retention (days)
     CLEANUP_RETENTION_SYNC_DAYS = int(os.getenv("CLEANUP_RETENTION_SYNC_DAYS", "90"))
-    CLEANUP_RETENTION_ERROR_DAYS = int(
-        os.getenv("CLEANUP_RETENTION_ERROR_DAYS", "30")
-    )
-    CLEANUP_RETENTION_COMPLETED_DAYS = int(
-        os.getenv("CLEANUP_RETENTION_COMPLETED_DAYS", "7")
-    )
+    CLEANUP_RETENTION_ERROR_DAYS = int(os.getenv("CLEANUP_RETENTION_ERROR_DAYS", "30"))
+    CLEANUP_RETENTION_COMPLETED_DAYS = int(os.getenv("CLEANUP_RETENTION_COMPLETED_DAYS", "7"))
 
     # ========================================================================
     # Log Retention Configuration

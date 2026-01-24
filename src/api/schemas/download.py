@@ -8,8 +8,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .common import BookActionCreate, PaginatedResponse
 
+
 class DownloadCreate(BookActionCreate):
     """Request to initiate a book download."""
+
 
 class DownloadResponse(BaseModel):
     """Download status response."""
@@ -61,8 +63,9 @@ class DownloadResponse(BaseModel):
                 "message": "Download initiated",
                 "download_started_at": "2024-12-22T10:30:00",
             }
-        }
+        },
     )
+
 
 DownloadList = PaginatedResponse[DownloadResponse]
 """Type alias for paginated download list response."""

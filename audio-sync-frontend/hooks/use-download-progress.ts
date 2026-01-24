@@ -20,6 +20,7 @@ export function useDownloadProgress() {
   const ws = useRef<WebSocket | null>(null);
   const reconnectTimeout = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttempts = useRef(0);
+  const connectRef = useRef<() => void>(() => {});
   const MAX_RECONNECT_ATTEMPTS = 5;
   const RECONNECT_DELAY = 3000;
 
@@ -86,8 +87,8 @@ export function useDownloadProgress() {
         setIsConnected(false);
       };
 
-      ws.current.onclose = (event) => {
-        console.log(`✗ WebSocket closed (code: ${event.code}, clean: ${event.wasClean})`);
+      ws.current.onclose = () => {
+        console.log('✗ WebSocket closed');
         setIsConnected(false);
 
         // Attempt to reconnect
@@ -96,7 +97,7 @@ export function useDownloadProgress() {
           console.log(`Attempting to reconnect (${reconnectAttempts.current}/${MAX_RECONNECT_ATTEMPTS})...`);
 
           reconnectTimeout.current = setTimeout(() => {
-            connect();
+            connectRef.current();
           }, RECONNECT_DELAY);
         } else {
           console.error('Max reconnection attempts reached');
@@ -108,6 +109,11 @@ export function useDownloadProgress() {
     }
   }, [getWebSocketUrl]);
 
+  // Store connect function in ref to avoid circular dependency
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -117,9 +123,13 @@ export function useDownloadProgress() {
       return;
     }
 
-    connect();
+    // Use a setTimeout to defer connection setup to avoid cascading renders
+    const timeoutId = setTimeout(() => {
+      connect();
+    }, 0);
 
     return () => {
+      clearTimeout(timeoutId);
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
       }

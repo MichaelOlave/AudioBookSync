@@ -46,4 +46,6 @@ class Chapter(Base):
     book = relationship("Book", back_populates="chapters", lazy="select")
 
     def __repr__(self) -> str:
-        return f"<Chapter(chapter_id={self.chapter_id}, asin={self.asin}, seq={self.sequence_number})>"
+        return (
+            f"<Chapter(chapter_id={self.chapter_id}, asin={self.asin}, seq={self.sequence_number})>"
+        )

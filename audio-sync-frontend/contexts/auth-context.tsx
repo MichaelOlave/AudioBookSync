@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           apiClient.clearTokens();
           setUser(null);
         }
-      } catch (err) {
+      } catch {
         setError("Failed to restore session");
         setUser(null);
       } finally {

@@ -9,7 +9,7 @@ from loguru import logger
 from src.celery_app import celery_app
 from src.celery_app.utils.progress import publish_progress
 from src.database.engine import AsyncSessionLocal
-from src.database.services import sync_service, error_service
+from src.database.services import error_service, sync_service
 from src.operations.library_sync import sync_library
 
 

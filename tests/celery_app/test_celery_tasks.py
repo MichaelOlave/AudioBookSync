@@ -1,7 +1,8 @@
 """Tests for Celery task structure and configuration."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from src.celery_app import celery_app
 from src.celery_app.config import CeleryConfig
@@ -96,9 +97,7 @@ class TestProgressPublisher:
         mock_redis.publish = MagicMock(return_value=1)
 
         data = {"progress": 50}
-        publish_progress(
-            user_id="user123", event_type="download.progress", data=data
-        )
+        publish_progress(user_id="user123", event_type="download.progress", data=data)
 
         # Verify timestamp was added
         assert "timestamp" in data
@@ -128,8 +127,8 @@ class TestTaskStructure:
     def test_cleanup_task_imports(self):
         """Test that cleanup tasks can be imported."""
         from src.celery_app.tasks.cleanup_tasks import (
-            cleanup_orphaned_minio_files,
             cleanup_old_database_records,
+            cleanup_orphaned_minio_files,
         )
 
         assert cleanup_orphaned_minio_files is not None
@@ -138,8 +137,8 @@ class TestTaskStructure:
     def test_retry_task_imports(self):
         """Test that retry tasks can be imported."""
         from src.celery_app.tasks.retry_tasks import (
-            retry_failed_downloads,
             retry_failed_decrypts,
+            retry_failed_downloads,
         )
 
         assert retry_failed_downloads is not None

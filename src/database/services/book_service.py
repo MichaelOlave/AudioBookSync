@@ -178,9 +178,7 @@ async def get_user_book(db: AsyncSession, user_id: str, asin: str) -> Optional[U
     """
     try:
         result = await db.execute(
-            select(UserBook).where(
-                and_(UserBook.user_id == user_id, UserBook.asin == asin)
-            )
+            select(UserBook).where(and_(UserBook.user_id == user_id, UserBook.asin == asin))
         )
         return result.scalar_one_or_none()
     except Exception as e:
@@ -251,10 +249,7 @@ async def get_books_by_user(db: AsyncSession, user_id: str) -> List[dict]:
             .where(UserBook.user_id == user_id)
             .order_by(Book.title)
         )
-        return [
-            build_book_response_data(book, user_book)
-            for book, user_book in result.all()
-        ]
+        return [build_book_response_data(book, user_book) for book, user_book in result.all()]
     except Exception as e:
         logger.error(f"Failed to get books for user: {e}")
         return []
@@ -281,10 +276,7 @@ async def get_books_by_user_ids(db: AsyncSession, user_ids: List[str]) -> List[d
             .where(UserBook.user_id.in_(user_ids))
             .order_by(Book.title)
         )
-        return [
-            build_book_response_data(book, user_book)
-            for book, user_book in result.all()
-        ]
+        return [build_book_response_data(book, user_book) for book, user_book in result.all()]
     except Exception as e:
         logger.error(f"Failed to get books for user list: {e}")
         return []

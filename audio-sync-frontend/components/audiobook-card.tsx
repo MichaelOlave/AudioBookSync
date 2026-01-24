@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Play, Download, MoreVertical, X, Pause, Loader2 } from "lucide-react";
+import { Play, Download, Pause, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { getAPIClient } from "@/lib/api/client";
 
@@ -55,17 +55,9 @@ export function AudiobookCard({
   const audioRef = useRef<HTMLAudioElement>(null);
   const blobUrlRef = useRef<string | null>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const apiClient = getAPIClient();
+  const apiClient = useMemo(() => getAPIClient(), []);
 
-  // Load progress and chapters when dialog opens
-  useEffect(() => {
-    if (isDialogOpen) {
-      loadProgress();
-      loadChapters();
-    }
-  }, [isDialogOpen]);
-
-  const loadChapters = async () => {
+  const loadChapters = useCallback(async () => {
     try {
       setIsLoadingChapters(true);
       const chaptersData = (await apiClient.getChapters(id)) as Array<{
@@ -80,9 +72,9 @@ export function AudiobookCard({
     } finally {
       setIsLoadingChapters(false);
     }
-  };
+  }, [id, apiClient]);
 
-  const loadProgress = async () => {
+  const loadProgress = useCallback(async () => {
     try {
       const progress = (await apiClient.getProgress(id)) as {
         position_ms: number;
@@ -93,9 +85,9 @@ export function AudiobookCard({
     } catch (error) {
       console.error("Failed to load progress:", error);
     }
-  };
+  }, [id, apiClient]);
 
-  const saveProgress = async () => {
+  const saveProgress = useCallback(async () => {
     if (!audioRef.current) return;
 
     const duration_ms =
@@ -115,7 +107,15 @@ export function AudiobookCard({
     } catch (error) {
       console.error("Failed to save progress:", error);
     }
-  };
+  }, [id, apiClient]);
+
+  // Load progress and chapters when dialog opens
+  useEffect(() => {
+    if (isDialogOpen) {
+      loadProgress();
+      loadChapters();
+    }
+  }, [isDialogOpen, loadProgress, loadChapters]);
 
   // Setup progress tracking interval
   useEffect(() => {
@@ -134,7 +134,7 @@ export function AudiobookCard({
         clearInterval(progressIntervalRef.current);
       }
     }
-  }, [isPlaying, isDialogOpen]);
+  }, [isPlaying, isDialogOpen, saveProgress]);
 
   // Cleanup
   useEffect(() => {
@@ -150,7 +150,7 @@ export function AudiobookCard({
         saveProgress();
       }
     };
-  }, []);
+  }, [isDialogOpen, saveProgress]);
 
   const handlePlay = async () => {
     if (!audioRef.current) return;

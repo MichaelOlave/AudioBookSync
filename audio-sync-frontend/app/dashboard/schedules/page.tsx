@@ -20,7 +20,6 @@ import {
 } from "@/components/ui/dialog";
 import {
   Plus,
-  Clock,
   CheckCircle2,
   AlertCircle,
   Loader2,
@@ -337,7 +336,7 @@ export default function SchedulesPage() {
           <div className="flex-1 flex flex-col items-center justify-center">
             <Calendar className="w-12 h-12 text-muted-foreground mb-4 opacity-50" />
             <p className="text-muted-foreground mb-4">
-              No schedules configured yet. Click "Create Schedule" to add one.
+              No schedules configured yet. Click &quot;Create Schedule&quot; to add one.
             </p>
             <Button onClick={openCreateDialog} className="gap-2">
               <Plus className="w-4 h-4" />

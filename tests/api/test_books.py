@@ -1,6 +1,5 @@
 """Tests for books management endpoints."""
 
-
 import pytest
 from fastapi import status
 

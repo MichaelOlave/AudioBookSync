@@ -1,6 +1,5 @@
 """Tests for library endpoints."""
 
-
 import pytest
 from fastapi import status
 

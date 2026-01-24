@@ -3,6 +3,7 @@
 import pytest
 from fastapi import status
 
+
 class TestAudibleCredentialsStatus:
     """Tests for checking Audible credentials status."""
 
@@ -50,6 +51,7 @@ class TestAudibleCredentialsStatus:
         # Region might be None or not present if not configured
         assert "region" in data or "has_credentials" in data
 
+
 class TestClearAudibleCredentials:
     """Tests for clearing Audible credentials."""
 
@@ -89,6 +91,7 @@ class TestClearAudibleCredentials:
             # Should have success or message field
             assert "success" in data or "message" in data or data
 
+
 class TestPreferencesSettings:
     """Tests for user preference settings."""
 
@@ -125,6 +128,7 @@ class TestPreferencesSettings:
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
+
 class TestLibrarySettings:
     """Tests for library-specific settings."""
 
@@ -154,6 +158,7 @@ class TestLibrarySettings:
         response = authenticated_client.get("/api/v1/settings/library/storage")
 
         assert response.status_code in [status.HTTP_200_OK, status.HTTP_404_NOT_FOUND]
+
 
 class TestSettingsValidation:
     """Tests for settings validation."""

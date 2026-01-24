@@ -15,9 +15,7 @@ from src.operations.decryptor import decrypt_book
 
 
 @celery_app.task(bind=True, name="decrypt_task")
-def execute_decrypt_task(
-    self: Task, user_id: str, decryption_id: str, book: dict
-) -> bool:
+def execute_decrypt_task(self: Task, user_id: str, decryption_id: str, book: dict) -> bool:
     """
     Execute decrypt operation in Celery worker.
 
@@ -37,9 +35,7 @@ def execute_decrypt_task(
         return False
 
 
-async def _async_decrypt(
-    task: Task, user_id: str, decryption_id: str, book: dict
-) -> bool:
+async def _async_decrypt(task: Task, user_id: str, decryption_id: str, book: dict) -> bool:
     """
     Async implementation of decrypt task.
 

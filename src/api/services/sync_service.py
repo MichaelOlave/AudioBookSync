@@ -6,8 +6,8 @@ from uuid import UUID
 
 from loguru import logger
 
-from ...database.services import sync_service as orm_sync_service
 from ...database.engine import get_db_session
+from ...database.services import sync_service as orm_sync_service
 from ...operations.library_sync import sync_library
 from ..websockets import EventType, ws_manager
 

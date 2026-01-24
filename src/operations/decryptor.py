@@ -12,8 +12,8 @@ from ..core.config import Config
 from ..database.engine import AsyncSessionLocal
 from ..database.services import book_service, metadata_service
 from ..domain.progress import safe_progress_callback
-from ..infrastructure.storage_service import StorageService
 from ..infrastructure.file_utils import normalize_filename
+from ..infrastructure.storage_service import StorageService
 
 
 async def decrypt_book(
@@ -122,7 +122,9 @@ async def decrypt_book(
                     # If this was a retry, delete encrypted file from MinIO
                     if is_retry:
                         # This would need encrypted_object_key parameter
-                        logger.info("Retry successful - encrypted file should be deleted from MinIO")
+                        logger.info(
+                            "Retry successful - encrypted file should be deleted from MinIO"
+                        )
 
                     # Broadcast decrypt completed
                     await safe_progress_callback(
@@ -139,7 +141,9 @@ async def decrypt_book(
                 stderr_text = stderr.decode().strip()
 
                 # Decryption failed - upload encrypted file for retry
-                logger.warning(f"Decryption failed for {book_title}, uploading encrypted file for retry")
+                logger.warning(
+                    f"Decryption failed for {book_title}, uploading encrypted file for retry"
+                )
                 await _upload_encrypted_file_to_minio(book_asin, user_id, input_file)
 
                 raise Exception(f"FFmpeg error decrypting: {stderr_text}")
@@ -343,7 +347,9 @@ async def _upload_decrypted_file_to_minio(
         return False, ""
 
 
-async def _upload_encrypted_file_to_minio(book_asin: str, user_id: str, file_path: str) -> tuple[bool, str]:
+async def _upload_encrypted_file_to_minio(
+    book_asin: str, user_id: str, file_path: str
+) -> tuple[bool, str]:
     """
     Upload encrypted file to MinIO when decryption fails.
 

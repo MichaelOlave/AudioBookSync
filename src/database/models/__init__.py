@@ -15,8 +15,8 @@ from src.database.models.family import Family
 from src.database.models.genre import BookGenre, Genre
 from src.database.models.media_info import MediaInfo
 from src.database.models.reading_progress import ReadingProgress
-from src.database.models.sync_schedule import SyncSchedule
 from src.database.models.sync import SyncHistory
+from src.database.models.sync_schedule import SyncSchedule
 from src.database.models.user import User
 from src.database.models.user_book import UserBook
 

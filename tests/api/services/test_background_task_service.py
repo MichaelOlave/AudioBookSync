@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+
 class TestBackgroundTaskService:
     """Tests for background task execution service."""
 
@@ -123,6 +124,7 @@ class TestBackgroundTaskService:
         # Service should support monitoring
         assert service is not None
 
+
 class TestSyncOperationFlow:
     """Tests for complete sync operation flow."""
 
@@ -192,6 +194,7 @@ class TestSyncOperationFlow:
 
         # Verify error recording capability
 
+
 class TestDownloadOperationFlow:
     """Tests for complete download operation flow."""
 
@@ -229,6 +232,7 @@ class TestDownloadOperationFlow:
             )
 
         # Verify progress update capability
+
 
 class TestDecryptOperationFlow:
     """Tests for complete decrypt operation flow."""
@@ -272,6 +276,7 @@ class TestDecryptOperationFlow:
         monkeypatch.setattr(download_ops, "get_download_by_asin", mock_get_download_by_asin)
 
         # Verify prerequisite checking
+
 
 class TestServiceErrorRecovery:
     """Tests for service error handling and recovery."""

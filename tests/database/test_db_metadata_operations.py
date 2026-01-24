@@ -1,6 +1,5 @@
 """Tests for database metadata operations."""
 
-
 import pytest
 
 

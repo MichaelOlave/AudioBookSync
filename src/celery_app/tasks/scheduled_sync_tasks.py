@@ -26,9 +26,7 @@ def execute_scheduled_sync_task(self: Task, schedule_id: str) -> dict:
 async def _async_execute_scheduled_sync(schedule_id: str) -> dict:
     try:
         async with AsyncSessionLocal() as db:
-            schedule = await sync_schedule_service.get_sync_schedule_by_id(
-                db, UUID(schedule_id)
-            )
+            schedule = await sync_schedule_service.get_sync_schedule_by_id(db, UUID(schedule_id))
             if not schedule or not schedule.enabled:
                 return {
                     "success": False,

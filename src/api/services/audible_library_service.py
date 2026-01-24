@@ -59,13 +59,9 @@ async def fetch_audible_library_to_db(
     auth_data = json.loads(str(user.audible_auth_json))
     auth = audible.Authenticator.from_dict(auth_data)
 
-    response_groups_param, removed_groups = _build_response_groups(
-        Config.AUDIBLE_RESPONSE_GROUPS
-    )
+    response_groups_param, removed_groups = _build_response_groups(Config.AUDIBLE_RESPONSE_GROUPS)
     if removed_groups:
-        logger.warning(
-            f"Skipping unsupported Audible response groups: {', '.join(removed_groups)}"
-        )
+        logger.warning(f"Skipping unsupported Audible response groups: {', '.join(removed_groups)}")
 
     logger.info(
         f"Fetching library from Audible (num_results={num_results}, page={page}, "

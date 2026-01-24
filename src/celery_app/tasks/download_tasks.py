@@ -15,9 +15,7 @@ from src.operations.downloader import download_book
 
 
 @celery_app.task(bind=True, name="download_task")
-def execute_download_task(
-    self: Task, user_id: str, download_id: str, book: dict
-) -> bool:
+def execute_download_task(self: Task, user_id: str, download_id: str, book: dict) -> bool:
     """
     Execute download operation in Celery worker.
 
@@ -37,7 +35,7 @@ def execute_download_task(
         return False
 
 
-async def _async_download(
+async def _async_download(  # noqa: C901
     task: Task, user_id: str, download_id: str, book: dict
 ) -> bool:
     """

@@ -118,7 +118,9 @@ async def download_book(
                     """Monitor temporary directory for growing file."""
                     nonlocal last_file_sizes, progress_emitted, progress_check_count, iterations
 
-                    logger.warning(f"[Monitor] STARTING monitoring for temp_dir: {temp_dir}")  # Use warning for visibility
+                    logger.warning(
+                        f"[Monitor] STARTING monitoring for temp_dir: {temp_dir}"
+                    )  # Use warning for visibility
 
                     while process.returncode is None:
                         iterations += 1
@@ -159,8 +161,12 @@ async def download_book(
                                             if iterations % 5 == 0:
                                                 # Estimate total based on current file size
                                                 # Audiobooks typically range 500MB-2GB, so estimate at 1.5x current size
-                                                estimated_total = max(file_size * 1.5, 1.5 * 1024 * 1024 * 1024)
-                                                progress_percent = (file_size / estimated_total) * 100
+                                                estimated_total = max(
+                                                    file_size * 1.5, 1.5 * 1024 * 1024 * 1024
+                                                )
+                                                progress_percent = (
+                                                    file_size / estimated_total
+                                                ) * 100
 
                                                 logger.debug(
                                                     f"[Monitor] File size {file_size / 1024 / 1024:.1f}MB, estimated total {estimated_total / 1024 / 1024:.1f}MB -> {progress_percent:.1f}%"
@@ -177,7 +183,9 @@ async def download_book(
                                                 )
                                                 progress_emitted = True
                                     except (OSError, ValueError) as e:
-                                        logger.debug(f"[Monitor] Error reading file {file_path}: {e}")
+                                        logger.debug(
+                                            f"[Monitor] Error reading file {file_path}: {e}"
+                                        )
 
                             last_file_sizes = current_files
 

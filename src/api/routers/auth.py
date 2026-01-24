@@ -1,6 +1,5 @@
 """Authentication endpoints (register, login, refresh tokens)."""
 
-
 from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 from loguru import logger

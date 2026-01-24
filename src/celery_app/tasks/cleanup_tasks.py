@@ -35,17 +35,13 @@ async def _async_cleanup_minio() -> dict:
 
             # Query download_status for download paths
             result = await db.execute(
-                select(DownloadStatus.file_path).where(
-                    DownloadStatus.file_path.isnot(None)
-                )
+                select(DownloadStatus.file_path).where(DownloadStatus.file_path.isnot(None))
             )
             expected_paths.update(row[0] for row in result.fetchall() if row[0])
 
             # Query decryption_status for decrypted paths
             result = await db.execute(
-                select(DecryptionStatus.file_path).where(
-                    DecryptionStatus.file_path.isnot(None)
-                )
+                select(DecryptionStatus.file_path).where(DecryptionStatus.file_path.isnot(None))
             )
             expected_paths.update(row[0] for row in result.fetchall() if row[0])
 

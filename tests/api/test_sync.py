@@ -1,6 +1,5 @@
 """Tests for sync operation endpoints."""
 
-
 import pytest
 from fastapi import status
 

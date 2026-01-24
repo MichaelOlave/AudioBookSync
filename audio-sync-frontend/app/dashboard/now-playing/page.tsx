@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { Card } from "@/components/ui/card";
@@ -21,7 +21,7 @@ import { getAPIClient } from "@/lib/api/client";
 export default function NowPlayingPage() {
   const searchParams = useSearchParams();
   const requestedAsin = searchParams.get("asin");
-  const { books, loading, fetchDashboard } = useLibrary();
+  const { books, fetchDashboard } = useLibrary();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [chapters, setChapters] = useState<
@@ -31,7 +31,7 @@ export default function NowPlayingPage() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const blobUrlRef = useRef<string | null>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const apiClient = getAPIClient();
+  const apiClient = useMemo(() => getAPIClient(), []);
 
   const currentBook =
     books.length > 0
@@ -44,15 +44,7 @@ export default function NowPlayingPage() {
     fetchDashboard(true);
   }, [fetchDashboard]);
 
-  // Load progress and chapters when book is available
-  useEffect(() => {
-    if (currentBook) {
-      loadProgress();
-      loadChapters();
-    }
-  }, [currentBook?.asin]);
-
-  const loadChapters = async () => {
+  const loadChapters = useCallback(async () => {
     if (!currentBook) return;
     try {
       setIsLoadingChapters(true);
@@ -70,9 +62,9 @@ export default function NowPlayingPage() {
     } finally {
       setIsLoadingChapters(false);
     }
-  };
+  }, [currentBook, apiClient]);
 
-  const loadProgress = async () => {
+  const loadProgress = useCallback(async () => {
     if (!currentBook || !audioRef.current) return;
     try {
       const progress = (await apiClient.getProgress(currentBook.asin)) as {
@@ -84,9 +76,17 @@ export default function NowPlayingPage() {
     } catch (error) {
       console.error("Failed to load progress:", error);
     }
-  };
+  }, [currentBook, apiClient]);
 
-  const saveProgress = async () => {
+  // Load progress and chapters when book is available
+  useEffect(() => {
+    if (currentBook) {
+      loadProgress();
+      loadChapters();
+    }
+  }, [currentBook, loadProgress, loadChapters]);
+
+  const saveProgress = useCallback(async () => {
     if (!audioRef.current || !currentBook) return;
 
     const duration_ms = (audioRef.current.duration || 0) * 1000;
@@ -105,7 +105,7 @@ export default function NowPlayingPage() {
     } catch (error) {
       console.error("Failed to save progress:", error);
     }
-  };
+  }, [currentBook, apiClient]);
 
   // Setup progress tracking interval
   useEffect(() => {
@@ -124,7 +124,7 @@ export default function NowPlayingPage() {
         clearInterval(progressIntervalRef.current);
       }
     }
-  }, [isPlaying]);
+  }, [isPlaying, saveProgress]);
 
   // Cleanup and save progress on unmount
   useEffect(() => {
@@ -138,7 +138,7 @@ export default function NowPlayingPage() {
       // Save progress on unmount
       saveProgress();
     };
-  }, []);
+  }, [saveProgress]);
 
   if (!currentBook) {
     return (
@@ -157,8 +157,6 @@ export default function NowPlayingPage() {
       </div>
     );
   }
-
-  const duration = `${Math.round(currentBook.runtime_min / 60)}h ${currentBook.runtime_min % 60}m`;
 
   const handlePlay = async () => {
     if (!audioRef.current) return;

@@ -28,7 +28,7 @@ export default function DashboardHome() {
       }
     };
     initData();
-  }, []);
+  }, [fetchLibrary, getDownloads]);
 
   const handleStartSync = async () => {
     try {
@@ -79,7 +79,7 @@ export default function DashboardHome() {
           Welcome back, {user?.username || "User"}!
         </h1>
         <p className="text-muted-foreground mt-2">
-          Here's an overview of your audiobook library
+          Here&apos;s an overview of your audiobook library
         </p>
       </div>
 

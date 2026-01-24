@@ -13,7 +13,7 @@ router = APIRouter()
 
 
 @router.websocket("/updates")
-async def websocket_updates(
+async def websocket_updates(  # noqa: C901
     websocket: WebSocket,
     token: str = Query(..., description="JWT access token for authentication"),
 ) -> None:

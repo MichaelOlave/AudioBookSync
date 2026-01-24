@@ -37,7 +37,7 @@ class ConnectionManager:
             except Exception as e:
                 logger.error(f"Failed to initialize Redis: {e}")
 
-    async def _subscribe_to_user_channel(self, user_id: str) -> None:
+    async def _subscribe_to_user_channel(self, user_id: str) -> None:  # noqa: C901
         """
         Subscribe to Redis pub/sub channel for user and forward to WebSockets.
 
@@ -77,9 +77,7 @@ class ConnectionManager:
         except Exception as e:
             logger.error(f"Error in Redis subscription: {e}")
 
-    async def _send_to_user_websockets(
-        self, user_id: str, event_type: str, data: dict
-    ) -> None:
+    async def _send_to_user_websockets(self, user_id: str, event_type: str, data: dict) -> None:
         """
         Send message to all WebSocket connections for user.
 

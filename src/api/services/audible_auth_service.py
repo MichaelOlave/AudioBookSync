@@ -76,7 +76,7 @@ async def start_audible_auth_flow(
     return AuthStartResponse(login_url=oauth_url)
 
 
-async def complete_audible_auth_flow(
+async def complete_audible_auth_flow(  # noqa: C901
     db: AsyncSession,
     user_id: str,
     redirect_url: str,

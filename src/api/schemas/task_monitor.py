@@ -27,9 +27,7 @@ class ActiveTaskResponse(BaseModel):
     title: Optional[str] = Field(None, description="Book title")
 
     # Progress Info
-    progress_percentage: Optional[int] = Field(
-        None, ge=0, le=100, description="Progress (0-100)"
-    )
+    progress_percentage: Optional[int] = Field(None, ge=0, le=100, description="Progress (0-100)")
     started_at: datetime = Field(description="When task started")
 
     # Download/Decryption specific

@@ -37,7 +37,6 @@ class TestConfigDefaults:
 
             assert ConfigReloaded.ACTIVATION_BYTES == "c3f80507"
 
-
     def test_default_log_dir(self):
         """Test default LOG_DIR value."""
         with patch.dict(os.environ, {}, clear=False):
@@ -91,7 +90,6 @@ class TestConfigEnvironmentVariables:
         from src.core.config import Config as ConfigReloaded
 
         assert ConfigReloaded.ACTIVATION_BYTES == "abcdef1234567890"
-
 
     def test_num_results_from_env(self, monkeypatch):
         """Test AUDIBLE_NUM_RESULTS can be set from environment variable."""

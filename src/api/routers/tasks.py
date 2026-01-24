@@ -154,12 +154,10 @@ async def cancel_task(
 
     # Cancel the task
     try:
-        success, task_type, current_status, message = (
-            await task_monitor_service.cancel_task(
-                db=db,
-                task_id=task_uuid,
-                user_id=user_id,
-            )
+        success, task_type, current_status, message = await task_monitor_service.cancel_task(
+            db=db,
+            task_id=task_uuid,
+            user_id=user_id,
         )
 
         logger.info(f"Task {task_id} cancellation result: {message}")

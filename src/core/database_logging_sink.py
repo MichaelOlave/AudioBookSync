@@ -71,8 +71,7 @@ class DatabaseLoggingSink:
             else:
                 # Queue full - log to stderr and drop log
                 msg_text = (
-                    message.record.get("message") if hasattr(message, "record")
-                    else str(message)
+                    message.record.get("message") if hasattr(message, "record") else str(message)
                 )
                 print(
                     f"WARNING: Database logging queue full (max {self.max_queue_size}), "
