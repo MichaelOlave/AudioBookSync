@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Column, DateTime, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -31,6 +31,13 @@ class User(Base):
     audible_email = Column(String(255), nullable=True, index=True)
     audible_device_name = Column(String(255), nullable=True, index=True)
     is_active = Column(Boolean, default=True, nullable=False, index=True)
+    family_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("families.family_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    share_library_with_family = Column(Boolean, default=False, nullable=False)
     last_sync_date = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=get_current_timestamp, nullable=False)
     updated_at = Column(
@@ -53,12 +60,19 @@ class User(Base):
         cascade="all, delete-orphan",
         lazy="select",
     )
+    sync_schedules = relationship(
+        "SyncSchedule",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
     error_logs = relationship(
         "ErrorLog",
         back_populates="user",
         cascade="all, delete-orphan",
         lazy="select",
     )
+    family = relationship("Family", back_populates="members", lazy="select")
 
     def __repr__(self) -> str:
         return f"<User(user_id={self.user_id}, username={self.username}, email={self.email})>"
