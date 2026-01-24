@@ -2,8 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from src.celery_app import celery_app
 from src.celery_app.config import CeleryConfig
 
@@ -37,11 +35,10 @@ class TestCeleryConfiguration:
         ]
 
         registered_tasks = list(celery_app.tasks.keys())
+        assert registered_tasks
         for task_name in task_names:
             # Check if task is in registered tasks (may have different name format)
-            found = any(task_name in t or t in task_name for t in registered_tasks)
-            # For now, just verify the app has tasks
-            assert len(registered_tasks) > 0
+            assert any(task_name in t or t in task_name for t in registered_tasks)
 
 
 class TestBeatSchedule:

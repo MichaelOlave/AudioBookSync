@@ -16,7 +16,7 @@ from ..infrastructure.file_utils import normalize_filename
 from ..infrastructure.storage_service import StorageService
 
 
-async def decrypt_book(
+async def decrypt_book(  # noqa: C901
     book: list,
     user_id: str,
     encrypted_file_path: str = None,

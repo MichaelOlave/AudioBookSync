@@ -46,7 +46,7 @@ async def ensure_directory(directory: str) -> None:
     tmp_root = Path(tempfile.gettempdir())
     try:
         # Python 3.9+ has is_relative_to; guard in case of older versions.
-        is_under_tmp = path.is_relative_to(tmp_root)  # type: ignore[attr-defined]
+        is_under_tmp = path.is_relative_to(tmp_root)
     except AttributeError:
         is_under_tmp = str(path).startswith(str(tmp_root))
 

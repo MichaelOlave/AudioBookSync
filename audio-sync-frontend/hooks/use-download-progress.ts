@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { logger } from '@/lib/logger';
 
 export interface DownloadProgressEvent {
   asin: string;
@@ -32,28 +33,28 @@ export function useDownloadProgress() {
     const token = localStorage.getItem('accessToken');
 
     if (!token) {
-      console.warn('No access token available for WebSocket connection');
+      logger.warn('No access token available for WebSocket connection');
       return '';
     }
 
     const url = `${wsUrl}/ws/updates?token=${encodeURIComponent(token)}`;
-    console.log('WebSocket URL:', url.replace(token, 'TOKEN_HIDDEN'));
+    logger.debug('WebSocket URL:', url.replace(token, 'TOKEN_HIDDEN'));
     return url;
   }, []);
 
   const connect = useCallback(() => {
     const wsUrl = getWebSocketUrl();
     if (!wsUrl) {
-      console.warn('Cannot connect to WebSocket: missing URL');
+      logger.warn('Cannot connect to WebSocket: missing URL');
       return;
     }
 
     try {
-      console.log('Connecting to WebSocket...');
+      logger.debug('Connecting to WebSocket...');
       ws.current = new WebSocket(wsUrl);
 
       ws.current.onopen = () => {
-        console.log('✓ WebSocket connected');
+        logger.debug('WebSocket connected');
         setIsConnected(true);
         reconnectAttempts.current = 0;
       };
@@ -61,7 +62,7 @@ export function useDownloadProgress() {
       ws.current.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          console.log('WebSocket message:', message.type);
+          logger.debug('WebSocket message:', message.type);
 
           // Keep connection alive on any message
           setIsConnected(true);
@@ -70,7 +71,7 @@ export function useDownloadProgress() {
           if (message.type === 'download.progress' || message.type === 'download_progress') {
             const data = message.data;
             if (data.asin) {
-              console.log(`✓ Update progress for ${data.asin}: ${data.progress_percent}%`);
+              logger.debug(`Update progress for ${data.asin}: ${data.progress_percent}%`);
               setProgress((prev) => ({
                 ...prev,
                 [data.asin]: data,
@@ -78,33 +79,33 @@ export function useDownloadProgress() {
             }
           }
         } catch (error) {
-          console.error('Failed to parse WebSocket message:', error, 'Raw:', event.data);
+          logger.error('Failed to parse WebSocket message:', error);
         }
       };
 
       ws.current.onerror = (error) => {
-        console.error('✗ WebSocket error:', error);
+        logger.error('WebSocket error:', error);
         setIsConnected(false);
       };
 
       ws.current.onclose = () => {
-        console.log('✗ WebSocket closed');
+        logger.debug('WebSocket closed');
         setIsConnected(false);
 
         // Attempt to reconnect
         if (reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
           reconnectAttempts.current += 1;
-          console.log(`Attempting to reconnect (${reconnectAttempts.current}/${MAX_RECONNECT_ATTEMPTS})...`);
+          logger.debug(`Attempting to reconnect (${reconnectAttempts.current}/${MAX_RECONNECT_ATTEMPTS})...`);
 
           reconnectTimeout.current = setTimeout(() => {
             connectRef.current();
           }, RECONNECT_DELAY);
         } else {
-          console.error('Max reconnection attempts reached');
+          logger.error('Max reconnection attempts reached');
         }
       };
     } catch (error) {
-      console.error('Failed to create WebSocket:', error);
+      logger.error('Failed to create WebSocket:', error);
       setIsConnected(false);
     }
   }, [getWebSocketUrl]);
@@ -119,7 +120,7 @@ export function useDownloadProgress() {
 
     const token = localStorage.getItem('accessToken');
     if (!token) {
-      console.warn('No token available, skipping WebSocket connection');
+      logger.warn('No token available, skipping WebSocket connection');
       return;
     }
 

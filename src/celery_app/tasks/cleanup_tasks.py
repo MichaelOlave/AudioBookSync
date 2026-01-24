@@ -106,7 +106,7 @@ async def _async_cleanup_database() -> dict:
             )
             result = await db.execute(
                 delete(ErrorLog).where(
-                    and_(ErrorLog.timestamp < error_cutoff, ErrorLog.resolved == True)
+                    and_(ErrorLog.timestamp < error_cutoff, ErrorLog.resolved.is_(True))
                 )
             )
             await db.flush()

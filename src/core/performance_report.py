@@ -90,7 +90,7 @@ class PerformanceReport:
         Returns:
             Detailed performance report
         """
-        report = {
+        report: Dict[str, Any] = {
             "timestamp": datetime.now().isoformat(),
             "summary": {
                 "total_benchmarks": len(self.benchmarks),

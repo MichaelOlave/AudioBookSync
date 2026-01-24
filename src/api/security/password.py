@@ -1,5 +1,7 @@
 """Password hashing and verification using bcrypt."""
 
+from typing import cast
+
 from passlib.context import CryptContext
 
 # Create bcrypt context with sensible defaults
@@ -26,7 +28,7 @@ def hash_password(password: str) -> str:
         >>> verify_password("mypassword123", hash_pwd)
         True
     """
-    return pwd_context.hash(password)
+    return cast(str, pwd_context.hash(password))
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -47,4 +49,4 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         >>> verify_password("wrongpassword", hash_pwd)
         False
     """
-    return pwd_context.verify(plain_password, hashed_password)
+    return bool(pwd_context.verify(plain_password, hashed_password))

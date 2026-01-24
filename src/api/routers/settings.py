@@ -1,5 +1,6 @@
 """User settings and Audible credentials endpoints."""
 
+from typing import Literal, cast
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, status
@@ -22,6 +23,8 @@ from ..security.auth import get_current_user
 from ..utils.auth_utils import get_user_id
 
 router = APIRouter()
+
+StorageProviderType = Literal["minio", "aws_s3", "gcs"]
 
 
 def normalize_endpoint(endpoint: str) -> str:
@@ -287,6 +290,7 @@ async def get_storage_config(
     is_dict = isinstance(storage_config, dict)
 
     provider_type = storage_config.get("provider_type", "minio") if is_dict else "minio"
+    provider_type = cast(StorageProviderType, provider_type)
     endpoint = (
         storage_config.get("endpoint", "http://localhost:9000")
         if is_dict

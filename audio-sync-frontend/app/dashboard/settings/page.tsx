@@ -22,6 +22,7 @@ import {
   Crown,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { logger } from "@/lib/logger";
 import {
   Dialog,
   DialogContent,
@@ -197,7 +198,7 @@ export default function SettingsPage() {
       setStorageConnected(data.is_connected);
       setStorageMessage(data.message || "");
     } catch (err) {
-      console.error("Failed to fetch storage config:", err);
+      logger.error("Failed to fetch storage config:", err);
     }
   };
 
@@ -211,7 +212,7 @@ export default function SettingsPage() {
       setAudibleEmail(data.audible_email || "");
       setAudibleDeviceName(data.device_name || "");
     } catch (err) {
-      console.warn("Audible status check failed:", err);
+      logger.warn("Audible status check failed:", err);
       setAudibleConnected(false);
       setAudibleEmail("");
       setAudibleDeviceName("");
@@ -1452,7 +1453,7 @@ export default function SettingsPage() {
                   </Button>
                   <Button
                     onClick={() => {
-                      console.log(
+                      logger.debug(
                         "Redirecting to Audible auth URL:",
                         audibleAuthUrl,
                       );

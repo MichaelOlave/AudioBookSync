@@ -9,6 +9,7 @@ import { useLibrary } from "@/hooks/use-library";
 import { useSync } from "@/hooks/use-sync";
 import { useDownloads } from "@/hooks/use-downloads";
 import { BookOpen, Download, Music, TrendingUp, Loader2 } from "lucide-react";
+import { logger } from "@/lib/logger";
 
 export default function DashboardHome() {
   const { user } = useAuth();
@@ -24,7 +25,7 @@ export default function DashboardHome() {
         await fetchLibrary(1, 50);
         await getDownloads("completed", 1, 10);
       } catch (err) {
-        console.error("Failed to fetch initial data:", err);
+        logger.error("Failed to fetch initial data:", err);
       }
     };
     initData();
@@ -35,7 +36,7 @@ export default function DashboardHome() {
       setIsSyncing(true);
       await startSync("full");
     } catch (err) {
-      console.error("Failed to start sync:", err);
+      logger.error("Failed to start sync:", err);
     } finally {
       setIsSyncing(false);
     }

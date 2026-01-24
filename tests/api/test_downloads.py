@@ -291,8 +291,8 @@ class TestDownloadStatuses:
 
         for status_value in valid_statuses:
 
-            def mock_get_user_downloads(user_id, status=None, limit=10, offset=0):
-                if status == status_value:
+            def mock_get_user_downloads(user_id, status_filter=None, limit=10, offset=0):
+                if status_filter == status_value:
                     return [
                         {
                             "download_id": str(uuid.uuid4()),
@@ -302,8 +302,8 @@ class TestDownloadStatuses:
                     ]
                 return []
 
-            def mock_count_user_downloads(user_id, status=None):
-                return 1 if status == status_value else 0
+            def mock_count_user_downloads(user_id, status_filter=None):
+                return 1 if status_filter == status_value else 0
 
             monkeypatch.setattr(download_ops, "get_user_downloads", mock_get_user_downloads)
             monkeypatch.setattr(download_ops, "count_user_downloads", mock_count_user_downloads)

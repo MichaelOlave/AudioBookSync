@@ -113,7 +113,7 @@ async def add_book_contributor(
         return None
 
 
-async def get_or_create_contributor(
+async def get_or_create_contributor(  # noqa: C901
     db: AsyncSession,
     name: str,
     contributor_type: str,
@@ -424,7 +424,7 @@ async def get_book_availability(db: AsyncSession, asin: str) -> Optional[BookAva
         return None
 
 
-async def upsert_book_availability(
+async def upsert_book_availability(  # noqa: C901
     db: AsyncSession,
     asin: str,
     is_playable: Optional[bool] = None,

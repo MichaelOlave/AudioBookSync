@@ -15,6 +15,7 @@ import {
 import { Play, Download, Pause, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { getAPIClient } from "@/lib/api/client";
+import { logger } from "@/lib/logger";
 
 interface AudiobookCardProps {
   id: string;
@@ -68,7 +69,7 @@ export function AudiobookCard({
         setChapters(chaptersData);
       }
     } catch (error) {
-      console.error("Failed to load chapters:", error);
+      logger.error("Failed to load chapters:", error);
     } finally {
       setIsLoadingChapters(false);
     }
@@ -83,7 +84,7 @@ export function AudiobookCard({
         audioRef.current.currentTime = progress.position_ms / 1000;
       }
     } catch (error) {
-      console.error("Failed to load progress:", error);
+      logger.error("Failed to load progress:", error);
     }
   }, [id, apiClient]);
 
@@ -105,7 +106,7 @@ export function AudiobookCard({
         is_finished: percent_complete >= 95,
       });
     } catch (error) {
-      console.error("Failed to save progress:", error);
+      logger.error("Failed to save progress:", error);
     }
   }, [id, apiClient]);
 
@@ -174,7 +175,7 @@ export function AudiobookCard({
         await audioRef.current.play();
         setIsPlaying(true);
       } catch (error) {
-        console.error("Play failed:", error);
+        logger.error("Play failed:", error);
       } finally {
         setIsLoading(false);
       }
@@ -194,7 +195,7 @@ export function AudiobookCard({
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      console.error("Download failed:", error);
+      logger.error("Download failed:", error);
     } finally {
       setIsDownloading(false);
     }
@@ -366,7 +367,7 @@ export function AudiobookCard({
                         blobUrlRef.current = blobUrl;
                         audioRef.current.src = blobUrl;
                       } catch (error) {
-                        console.error("Failed to load audio:", error);
+                        logger.error("Failed to load audio:", error);
                         return;
                       } finally {
                         setIsLoading(false);

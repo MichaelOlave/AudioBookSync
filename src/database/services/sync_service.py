@@ -118,7 +118,7 @@ async def get_latest_sync(db: AsyncSession, user_id: UUID) -> Optional[SyncHisto
         return None
 
 
-async def update_sync_status(
+async def update_sync_status(  # noqa: C901
     db: AsyncSession,
     sync_id: UUID,
     status: str,

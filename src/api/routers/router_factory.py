@@ -394,7 +394,6 @@ class StatusRouterFactory:
         """
         get_by_id_method = getattr(self.config.service_module, self.config.get_by_id_method_name)
         operation_name = self.config.operation_name
-        id_field = self.config.id_field
 
         @handle_route_errors(f"get {operation_name} status")
         async def get_status_endpoint(

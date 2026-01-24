@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { getAPIClient, APIError } from "@/lib/api/client";
+import { logger } from "@/lib/logger";
 
 export interface Book {
   asin: string;
@@ -200,7 +201,7 @@ export function useLibrary() {
   );
 
   const syncFromAudible = useCallback(async () => {
-    console.log("Starting syncFromAudible...");
+    logger.debug("Starting syncFromAudible...");
     setState((prev) => ({
       ...prev,
       syncing: true,
@@ -214,16 +215,16 @@ export function useLibrary() {
       let totalFailed = 0;
       const pageSize = 500;
 
-      console.log("Beginning pagination loop...");
+      logger.debug("Beginning pagination loop...");
       // Keep fetching pages until all books are retrieved
       while (true) {
-        console.log(`Fetching page ${currentPage}...`);
+        logger.debug(`Fetching page ${currentPage}...`);
         const response = (await apiClient.fetchFromAudible(
           pageSize,
           currentPage,
         )) as SyncResponse;
 
-        console.log("Full response:", response);
+        logger.debug("Full response:", response);
         const fetched = response.total_fetched || 0;
         const saved = response.books_saved || 0;
         const failed = response.books_failed || 0;
@@ -231,20 +232,20 @@ export function useLibrary() {
         totalSaved += saved;
         totalFailed += failed;
 
-        console.log(
+        logger.debug(
           `Fetched page ${currentPage}: ${fetched} books (saved: ${saved}, failed: ${failed}), cumulative: ${totalSaved} saved, ${totalFailed} failed`,
         );
 
         // Stop if no more books were fetched on this page
         if (fetched === 0) {
-          console.log("Pagination complete");
+          logger.debug("Pagination complete");
           break;
         }
 
         currentPage++;
       }
 
-      console.log(
+      logger.debug(
         `Sync complete. Total saved: ${totalSaved}, Total failed: ${totalFailed}`,
       );
       const syncResult: SyncResponse = {
@@ -262,7 +263,7 @@ export function useLibrary() {
       // Refresh library after successful sync
       await fetchLibrary(1, 50);
     } catch (err) {
-      console.error("Error in syncFromAudible:", err);
+      logger.error("Error in syncFromAudible:", err);
       const error =
         err instanceof APIError ? err.message : "Failed to fetch from Audible";
       setState((prev) => ({

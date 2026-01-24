@@ -19,6 +19,7 @@ import {
   FormItem,
   FormMessage,
 } from "@/components/ui/form";
+import { logger } from "@/lib/logger";
 
 const loginSchema = z.object({
   username: z
@@ -46,7 +47,7 @@ export default function LoginPage() {
   async function onSubmit(values: LoginFormValues) {
     setIsSubmitting(true);
     try {
-      console.log("Submitting login form with values:", values);
+      logger.debug("Submitting login form with values:", values);
       await login(values.username, values.password);
       toast.success("Login successful!");
       router.push("/");

@@ -19,6 +19,7 @@ import {
   FormItem,
   FormMessage,
 } from "@/components/ui/form";
+import { logger } from "@/lib/logger";
 
 const registerSchema = z
   .object({
@@ -62,7 +63,7 @@ export default function RegisterPage() {
   async function onSubmit(values: RegisterFormValues) {
     setIsSubmitting(true);
     try {
-      console.log("Submitting registration with values:", {
+      logger.debug("Submitting registration with values:", {
         username: values.username,
         email: values.email,
         password: "***",
@@ -71,7 +72,7 @@ export default function RegisterPage() {
       toast.success("Registration successful! Please log in with your credentials.");
       router.push("/login");
     } catch (error) {
-      console.error("Registration error:", error);
+      logger.error("Registration error:", error);
       let errorMessage = "Registration failed. Please try again.";
 
       if (error instanceof Error) {

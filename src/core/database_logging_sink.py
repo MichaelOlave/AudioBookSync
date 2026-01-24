@@ -7,9 +7,6 @@ import traceback
 from queue import Queue
 from typing import Any, Dict, Optional
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.database.engine import AsyncSessionLocal
 from src.database.models.application_log import ApplicationLog
 
@@ -117,7 +114,7 @@ class DatabaseLoggingSink:
         finally:
             loop.close()
 
-    async def _process_queue(self) -> None:
+    async def _process_queue(self) -> None:  # noqa: C901
         """
         Process logs from the queue in batches.
 
@@ -132,7 +129,7 @@ class DatabaseLoggingSink:
                 try:
                     record = self.queue.get(timeout=self.batch_timeout_seconds)
                     batch.append(record)
-                except:
+                except Exception:
                     # Timeout - check if we should flush
                     pass
 

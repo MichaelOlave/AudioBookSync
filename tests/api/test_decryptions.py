@@ -353,8 +353,8 @@ class TestDecryptionStatuses:
 
         for status_value in valid_statuses:
 
-            def mock_get_user_decryptions(user_id, status=None, limit=10, offset=0):
-                if status == status_value:
+            def mock_get_user_decryptions(user_id, status_filter=None, limit=10, offset=0):
+                if status_filter == status_value:
                     return [
                         {
                             "decryption_id": str(uuid.uuid4()),
@@ -364,8 +364,8 @@ class TestDecryptionStatuses:
                     ]
                 return []
 
-            def mock_count_user_decryptions(user_id, status=None):
-                return 1 if status == status_value else 0
+            def mock_count_user_decryptions(user_id, status_filter=None):
+                return 1 if status_filter == status_value else 0
 
             monkeypatch.setattr(decryption_ops, "get_user_decryptions", mock_get_user_decryptions)
             monkeypatch.setattr(

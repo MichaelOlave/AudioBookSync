@@ -5,7 +5,7 @@ Provides reusable handlers for paginated list endpoints and other common pattern
 """
 
 import inspect
-from typing import Any, Callable, Optional, Type, TypeVar, Union
+from typing import Any, Callable, Optional, Type, TypeVar
 
 from fastapi import Query
 from loguru import logger
@@ -20,7 +20,7 @@ T = TypeVar("T")
 ResponseT = TypeVar("ResponseT")
 
 
-def verify_book_ownership(book: Union[dict, object], user_id: str, asin: str) -> None:
+def verify_book_ownership(book: Any, user_id: str, asin: str) -> None:
     """
     Verify that a book belongs to the specified user.
 

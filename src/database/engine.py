@@ -10,6 +10,9 @@ from src.core.config import Config
 # Create async engine
 # Note: psycopg2 URLs need to be converted to asyncpg:
 # postgresql:// -> postgresql+asyncpg://
+if not Config.DATABASE_URL:
+    raise RuntimeError("DATABASE_URL is not set")
+
 async_db_url = Config.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
 
 engine = create_async_engine(

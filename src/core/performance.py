@@ -145,13 +145,13 @@ class PerformanceProfiler:
         if not self.metrics:
             return {"total_operations": 0, "operations": {}}
 
-        by_operation = {}
+        by_operation: Dict[str, List[PerformanceMetrics]] = {}
         for metric in self.metrics:
             if metric.operation_name not in by_operation:
                 by_operation[metric.operation_name] = []
             by_operation[metric.operation_name].append(metric)
 
-        summary = {"total_operations": len(self.metrics), "operations": {}}
+        summary: Dict[str, Any] = {"total_operations": len(self.metrics), "operations": {}}
 
         for op_name, metrics_list in by_operation.items():
             successful = [m for m in metrics_list if m.success]
@@ -198,7 +198,7 @@ class BenchmarkComparison:
 
     def __init__(self):
         """Initialize benchmark comparison."""
-        self.results: Dict[str, List[BenchmarkResult]] = {}
+        self.results: Dict[str, List[Dict[str, Any]]] = {}
 
     async def compare(
         self,
@@ -313,7 +313,7 @@ class BenchmarkComparison:
         Returns:
             Comprehensive performance report
         """
-        report = {
+        report: Dict[str, Any] = {
             "timestamp": datetime.now().isoformat(),
             "benchmarks": [],
             "summary": {
@@ -365,7 +365,7 @@ class LoadTester:
             target_rps: Target requests per second
         """
         self.target_rps = target_rps
-        self.results = []
+        self.results: List[Dict[str, Any]] = []
 
     async def run_load_test(
         self,

@@ -181,9 +181,9 @@ class TestWebSocketConcurrency:
 
                     # Both should work
                     try:
-                        data1 = websocket1.receive_json(timeout=2)
-                        data2 = websocket2.receive_json(timeout=2)
-                    except:
+                        websocket1.receive_json(timeout=2)
+                        websocket2.receive_json(timeout=2)
+                    except Exception:
                         # Timing-based, may not work in test environment
                         pass
         except Exception:
@@ -248,7 +248,7 @@ class TestWebSocketLifecycle:
                         data = websocket.receive_json(timeout=1)
                         if "id" in data:
                             received_ids.append(data["id"])
-                except:
+                except Exception:
                     # Timing-dependent in test environment
                     pass
         except Exception:

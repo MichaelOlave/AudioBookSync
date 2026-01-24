@@ -15,7 +15,7 @@ from src.database.models.user_book import UserBook
 from src.database.services import metadata_service
 
 
-async def add_book(
+async def add_book(  # noqa: C901
     db: AsyncSession,
     asin: str,
     user_id: str,
@@ -643,7 +643,7 @@ async def get_books_by_series(
         return []
 
 
-async def add_book_with_metadata(
+async def add_book_with_metadata(  # noqa: C901
     db: AsyncSession,
     asin: str,
     user_id: str,

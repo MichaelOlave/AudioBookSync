@@ -1,6 +1,7 @@
 """Request/response logging middleware for FastAPI."""
 
 import time
+from typing import Awaitable, Callable
 
 from fastapi import Request
 from loguru import logger
@@ -21,7 +22,11 @@ class LoggingMiddleware(BaseHTTPMiddleware):
     - Client IP address
     """
 
-    async def dispatch(self, request: Request, call_next) -> Response:
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
         """Process request and log details."""
 
         # Skip logging for health checks to reduce log noise

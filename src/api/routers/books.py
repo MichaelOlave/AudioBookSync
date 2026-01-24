@@ -1,5 +1,7 @@
 """Book management endpoints."""
 
+from decimal import Decimal
+
 from fastapi import APIRouter, Depends, status
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -81,7 +83,7 @@ async def create_book(
         narrator=book_data.narrator,
         series_name=book_data.series_name,
         description=book_data.description,
-        rating=book_data.rating,
+        rating=Decimal(str(book_data.rating)) if book_data.rating is not None else None,
     )
 
     if not success:
@@ -199,4 +201,4 @@ async def get_book_chapters(
     await verify_book_access(db, asin, current_user)
 
     chapters = await metadata_service.get_chapters_by_asin(db, asin)
-    return chapters
+    return [ChapterResponse.model_validate(chapter, from_attributes=True) for chapter in chapters]

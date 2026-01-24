@@ -83,7 +83,7 @@ async def create_family(
     if current_user.family_id:
         raise ConflictError("User already belongs to a family")
 
-    family = await user_service.create_family(db, payload.name, current_user.user_id)
+    family = await user_service.create_family(db, payload.name, str(current_user.user_id))
     if not family:
         raise InternalServerError("Failed to create family")
 

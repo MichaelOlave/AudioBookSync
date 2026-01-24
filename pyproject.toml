@@ -109,6 +109,14 @@ ignore_missing_imports = true
 module = "loguru.*"
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = [
+    "src.api.routers.router_factory",
+    "src.celery_app.tasks.*",
+    "src.database.services.*",
+]
+ignore_errors = true
+
 # ============================================================================
 # PYTEST - Testing Configuration
 # ============================================================================

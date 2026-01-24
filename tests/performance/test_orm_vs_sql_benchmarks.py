@@ -58,7 +58,7 @@ class TestMetadataPerformance:
         assert result["sql"]["error_rate"] <= 0.01, "SQL error rate > 1%"
 
         # Log results
-        print(f"\nget_or_create_contributor benchmark:")
+        print("\nget_or_create_contributor benchmark:")
         print(f"  ORM: {result['orm']['mean_duration_ms']:.2f}ms")
         print(f"  SQL: {result['sql']['mean_duration_ms']:.2f}ms")
         print(f"  Overhead: {result['overhead']['percentage']:.1f}%")
@@ -92,7 +92,7 @@ class TestMetadataPerformance:
         )
 
         assert result["overhead"]["percentage"] <= 20
-        print(f"\nupsert_media_info benchmark:")
+        print("\nupsert_media_info benchmark:")
         print(f"  ORM: {result['orm']['mean_duration_ms']:.2f}ms")
         print(f"  Overhead: {result['overhead']['percentage']:.1f}%")
 
@@ -124,7 +124,7 @@ class TestMetadataPerformance:
         )
 
         assert result["overhead"]["percentage"] <= 20
-        print(f"\nadd_custom_metadata benchmark:")
+        print("\nadd_custom_metadata benchmark:")
         print(f"  ORM: {result['orm']['mean_duration_ms']:.2f}ms")
         print(f"  Overhead: {result['overhead']['percentage']:.1f}%")
 
@@ -159,7 +159,7 @@ class TestUserPerformance:
         )
 
         assert result["overhead"]["percentage"] <= 15, "ORM overhead > 15%"
-        print(f"\nget_user_by_id benchmark:")
+        print("\nget_user_by_id benchmark:")
         print(f"  ORM: {result['orm']['mean_duration_ms']:.2f}ms")
         print(f"  SQL: {result['sql']['mean_duration_ms']:.2f}ms")
         print(f"  Overhead: {result['overhead']['percentage']:.1f}%")
@@ -198,7 +198,7 @@ class TestUserPerformance:
         )
 
         assert result["overhead"]["percentage"] <= 20
-        print(f"\nupdate_audible_auth_json benchmark:")
+        print("\nupdate_audible_auth_json benchmark:")
         print(f"  ORM: {result['orm']['mean_duration_ms']:.2f}ms")
         print(f"  Overhead: {result['overhead']['percentage']:.1f}%")
 
@@ -234,7 +234,7 @@ class TestSyncPerformance:
         )
 
         assert result["overhead"]["percentage"] <= 25
-        print(f"\ncreate_sync_history benchmark:")
+        print("\ncreate_sync_history benchmark:")
         print(f"  ORM: {result['orm']['mean_duration_ms']:.2f}ms")
         print(f"  SQL: {result['sql']['mean_duration_ms']:.2f}ms")
         print(f"  Overhead: {result['overhead']['percentage']:.1f}%")
@@ -268,7 +268,7 @@ class TestSyncPerformance:
         )
 
         assert result["overhead"]["percentage"] <= 25
-        print(f"\nupdate_sync_status benchmark:")
+        print("\nupdate_sync_status benchmark:")
         print(f"  ORM: {result['orm']['mean_duration_ms']:.2f}ms")
         print(f"  Overhead: {result['overhead']['percentage']:.1f}%")
 
@@ -312,7 +312,7 @@ class TestBookPerformance:
         )
 
         assert result["overhead"]["percentage"] <= 20
-        print(f"\nget_books_by_user benchmark:")
+        print("\nget_books_by_user benchmark:")
         print(f"  ORM: {result['orm']['mean_duration_ms']:.2f}ms")
         print(f"  SQL: {result['sql']['mean_duration_ms']:.2f}ms")
         print(f"  Overhead: {result['overhead']['percentage']:.1f}%")
@@ -356,7 +356,7 @@ class TestBookPerformance:
 
         # Book orchestration is complex, higher overhead acceptable
         assert result["overhead"]["percentage"] <= 30
-        print(f"\nadd_book_with_metadata benchmark:")
+        print("\nadd_book_with_metadata benchmark:")
         print(f"  ORM: {result['orm']['mean_duration_ms']:.2f}ms")
         print(f"  SQL: {result['sql']['mean_duration_ms']:.2f}ms")
         print(f"  Overhead: {result['overhead']['percentage']:.1f}%")
@@ -394,7 +394,7 @@ class TestLoadPerformance:
         )
 
         assert result["success_rate"] > 0.95, "Success rate < 95%"
-        print(f"\nget_books load test results:")
+        print("\nget_books load test results:")
         print(f"  Target RPS: {result['target_rps']}")
         print(f"  Actual RPS: {result['actual_rps']:.1f}")
         print(f"  Success rate: {result['success_rate'] * 100:.1f}%")
@@ -430,7 +430,7 @@ class TestLoadPerformance:
         )
 
         assert result["success_rate"] > 0.95
-        print(f"\nupdate_sync_status load test results:")
+        print("\nupdate_sync_status load test results:")
         print(f"  Target RPS: {result['target_rps']}")
         print(f"  Actual RPS: {result['actual_rps']:.1f}")
         print(f"  Success rate: {result['success_rate'] * 100:.1f}%")

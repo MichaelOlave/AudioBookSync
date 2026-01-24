@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Any, Optional, cast
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.config import Config
 from ...database.engine import get_db_session
+from ...database.models.user import User
 from ...database.services import user_service
 
 # OAuth2 scheme for automatic Swagger documentation
@@ -53,10 +54,13 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     )
 
     # Sign the token
-    encoded_jwt = jwt.encode(
-        to_encode,
-        Config.SECRET_KEY,
-        algorithm=Config.ALGORITHM,
+    encoded_jwt = cast(
+        str,
+        jwt.encode(
+            to_encode,
+            Config.SECRET_KEY,
+            algorithm=Config.ALGORITHM,
+        ),
     )
 
     return encoded_jwt
@@ -90,16 +94,19 @@ def create_refresh_token(data: dict) -> str:
         }
     )
 
-    encoded_jwt = jwt.encode(
-        to_encode,
-        Config.SECRET_KEY,
-        algorithm=Config.ALGORITHM,
+    encoded_jwt = cast(
+        str,
+        jwt.encode(
+            to_encode,
+            Config.SECRET_KEY,
+            algorithm=Config.ALGORITHM,
+        ),
     )
 
     return encoded_jwt
 
 
-def decode_token(token: str) -> dict:
+def decode_token(token: str) -> dict[str, Any]:
     """
     Decode and validate a JWT token.
 
@@ -113,10 +120,13 @@ def decode_token(token: str) -> dict:
         HTTPException: If token is invalid, expired, or malformed
     """
     try:
-        payload = jwt.decode(
-            token,
-            Config.SECRET_KEY,
-            algorithms=[Config.ALGORITHM],
+        payload = cast(
+            dict[str, Any],
+            jwt.decode(
+                token,
+                Config.SECRET_KEY,
+                algorithms=[Config.ALGORITHM],
+            ),
         )
         return payload
     except JWTError as e:
@@ -131,7 +141,7 @@ def decode_token(token: str) -> dict:
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db_session),
-) -> dict:
+) -> User:
     """
     FastAPI dependency to get the current authenticated user from JWT token.
 

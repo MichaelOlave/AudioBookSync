@@ -1,5 +1,7 @@
 """User endpoints (profile, preferences, etc)."""
 
+from typing import cast
+
 from fastapi import APIRouter, Depends
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -140,8 +142,9 @@ async def change_password(
     logger.info(f"Password change request for user: {current_user.user_id}")
 
     # Verify current password
-    if not current_user.password_hash or not verify_password(
-        password_data.current_password, current_user.password_hash
+    current_password_hash = cast(str, current_user.password_hash)
+    if not current_password_hash or not verify_password(
+        password_data.current_password, current_password_hash
     ):
         logger.warning(
             f"Password change failed: Wrong current password for user: {current_user.user_id}"
@@ -149,7 +152,7 @@ async def change_password(
         raise AuthenticationError("Current password is incorrect")
 
     # Check new password is different from current
-    if verify_password(password_data.new_password, current_user.password_hash):
+    if verify_password(password_data.new_password, current_password_hash):
         logger.warning(
             f"Password change failed: New password same as current for user: {current_user.user_id}"
         )
@@ -225,9 +228,8 @@ async def change_email(
     logger.info(f"Email change request for user: {current_user.user_id}")
 
     # Verify password
-    if not current_user.password_hash or not verify_password(
-        email_data.password, current_user.password_hash
-    ):
+    current_password_hash = cast(str, current_user.password_hash)
+    if not current_password_hash or not verify_password(email_data.password, current_password_hash):
         logger.warning(f"Email change failed: Wrong password for user: {current_user.user_id}")
         raise AuthenticationError("Password is incorrect")
 

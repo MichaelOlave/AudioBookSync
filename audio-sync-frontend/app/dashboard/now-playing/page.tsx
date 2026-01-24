@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useLibrary } from "@/hooks/use-library";
 import { getAPIClient } from "@/lib/api/client";
+import { logger } from "@/lib/logger";
 
 export default function NowPlayingPage() {
   const searchParams = useSearchParams();
@@ -58,7 +59,7 @@ export default function NowPlayingPage() {
         setChapters(chaptersData);
       }
     } catch (error) {
-      console.error("Failed to load chapters:", error);
+      logger.error("Failed to load chapters:", error);
     } finally {
       setIsLoadingChapters(false);
     }
@@ -74,7 +75,7 @@ export default function NowPlayingPage() {
         audioRef.current.currentTime = progress.position_ms / 1000;
       }
     } catch (error) {
-      console.error("Failed to load progress:", error);
+      logger.error("Failed to load progress:", error);
     }
   }, [currentBook, apiClient]);
 
@@ -103,7 +104,7 @@ export default function NowPlayingPage() {
         is_finished: percent_complete >= 95,
       });
     } catch (error) {
-      console.error("Failed to save progress:", error);
+      logger.error("Failed to save progress:", error);
     }
   }, [currentBook, apiClient]);
 
@@ -180,7 +181,7 @@ export default function NowPlayingPage() {
         await audioRef.current.play();
         setIsPlaying(true);
       } catch (error) {
-        console.error("Play failed:", error);
+        logger.error("Play failed:", error);
       } finally {
         setIsLoadingAudio(false);
       }
@@ -279,7 +280,7 @@ export default function NowPlayingPage() {
                         blobUrlRef.current = blobUrl;
                         audioRef.current.src = blobUrl;
                       } catch (error) {
-                        console.error("Failed to load audio:", error);
+                        logger.error("Failed to load audio:", error);
                         return;
                       } finally {
                         setIsLoadingAudio(false);

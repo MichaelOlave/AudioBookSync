@@ -12,7 +12,7 @@ from ..domain.progress import safe_progress_callback
 from .decryptor import decrypt_book as decrypt_book_impl
 
 
-async def download_book(
+async def download_book(  # noqa: C901
     book: list,
     user_id: str,
     progress_callback=None,
@@ -229,7 +229,9 @@ async def download_book(
                         # Emit multiple progress updates to show activity
                         logger.warning(f"[Download] Emitting FALLBACK progress for {book_asin}")
                         for idx, progress in enumerate([25, 50, 75, 99]):
-                            logger.debug(f"[Download] Fallback progress {idx+1}/4: {progress}%")
+                            logger.debug(
+                                f"[Download] Fallback progress {idx + 1}/4: {progress}%"
+                            )
                             await safe_progress_callback(
                                 progress_callback,
                                 event_type="download.progress",

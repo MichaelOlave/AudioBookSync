@@ -75,7 +75,7 @@ class InternalServerError(AudioBookSyncException):
 # ============================================================================
 
 
-def handle_route_errors(operation_name: str = None) -> Callable:
+def handle_route_errors(operation_name: str | None = None) -> Callable:
     """
     Decorator for FastAPI route handlers that provides centralized error handling.
 

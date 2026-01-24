@@ -2,7 +2,6 @@
 
 import json
 from pathlib import Path
-from typing import Optional
 
 from loguru import logger
 
@@ -12,7 +11,7 @@ from ..schemas.credentials import AuthSessionData
 class SessionManager:
     """Manages authentication session data persistence."""
 
-    def __init__(self, session_dir: Path = None):
+    def __init__(self, session_dir: Path | None = None):
         """
         Initialize SessionManager.
 
@@ -42,7 +41,7 @@ class SessionManager:
             logger.error(f"Failed to save session for user {user_id_str}: {e}")
             raise
 
-    def load_session(self, user_id: str) -> Optional[AuthSessionData]:
+    def load_session(self, user_id: str) -> AuthSessionData | None:
         """
         Load auth session data from disk.
 

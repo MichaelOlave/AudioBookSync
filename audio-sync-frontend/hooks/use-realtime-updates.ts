@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { getWebSocketClient, WebSocketMessage } from '@/lib/websocket-client';
+import { logger } from '@/lib/logger';
 
 interface UseRealtimeUpdatesOptions {
   enabled?: boolean;
@@ -78,7 +79,7 @@ export function useRealtimeUpdates(options: UseRealtimeUpdatesOptions = {}) {
         unsubscribeDownloadProgress();
       };
     } catch (error) {
-      console.error('Failed to initialize WebSocket client:', error);
+      logger.error('Failed to initialize WebSocket client:', error);
     }
   }, [enabled, token]);
 
