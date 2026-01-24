@@ -16,12 +16,7 @@ from ..middleware.error_handler import (
     ResourceNotFoundError,
     handle_route_errors,
 )
-from ..schemas.sync import (
-    SyncAcceptedResponse,
-    SyncCreate,
-    SyncHistoryList,
-    SyncResponse,
-)
+from ..schemas.sync import SyncAcceptedResponse, SyncCreate, SyncHistoryList, SyncResponse
 from ..security.auth import get_current_user
 from ..utils.auth_utils import get_user_id
 from ..utils.generic_handlers import get_paginated_list, get_pagination_params
@@ -50,8 +45,7 @@ async def trigger_sync(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> SyncAcceptedResponse:
-    """
-    Trigger a new library sync operation.
+    """Trigger a new library sync operation.
 
     Initiates a background sync that will fetch books from Audible, download,
     and decrypt them. The operation runs asynchronously and progress updates
@@ -127,8 +121,7 @@ async def get_sync_history(
     page_size: int = _sync_page_size,
     db: AsyncSession = Depends(get_db_session),
 ) -> SyncHistoryList:
-    """
-    Get user's sync history with pagination.
+    """Get user's sync history with pagination.
 
     Retrieves all sync operations performed by the user, ordered by most recent first.
 
@@ -184,8 +177,7 @@ async def get_sync_status(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> SyncResponse:
-    """
-    Get detailed status of a specific sync operation.
+    """Get detailed status of a specific sync operation.
 
     Retrieves the current status and statistics for a sync operation.
     User can only access their own sync records.

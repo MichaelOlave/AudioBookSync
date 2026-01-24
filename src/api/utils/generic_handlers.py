@@ -1,5 +1,4 @@
-"""
-Generic request handlers for common API patterns.
+"""Generic request handlers for common API patterns.
 
 Provides reusable handlers for paginated list endpoints and other common patterns.
 """
@@ -21,8 +20,7 @@ ResponseT = TypeVar("ResponseT")
 
 
 def verify_book_ownership(book: Any, user_id: str, asin: str) -> None:
-    """
-    Verify that a book belongs to the specified user.
+    """Verify that a book belongs to the specified user.
 
     Handles both dict-like and object attribute access for user_id.
 
@@ -47,8 +45,7 @@ async def verify_book_access(
     asin: str,
     current_user: Any,
 ) -> tuple[Any, Any]:
-    """
-    Verify the current user can access a book, including shared family libraries.
+    """Verify the current user can access a book, including shared family libraries.
 
     Returns (UserBook, Book) when access is allowed.
     """
@@ -81,8 +78,7 @@ def get_pagination_params(
     page_size_default: int = 50,
     page_size_max: int = 100,
 ):
-    """
-    Create pagination Query parameters with customizable defaults and limits.
+    """Create pagination Query parameters with customizable defaults and limits.
 
     Args:
         page_default: Default page number (default: 1)
@@ -127,8 +123,7 @@ async def get_paginated_list(
     count_kwargs: Optional[dict] = None,
     resource_name: str = "items",
 ) -> dict:
-    """
-    Generic handler for paginated list endpoints.
+    """Generic handler for paginated list endpoints.
 
     Supports both database-level pagination (using limit/offset with separate count)
     and in-memory pagination (loading all items and slicing).

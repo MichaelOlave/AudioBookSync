@@ -20,11 +20,7 @@ from ..schemas.book import (
 from ..security.auth import get_current_user
 from ..services.audible_library_service import fetch_audible_library_to_db
 from ..utils.auth_utils import get_user_id
-from ..utils.generic_handlers import (
-    get_paginated_list,
-    get_pagination_params,
-    verify_book_access,
-)
+from ..utils.generic_handlers import get_paginated_list, get_pagination_params, verify_book_access
 
 router = APIRouter()
 
@@ -49,8 +45,7 @@ async def get_library(
     page: int = _lib_page,
     page_size: int = _lib_page_size,
 ) -> BookList:
-    """
-    Get user's audiobook library with pagination.
+    """Get user's audiobook library with pagination.
 
     Retrieves all books owned by the current user plus shared family libraries.
 
@@ -66,7 +61,6 @@ async def get_library(
     Example:
         GET /api/v1/library?page=1&page_size=50
     """
-
     family_id = str(current_user.family_id) if current_user.family_id else None
     accessible_user_ids = await user_service.get_accessible_user_ids(
         db=db,
@@ -123,8 +117,7 @@ async def fetch_audible_library(
         description="Page number to fetch (starting from 1)",
     ),
 ) -> Dict[str, Any]:
-    """
-    Fetch user's audiobook library from Audible API and save to database.
+    """Fetch user's audiobook library from Audible API and save to database.
 
     Uses stored Audible credentials to retrieve the complete library
     from Audible's servers and saves book data to the database without
@@ -175,8 +168,7 @@ async def get_dashboard_books(
         description="When true, only return books marked as downloaded",
     ),
 ) -> List[BookDashboardResponse]:
-    """
-    Get full library details for dashboard use.
+    """Get full library details for dashboard use.
 
     Returns all books with extended metadata when available.
     Optionally filters to downloaded books when requested.
@@ -200,9 +192,11 @@ async def get_dashboard_books(
             book=BookDashboardBook.model_validate(
                 book_service.build_dashboard_book_data(book, user_book)
             ),
-            metadata=BookMetadataResponse.model_validate(metadata, from_attributes=True)
-            if metadata
-            else None,
+            metadata=(
+                BookMetadataResponse.model_validate(metadata, from_attributes=True)
+                if metadata
+                else None
+            ),
         )
         for user_book, book, metadata in rows
     ]
@@ -226,8 +220,7 @@ async def get_book_details(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> BookResponse:
-    """
-    Get detailed information about a specific audiobook.
+    """Get detailed information about a specific audiobook.
 
     Retrieves book details by ASIN (Amazon Standard Identification Number).
     User can access their own books and shared family books.

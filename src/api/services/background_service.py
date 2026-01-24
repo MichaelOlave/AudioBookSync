@@ -15,12 +15,7 @@ from uuid import UUID
 from loguru import logger
 
 from ...database.engine import AsyncSessionLocal
-from ...database.services import (
-    decryption_service,
-    download_service,
-    error_service,
-    user_service,
-)
+from ...database.services import decryption_service, download_service, error_service, user_service
 from ...operations.decryptor import decrypt_book
 from ...operations.downloader import download_book
 from ...operations.library_sync import sync_library
@@ -50,6 +45,7 @@ class OperationExecutor:
         book: dict,
         operation_type: str,  # "download" or "decrypt"
     ):
+        """Initialize the operation executor."""
         self.user_id = user_id
         self.operation_id = operation_id
         self.book = book
@@ -247,6 +243,7 @@ class DownloadExecutor(OperationExecutor):
     """Specialized executor for download operations."""
 
     def __init__(self, user_id: str, download_id: str, book: dict):
+        """Initialize the download executor."""
         super().__init__(user_id, download_id, book, "download")
 
     async def _create_progress_callback(self) -> Callable:
@@ -341,6 +338,7 @@ class DecryptExecutor(OperationExecutor):
     """Specialized executor for decrypt operations."""
 
     def __init__(self, user_id: str, decryption_id: str, book: dict):
+        """Initialize the decryption executor."""
         super().__init__(user_id, decryption_id, book, "decrypt")
 
     async def _execute_operation(self, book_list: list, progress_callback) -> bool:
@@ -409,8 +407,7 @@ class BackgroundTaskService:
 
     @staticmethod
     def _dict_to_book_list(book: dict) -> list:
-        """
-        Convert API book dictionary to operations list format.
+        """Convert API book dictionary to operations list format.
 
         The operations layer expects books as [asin, title] lists.
         The API layer uses {"asin": "...", "title": "..."} dictionaries.
@@ -441,8 +438,7 @@ class BackgroundTaskService:
 
     @staticmethod
     async def _create_progress_callback(user_id: str) -> Callable:
-        """
-        Create a progress callback function for operations.
+        """Create a progress callback function for operations.
 
         The callback allows operations to report progress without directly
         depending on the WebSocket infrastructure. This maintains clean
@@ -487,8 +483,7 @@ class BackgroundTaskService:
         sync_id: str,
         sync_type: str = "full",
     ) -> None:
-        """
-        Execute a library sync operation in background.
+        """Execute a library sync operation in background.
 
         This is the main entry point for background sync tasks. It coordinates:
         1. Broadcast sync.started event

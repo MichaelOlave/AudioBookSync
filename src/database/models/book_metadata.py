@@ -87,4 +87,5 @@ class BookMetadataJson(Base):
     )
 
     def __repr__(self) -> str:
+        """Return a debug representation."""
         return f"<BookMetadataJson(metadata_id={self.metadata_id}, asin={self.asin}, title={self.title})>"

@@ -1,10 +1,7 @@
 """Decryption status database service layer using SQLAlchemy ORM."""
 
 from src.database.models.decryption import DecryptionStatus
-from src.database.services.status_service_factory import (
-    StatusServiceConfig,
-    StatusServiceFactory,
-)
+from src.database.services.status_service_factory import StatusServiceConfig, StatusServiceFactory
 
 # Configure decryption status service
 _config = StatusServiceConfig(

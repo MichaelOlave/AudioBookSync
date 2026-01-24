@@ -30,8 +30,7 @@ class SyncService:
         sync_id: str,
         sync_type: str = "full",
     ) -> None:
-        """
-        Start a background sync operation.
+        """Start a background sync operation.
 
         This is the main orchestration method that coordinates:
         1. Broadcast sync.started event
@@ -112,8 +111,7 @@ class SyncService:
         status: str,
         stats: dict,
     ) -> None:
-        """
-        Complete a sync operation with final statistics.
+        """Complete a sync operation with final statistics.
 
         Args:
             sync_id: Unique sync identifier
@@ -191,8 +189,7 @@ class SyncService:
         error: str,
         error_code: Optional[str] = None,
     ) -> None:
-        """
-        Mark a sync as failed.
+        """Mark a sync as failed.
 
         Args:
             sync_id: Unique sync identifier
@@ -251,8 +248,7 @@ class SyncService:
         books_total: int = 0,
         progress_percent: float = 0.0,
     ) -> None:
-        """
-        Broadcast sync progress update.
+        """Broadcast sync progress update.
 
         Args:
             sync_id: Unique sync identifier
@@ -290,8 +286,7 @@ class SyncService:
         total_bytes: int = 0,
         speed_kbps: float = 0.0,
     ) -> None:
-        """
-        Broadcast download progress update.
+        """Broadcast download progress update.
 
         Args:
             user_id: User UUID

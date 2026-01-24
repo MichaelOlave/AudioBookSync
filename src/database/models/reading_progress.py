@@ -47,4 +47,5 @@ class ReadingProgress(Base):
     )
 
     def __repr__(self) -> str:
+        """Return a debug representation."""
         return f"<ReadingProgress(progress_id={self.progress_id}, asin={self.asin}, percent={self.percent_complete}%)>"

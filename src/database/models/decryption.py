@@ -58,4 +58,5 @@ class DecryptionStatus(Base):
     book = relationship("Book", back_populates="decryption_status", lazy="select")
 
     def __repr__(self) -> str:
+        """Return a debug representation."""
         return f"<DecryptionStatus(decryption_id={self.decryption_id}, asin={self.asin}, status={self.status})>"

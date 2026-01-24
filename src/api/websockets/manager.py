@@ -38,8 +38,7 @@ class ConnectionManager:
                 logger.error(f"Failed to initialize Redis: {e}")
 
     async def _subscribe_to_user_channel(self, user_id: str) -> None:  # noqa: C901
-        """
-        Subscribe to Redis pub/sub channel for user and forward to WebSockets.
+        """Subscribe to Redis pub/sub channel for user and forward to WebSockets.
 
         Args:
             user_id: The user ID to subscribe for
@@ -78,8 +77,7 @@ class ConnectionManager:
             logger.error(f"Error in Redis subscription: {e}")
 
     async def _send_to_user_websockets(self, user_id: str, event_type: str, data: dict) -> None:
-        """
-        Send message to all WebSocket connections for user.
+        """Send message to all WebSocket connections for user.
 
         Args:
             user_id: The user ID
@@ -103,8 +101,7 @@ class ConnectionManager:
             self.disconnect(websocket, user_id)
 
     async def connect(self, websocket: WebSocket, user_id: str) -> None:
-        """
-        Register a new WebSocket connection.
+        """Register a new WebSocket connection.
 
         Args:
             websocket: The WebSocket connection object
@@ -136,8 +133,7 @@ class ConnectionManager:
             self.subscription_tasks[user_id] = task
 
     def disconnect(self, websocket: WebSocket, user_id: str) -> None:
-        """
-        Unregister a WebSocket connection.
+        """Unregister a WebSocket connection.
 
         Args:
             websocket: The WebSocket connection object
@@ -167,8 +163,7 @@ class ConnectionManager:
         event_type: str,
         data: Dict[str, Any],
     ) -> None:
-        """
-        Broadcast an event to all connections for a specific user.
+        """Broadcast an event to all connections for a specific user.
 
         Args:
             user_id: The user ID to broadcast to
@@ -210,8 +205,7 @@ class ConnectionManager:
         event_type: str,
         data: Dict[str, Any],
     ) -> None:
-        """
-        Broadcast an event to all connected users.
+        """Broadcast an event to all connected users.
 
         Args:
             event_type: Type of event
@@ -247,8 +241,7 @@ class ConnectionManager:
         event_type: str,
         data: Dict[str, Any],
     ) -> bool:
-        """
-        Send an event to a specific connection.
+        """Send an event to a specific connection.
 
         Args:
             websocket: The WebSocket connection
@@ -277,8 +270,7 @@ class ConnectionManager:
             return False
 
     def get_user_connection_count(self, user_id: str) -> int:
-        """
-        Get the number of active connections for a user.
+        """Get the number of active connections for a user.
 
         Args:
             user_id: The user ID
@@ -289,8 +281,7 @@ class ConnectionManager:
         return len(self.active_connections.get(user_id, set()))
 
     def get_total_connection_count(self) -> int:
-        """
-        Get the total number of active connections.
+        """Get the total number of active connections.
 
         Returns:
             Total number of active WebSocket connections across all users
@@ -298,8 +289,7 @@ class ConnectionManager:
         return sum(len(conns) for conns in self.active_connections.values())
 
     def get_active_users(self) -> list[str]:
-        """
-        Get list of user IDs with active connections.
+        """Get list of user IDs with active connections.
 
         Returns:
             List of user IDs with at least one active connection

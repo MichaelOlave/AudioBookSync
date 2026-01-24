@@ -13,8 +13,7 @@ redis_client = redis.from_url(Config.CELERY_BROKER_URL, decode_responses=True)
 
 
 def publish_progress(user_id: str, event_type: str, data: dict) -> None:
-    """
-    Publish progress event to Redis pub/sub channel for WebSocket delivery.
+    """Publish progress event to Redis pub/sub channel for WebSocket delivery.
 
     Args:
         user_id: User ID to publish to

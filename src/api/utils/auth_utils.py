@@ -6,8 +6,7 @@ from loguru import logger
 
 
 def get_user_id(current_user: Any) -> str:
-    """
-    Extract user_id from current_user object as a string.
+    """Extract user_id from current_user object as a string.
 
     Handles both SQLAlchemy model objects (from get_current_user dependency)
     and dictionary representations consistently.

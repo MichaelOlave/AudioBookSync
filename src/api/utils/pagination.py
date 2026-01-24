@@ -1,5 +1,4 @@
-"""
-Pagination utilities for API responses.
+"""Pagination utilities for API responses.
 
 Provides helper functions for calculating pagination metadata and slicing items.
 """
@@ -13,8 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def calculate_pagination(total: int, page: int, page_size: int) -> Tuple[int, int, int]:
-    """
-    Calculate pagination parameters.
+    """Calculate pagination parameters.
 
     Args:
         total: Total number of items
@@ -35,8 +33,7 @@ def calculate_pagination(total: int, page: int, page_size: int) -> Tuple[int, in
 
 
 def paginate_list(items: List[T], page: int, page_size: int) -> Tuple[List[T], int, int]:
-    """
-    Paginate an in-memory list of items.
+    """Paginate an in-memory list of items.
 
     Args:
         items: List of items to paginate
@@ -58,8 +55,7 @@ def paginate_list(items: List[T], page: int, page_size: int) -> Tuple[List[T], i
 
 
 def calculate_pages(total: int, page_size: int) -> int:
-    """
-    Calculate total number of pages.
+    """Calculate total number of pages.
 
     Args:
         total: Total number of items
@@ -72,8 +68,7 @@ def calculate_pages(total: int, page_size: int) -> int:
 
 
 def validate_page(page: int, pages: int, total: int) -> int:
-    """
-    Validate and adjust page number if it exceeds available pages.
+    """Validate and adjust page number if it exceeds available pages.
 
     Args:
         page: Requested page number (1-indexed)

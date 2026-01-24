@@ -23,8 +23,7 @@ async def log_error(
     stack_trace: Optional[str] = None,
     severity: str = "error",
 ) -> Optional[ErrorLog]:
-    """
-    Log an error to the database.
+    """Log an error to the database.
 
     Args:
         db: Database session
@@ -64,8 +63,7 @@ async def log_error(
 
 
 async def get_error_by_id(db: AsyncSession, error_id: UUID) -> Optional[ErrorLog]:
-    """
-    Get error log by ID.
+    """Get error log by ID.
 
     Args:
         db: Database session
@@ -88,8 +86,7 @@ async def get_errors_by_user(
     limit: int = 100,
     unresolved_only: bool = False,
 ) -> List[ErrorLog]:
-    """
-    Get error logs for a user.
+    """Get error logs for a user.
 
     Args:
         db: Database session
@@ -118,8 +115,7 @@ async def get_errors_by_asin(
     asin: str,
     limit: int = 50,
 ) -> List[ErrorLog]:
-    """
-    Get error logs for a book.
+    """Get error logs for a book.
 
     Args:
         db: Database session
@@ -147,8 +143,7 @@ async def get_errors_by_type(
     error_type: str,
     limit: int = 100,
 ) -> List[ErrorLog]:
-    """
-    Get error logs by type.
+    """Get error logs by type.
 
     Args:
         db: Database session
@@ -176,8 +171,7 @@ async def get_errors_by_severity(
     severity: str,
     limit: int = 100,
 ) -> List[ErrorLog]:
-    """
-    Get error logs by severity.
+    """Get error logs by severity.
 
     Args:
         db: Database session
@@ -204,8 +198,7 @@ async def get_unresolved_errors(
     db: AsyncSession,
     limit: int = 100,
 ) -> List[ErrorLog]:
-    """
-    Get all unresolved errors.
+    """Get all unresolved errors.
 
     Args:
         db: Database session
@@ -232,8 +225,7 @@ async def resolve_error(
     error_id: UUID,
     resolution_notes: Optional[str] = None,
 ) -> bool:
-    """
-    Mark an error as resolved.
+    """Mark an error as resolved.
 
     Args:
         db: Database session
@@ -265,8 +257,7 @@ async def get_critical_errors(
     db: AsyncSession,
     limit: int = 50,
 ) -> List[ErrorLog]:
-    """
-    Get critical errors for immediate attention.
+    """Get critical errors for immediate attention.
 
     Args:
         db: Database session
@@ -293,8 +284,7 @@ async def get_recent_errors(
     hours: int = 24,
     limit: int = 100,
 ) -> List[ErrorLog]:
-    """
-    Get errors from the last N hours.
+    """Get errors from the last N hours.
 
     Args:
         db: Database session
@@ -321,8 +311,7 @@ async def get_recent_errors(
 
 
 async def get_error_summary(db: AsyncSession) -> Optional[dict]:
-    """
-    Get a summary of all errors.
+    """Get a summary of all errors.
 
     Args:
         db: Database session
@@ -366,8 +355,7 @@ async def get_error_summary(db: AsyncSession) -> Optional[dict]:
 
 
 async def delete_error(db: AsyncSession, error_id: UUID) -> bool:
-    """
-    Delete an error record.
+    """Delete an error record.
 
     Args:
         db: Database session
@@ -394,8 +382,7 @@ async def clean_old_resolved_errors(
     db: AsyncSession,
     days: int = 90,
 ) -> int:
-    """
-    Delete resolved errors older than N days.
+    """Delete resolved errors older than N days.
 
     Args:
         db: Database session

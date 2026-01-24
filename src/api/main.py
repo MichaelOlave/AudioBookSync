@@ -41,8 +41,7 @@ from .schemas.common import HealthResponse
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Manage application lifecycle (startup and shutdown).
+    """Manage application lifecycle (startup and shutdown).
 
     This context manager handles:
     - Startup: Configure logging, ensure directories exist
@@ -58,10 +57,12 @@ async def lifespan(app: FastAPI):
         logger.info("AudioBookSync API Starting Up")
         logger.info("=" * 80)
         logger.info(f"Environment: {Config.LOG_LEVEL}")
-        logger.info(
-            "Database: "
-            f"{Config.DATABASE_URL.split('@')[1] if '@' in Config.DATABASE_URL else 'configured'}"
-        )
+        database_url = Config.DATABASE_URL
+        if database_url:
+            db_display = database_url.split("@")[1] if "@" in database_url else "configured"
+        else:
+            db_display = "not configured"
+        logger.info(f"Database: {db_display}")
         logger.info(f"CORS Origins: {Config.CORS_ORIGINS}")
         logger.info("=" * 80)
 
@@ -87,8 +88,7 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    """
-    Create and configure the FastAPI application.
+    """Create and configure the FastAPI application.
 
     Returns:
         FastAPI: Configured FastAPI instance
@@ -102,7 +102,6 @@ def create_app() -> FastAPI:
         - WebSocket support
         - OpenAPI documentation
     """
-
     # Create FastAPI instance with metadata
     app = FastAPI(
         title="AudioBookSync API",
@@ -239,8 +238,7 @@ def create_app() -> FastAPI:
         description="Check if the API and MinIO storage are running and healthy",
     )
     async def health_check() -> HealthResponse:
-        """
-        Health check endpoint with MinIO connectivity status.
+        """Health check endpoint with MinIO connectivity status.
 
         MinIO is required for all operations in native mode, so connectivity
         is mandatory for the service to be considered healthy.

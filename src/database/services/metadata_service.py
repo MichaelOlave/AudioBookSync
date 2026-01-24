@@ -121,8 +121,7 @@ async def get_or_create_contributor(  # noqa: C901
     description: Optional[str] = None,
     url: Optional[str] = None,
 ) -> Optional[Contributor]:
-    """
-    Get existing contributor or create new one.
+    """Get existing contributor or create new one.
 
     Uses name and type as unique identifier to prevent duplicates.
     """
@@ -240,8 +239,7 @@ async def upsert_media_info(
     chapters_count: Optional[int] = None,
     enhanced: bool = False,
 ) -> bool:
-    """
-    Insert or update media info using PostgreSQL upsert.
+    """Insert or update media info using PostgreSQL upsert.
 
     If media info exists for the asin, updates the provided fields.
     If not, creates a new record.
@@ -737,8 +735,7 @@ async def add_custom_metadata(
     key: str,
     value: Any,
 ) -> bool:
-    """
-    Add or update custom metadata field using JSON operations.
+    """Add or update custom metadata field using JSON operations.
 
     Creates or updates a specific key in the custom_metadata JSON object.
     """
@@ -775,8 +772,7 @@ async def add_badge(
     badge_name: str,
     badge_info: Optional[Dict[str, Any]] = None,
 ) -> bool:
-    """
-    Append badge to JSON array.
+    """Append badge to JSON array.
 
     Adds a new badge object to the badges array in book metadata.
     """

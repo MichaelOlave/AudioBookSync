@@ -39,4 +39,5 @@ class ApplicationLog(Base):
     )
 
     def __repr__(self) -> str:
+        """Return a debug representation."""
         return f"<ApplicationLog(log_id={self.log_id}, level={self.level}, timestamp={self.timestamp})>"

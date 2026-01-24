@@ -13,8 +13,7 @@ _db_sink: Optional["DatabaseLoggingSink"] = None
 
 
 def configure_logging(log_level: str = "INFO", enable_database: bool = True) -> None:
-    """
-    Configure loguru with stderr and optional database output.
+    """Configure loguru with stderr and optional database output.
 
     Args:
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)

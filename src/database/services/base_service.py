@@ -15,8 +15,7 @@ async def get_by_id(
     entity_id: Any,
     id_column: str = "id",
 ) -> Optional[T]:
-    """
-    Get an entity by its primary ID.
+    """Get an entity by its primary ID.
 
     Args:
         db: Database session
@@ -43,8 +42,7 @@ async def update_entity(
     entity_name: Optional[str] = None,
     entity_id: Optional[Any] = None,
 ) -> bool:
-    """
-    Update an entity's fields and commit changes.
+    """Update an entity's fields and commit changes.
 
     Args:
         db: Database session
@@ -90,8 +88,7 @@ async def delete_entity(
     entity_name: Optional[str] = None,
     entity_id: Optional[Any] = None,
 ) -> bool:
-    """
-    Delete an entity from the database.
+    """Delete an entity from the database.
 
     Args:
         db: Database session
@@ -132,8 +129,7 @@ async def conditional_update(
     entity_name: Optional[str] = None,
     entity_id: Optional[Any] = None,
 ) -> bool:
-    """
-    Update an entity only if a condition is met.
+    """Update an entity only if a condition is met.
 
     Args:
         db: Database session

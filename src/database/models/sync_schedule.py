@@ -39,6 +39,7 @@ class SyncSchedule(Base):
     user = relationship("User", back_populates="sync_schedules", lazy="select")
 
     def __repr__(self) -> str:
+        """Return a debug representation."""
         return (
             f"<SyncSchedule(schedule_id={self.schedule_id}, user_id={self.user_id}, "
             f"interval_minutes={self.interval_minutes}, action={self.action}, enabled={self.enabled})>"

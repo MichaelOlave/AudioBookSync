@@ -8,10 +8,7 @@ import inspect
 
 from src.database.models.decryption import DecryptionStatus
 from src.database.models.download import DownloadStatus
-from src.database.services.status_service_factory import (
-    StatusServiceConfig,
-    StatusServiceFactory,
-)
+from src.database.services.status_service_factory import StatusServiceConfig, StatusServiceFactory
 
 # ============================================================================
 # CONFIGURATION TESTS

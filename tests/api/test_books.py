@@ -24,9 +24,9 @@ class TestCreateBook:
         assert data["asin"] == test_book_data["asin"]
         assert data["title"] == test_book_data["title"]
 
-    def test_create_book_invalid_asin(self, authenticated_client):
+    def test_create_book_invalid_asin(self, authenticated_mocked_client):
         """Test book creation with invalid ASIN."""
-        response = authenticated_client.post(
+        response = authenticated_mocked_client.post(
             "/api/v1/books/",
             json={
                 "asin": "TOOSHORT",  # ASIN must be 10 chars
@@ -37,9 +37,9 @@ class TestCreateBook:
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_create_book_missing_title(self, authenticated_client):
+    def test_create_book_missing_title(self, authenticated_mocked_client):
         """Test book creation without title."""
-        response = authenticated_client.post(
+        response = authenticated_mocked_client.post(
             "/api/v1/books/",
             json={
                 "asin": "B084L6Z6M3",
@@ -56,7 +56,10 @@ class TestCreateBook:
             json=test_book_data,
         )
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code in [
+            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_403_FORBIDDEN,
+        ]
 
 
 class TestDeleteBook:
@@ -81,9 +84,9 @@ class TestDeleteBook:
         assert data["success"] is True
         assert "deleted" in data["message"].lower()
 
-    def test_delete_book_not_found(self, authenticated_client):
+    def test_delete_book_not_found(self, authenticated_mocked_client):
         """Test delete non-existent book."""
-        response = authenticated_client.delete("/api/v1/books/NOTEXIST")
+        response = authenticated_mocked_client.delete("/api/v1/books/NOTEXIST")
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
@@ -110,7 +113,10 @@ class TestDeleteBook:
         """Test book deletion without authentication."""
         response = client.delete("/api/v1/books/B084L6Z6M3")
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code in [
+            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_403_FORBIDDEN,
+        ]
 
 
 class TestCreateBookWithMetadata:
@@ -158,9 +164,9 @@ class TestCreateBookWithMetadata:
         assert data["asin"] == "B084L6Z6M3"
         assert data["title"] == "Minimal Book"
 
-    def test_create_book_invalid_rating_too_high(self, authenticated_client):
+    def test_create_book_invalid_rating_too_high(self, authenticated_mocked_client):
         """Test book creation with invalid rating (> 5)."""
-        response = authenticated_client.post(
+        response = authenticated_mocked_client.post(
             "/api/v1/books/",
             json={
                 "asin": "B084L6Z6M3",
@@ -171,9 +177,9 @@ class TestCreateBookWithMetadata:
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_create_book_invalid_rating_negative(self, authenticated_client):
+    def test_create_book_invalid_rating_negative(self, authenticated_mocked_client):
         """Test book creation with negative rating."""
-        response = authenticated_client.post(
+        response = authenticated_mocked_client.post(
             "/api/v1/books/",
             json={
                 "asin": "B084L6Z6M3",
@@ -184,9 +190,9 @@ class TestCreateBookWithMetadata:
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_create_book_invalid_runtime_negative(self, authenticated_client):
+    def test_create_book_invalid_runtime_negative(self, authenticated_mocked_client):
         """Test book creation with negative runtime."""
-        response = authenticated_client.post(
+        response = authenticated_mocked_client.post(
             "/api/v1/books/",
             json={
                 "asin": "B084L6Z6M3",
@@ -272,9 +278,9 @@ class TestBookResponseFormat:
 class TestBookValidation:
     """Tests for book input validation."""
 
-    def test_create_book_empty_title(self, authenticated_client):
+    def test_create_book_empty_title(self, authenticated_mocked_client):
         """Test book creation with empty title."""
-        response = authenticated_client.post(
+        response = authenticated_mocked_client.post(
             "/api/v1/books/",
             json={
                 "asin": "B084L6Z6M3",

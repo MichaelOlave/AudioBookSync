@@ -15,12 +15,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.performance import BenchmarkComparison, LoadTester
-from src.database.services import (
-    book_service,
-    metadata_service,
-    sync_service,
-    user_service,
-)
+from src.database.services import book_service, metadata_service, sync_service, user_service
 from tests.factories import BookFactory, SyncFactory, UserFactory
 
 

@@ -133,10 +133,7 @@ class TestTaskStructure:
 
     def test_retry_task_imports(self):
         """Test that retry tasks can be imported."""
-        from src.celery_app.tasks.retry_tasks import (
-            retry_failed_decrypts,
-            retry_failed_downloads,
-        )
+        from src.celery_app.tasks.retry_tasks import retry_failed_decrypts, retry_failed_downloads
 
         assert retry_failed_downloads is not None
         assert retry_failed_decrypts is not None

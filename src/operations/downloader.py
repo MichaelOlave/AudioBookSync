@@ -8,7 +8,9 @@ import time
 
 from loguru import logger
 
+from ..adapters.storage.minio_storage_adapter import MinIOStorageAdapter
 from ..domain.progress import safe_progress_callback
+from ..ports.file_storage_port import FileStoragePort
 from .decryptor import decrypt_book as decrypt_book_impl
 
 
@@ -19,8 +21,7 @@ async def download_book(  # noqa: C901
     audible_auth: dict | None = None,
     activation_bytes: str | None = None,
 ) -> bool:
-    """
-    Download a book from Audible using audible-cli and immediately decrypt it.
+    """Download a book from Audible using audible-cli and immediately decrypt it.
 
     Uses temporary directories for both encrypted and decrypted files.
     On successful decryption, uploads decrypted file to MinIO.
@@ -44,7 +45,6 @@ async def download_book(  # noqa: C901
     if not user_id:
         logger.error("user_id is required for MinIO storage")
         return False
-
     if not audible_auth:
         logger.error("Audible credentials not configured; cannot download")
         return False
@@ -229,9 +229,7 @@ async def download_book(  # noqa: C901
                         # Emit multiple progress updates to show activity
                         logger.warning(f"[Download] Emitting FALLBACK progress for {book_asin}")
                         for idx, progress in enumerate([25, 50, 75, 99]):
-                            logger.debug(
-                                f"[Download] Fallback progress {idx + 1}/4: {progress}%"
-                            )
+                            logger.debug(f"[Download] Fallback progress {idx + 1}/4: {progress}%")
                             await safe_progress_callback(
                                 progress_callback,
                                 event_type="download.progress",
@@ -339,3 +337,33 @@ async def download_book(  # noqa: C901
         )
 
         return False
+
+
+async def validate_book(
+    book: list,
+    user_id: str,
+    storage: FileStoragePort | None = None,
+) -> bool:
+    """Validate that a downloaded (encrypted) book exists in MinIO for the user."""
+    if not user_id:
+        logger.error("user_id is required to validate downloaded book")
+        return False
+
+    if not book:
+        logger.error("Book data is missing asin for validation")
+        return False
+
+    asin = str(book[0])
+    if not asin:
+        logger.error("Book ASIN missing; cannot validate downloaded file")
+        return False
+
+    storage = storage or MinIOStorageAdapter()
+    object_key = f"downloaded/{asin}.aax"
+
+    exists = storage.file_exists(user_id, object_key)
+    if exists:
+        logger.info(f"Validated downloaded file exists: {object_key}")
+    else:
+        logger.warning(f"Downloaded file not found: {object_key}")
+    return exists

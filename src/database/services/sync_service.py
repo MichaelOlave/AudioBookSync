@@ -17,8 +17,7 @@ async def create_sync_history(
     sync_type: str = "full",
     notes: Optional[str] = None,
 ) -> Optional[SyncHistory]:
-    """
-    Create a new sync history record.
+    """Create a new sync history record.
 
     Args:
         db: Database session
@@ -47,8 +46,7 @@ async def create_sync_history(
 
 
 async def get_sync_by_id(db: AsyncSession, sync_id: UUID) -> Optional[SyncHistory]:
-    """
-    Get sync history by ID.
+    """Get sync history by ID.
 
     Args:
         db: Database session
@@ -70,8 +68,7 @@ async def get_syncs_by_user(
     user_id: UUID,
     limit: int = 50,
 ) -> List[SyncHistory]:
-    """
-    Get sync history for a user.
+    """Get sync history for a user.
 
     Args:
         db: Database session
@@ -95,8 +92,7 @@ async def get_syncs_by_user(
 
 
 async def get_latest_sync(db: AsyncSession, user_id: UUID) -> Optional[SyncHistory]:
-    """
-    Get the latest sync for a user.
+    """Get the latest sync for a user.
 
     Args:
         db: Database session
@@ -130,8 +126,7 @@ async def update_sync_status(  # noqa: C901
     errors_count: Optional[int] = None,
     notes: Optional[str] = None,
 ) -> bool:
-    """
-    Update sync status with statistics.
+    """Update sync status with statistics.
 
     Args:
         db: Database session
@@ -194,8 +189,7 @@ async def complete_sync(
     books_decrypted: int,
     errors_count: int = 0,
 ) -> bool:
-    """
-    Mark a sync as completed with final statistics.
+    """Mark a sync as completed with final statistics.
 
     Args:
         db: Database session
@@ -244,8 +238,7 @@ async def fail_sync(
     books_added: int = 0,
     errors_count: int = 1,
 ) -> bool:
-    """
-    Mark a sync as failed.
+    """Mark a sync as failed.
 
     Args:
         db: Database session
@@ -283,8 +276,7 @@ async def fail_sync(
 
 
 async def get_incomplete_syncs(db: AsyncSession) -> List[SyncHistory]:
-    """
-    Get all incomplete syncs (for cleanup/recovery).
+    """Get all incomplete syncs (for cleanup/recovery).
 
     Args:
         db: Database session
@@ -305,8 +297,7 @@ async def get_incomplete_syncs(db: AsyncSession) -> List[SyncHistory]:
 
 
 async def get_failed_syncs(db: AsyncSession, limit: int = 50) -> List[SyncHistory]:
-    """
-    Get failed syncs for analysis.
+    """Get failed syncs for analysis.
 
     Args:
         db: Database session
@@ -332,8 +323,7 @@ async def get_sync_statistics(
     db: AsyncSession,
     user_id: UUID,
 ) -> Optional[dict]:
-    """
-    Get aggregated sync statistics for a user.
+    """Get aggregated sync statistics for a user.
 
     Args:
         db: Database session
@@ -371,8 +361,7 @@ async def get_sync_statistics(
 
 
 async def delete_sync(db: AsyncSession, sync_id: UUID) -> bool:
-    """
-    Delete a sync record.
+    """Delete a sync record.
 
     Args:
         db: Database session

@@ -34,4 +34,5 @@ class CompanionMaterial(Base):
     created_at = Column(DateTime(timezone=True), server_default="CURRENT_TIMESTAMP", nullable=False)
 
     def __repr__(self) -> str:
+        """Return a debug representation."""
         return f"<CompanionMaterial(material_id={self.material_id}, asin={self.asin}, type={self.material_type})>"

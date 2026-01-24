@@ -1,5 +1,4 @@
-"""
-Router factory for generating status operation endpoints.
+"""Router factory for generating status operation endpoints.
 
 Provides a factory pattern for creating router endpoints for operations that follow
 the standard pattern: trigger (POST), list (GET), and status (GET/{id}).
@@ -405,10 +404,16 @@ class StatusRouterFactory:
                 f"Fetching {operation_name} status: {id_param} " f"for user {current_user.user_id}"
             )
 
+            try:
+                entity_id = UUID(id_param)
+            except ValueError:
+                logger.warning(f"Invalid {operation_name} id format: {id_param}")
+                raise ResourceNotFoundError(f"{operation_name.title()} '{id_param}' not found")
+
             # Get operation by ID with user authorization check
             operation = await get_by_id_method(
                 db=db,
-                entity_id=UUID(id_param),
+                entity_id=entity_id,
                 user_id=str(current_user.user_id),
             )
 
@@ -430,8 +435,7 @@ class StatusRouterFactory:
 def _enqueue_celery_task(
     operation_name: str, operation_id: UUID, user_id: str, book_data: dict
 ) -> None:
-    """
-    Enqueue a Celery task based on operation name.
+    """Enqueue a Celery task based on operation name.
 
     Args:
         operation_name: Name of operation (download, decryption, sync)

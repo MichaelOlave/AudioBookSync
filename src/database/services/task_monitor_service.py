@@ -14,8 +14,7 @@ from src.database.models.sync import SyncHistory
 
 
 async def get_active_tasks_by_user(db: AsyncSession, user_id: str) -> Dict[str, List[Dict]]:
-    """
-    Get all active tasks for a user across all operation types.
+    """Get all active tasks for a user across all operation types.
 
     Args:
         db: Database session
@@ -24,7 +23,6 @@ async def get_active_tasks_by_user(db: AsyncSession, user_id: str) -> Dict[str, 
     Returns:
         Dict with keys 'downloads', 'decryptions', 'syncs' containing task data
     """
-
     # Query active downloads (status = 'downloading')
     downloads_query = (
         select(DownloadStatus, Book.title)
@@ -121,8 +119,7 @@ async def cancel_task(
     task_id: UUID,
     user_id: str,
 ) -> Tuple[bool, str, str, str]:
-    """
-    Cancel a task by ID.
+    """Cancel a task by ID.
 
     Args:
         db: Database session
@@ -135,7 +132,6 @@ async def cancel_task(
     Raises:
         ValueError: If task not found or not authorized
     """
-
     # Try to find in downloads
     download_query = select(DownloadStatus).where(
         and_(

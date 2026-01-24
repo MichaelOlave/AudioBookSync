@@ -6,12 +6,27 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import NullPool
+# Ensure tests default to a local DB, not the Docker hostname in .env.
+_DEFAULT_TEST_DB_URL = os.getenv(
+    "TEST_DATABASE_URL",
+    "postgresql+asyncpg://postgres@localhost/audibooksync_test",
+)
+os.environ.setdefault("TEST_DATABASE_URL", _DEFAULT_TEST_DB_URL)
+os.environ.setdefault(
+    "DATABASE_URL",
+    _DEFAULT_TEST_DB_URL.replace("postgresql+asyncpg://", "postgresql://"),
+)
 
-from src.database.models.base import Base
-from src.database.services import book_service, sync_service, user_service
+import pytest  # noqa: E402
+from sqlalchemy.ext.asyncio import (  # noqa: E402
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+from sqlalchemy.pool import NullPool  # noqa: E402
+
+from src.database.models.base import Base  # noqa: E402
+from src.database.services import book_service, sync_service, user_service  # noqa: E402
 
 
 @pytest.fixture(scope="session")
@@ -42,9 +57,13 @@ async def test_async_engine():
         poolclass=NullPool,  # No connection pooling for tests
     )
 
-    # Create all tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        # Create all tables
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as exc:
+        await engine.dispose()
+        pytest.skip(f"Test database unavailable: {exc}")
 
     yield engine
 

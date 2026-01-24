@@ -8,12 +8,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database.services import (
-    book_service,
-    metadata_service,
-    sync_service,
-    user_service,
-)
+from src.database.services import book_service, metadata_service, sync_service, user_service
 
 
 class UserFactory:

@@ -49,8 +49,7 @@ async def get_active_tasks(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> ActiveTasksList:
-    """
-    Get all active tasks for the current user.
+    """Get all active tasks for the current user.
 
     Returns downloads with status='downloading', decryptions with status='decrypting',
     and syncs with status='in_progress'.
@@ -148,8 +147,7 @@ async def cancel_task(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> TaskCancelResponse:
-    """
-    Cancel a task by ID.
+    """Cancel a task by ID.
 
     Updates the task status to 'cancelled' in the database.
     The task will be marked as cancelled but may take a moment to actually stop.
@@ -215,7 +213,7 @@ async def create_sync_schedule(
 
     schedule = await sync_schedule_service.create_sync_schedule(
         db=db,
-        user_id=current_user.user_id,
+        user_id=UUID(str(current_user.user_id)),
         interval_minutes=schedule_data.interval_minutes,
         action=schedule_data.action.value,
         enabled=schedule_data.enabled,
@@ -247,7 +245,7 @@ async def list_sync_schedules(
     """List scheduled syncs for the current user."""
     schedules = await sync_schedule_service.get_sync_schedules_by_user(
         db=db,
-        user_id=current_user.user_id,
+        user_id=UUID(str(current_user.user_id)),
     )
     items = [
         SyncScheduleResponse.model_validate(schedule, from_attributes=True)
@@ -293,7 +291,7 @@ async def update_sync_schedule(
     schedule = await sync_schedule_service.update_sync_schedule(
         db=db,
         schedule_id=schedule_uuid,
-        user_id=current_user.user_id,
+        user_id=UUID(str(current_user.user_id)),
         updates=updates,
     )
     if not schedule:
@@ -330,7 +328,7 @@ async def delete_sync_schedule(
     success = await sync_schedule_service.delete_sync_schedule(
         db=db,
         schedule_id=schedule_uuid,
-        user_id=current_user.user_id,
+        user_id=UUID(str(current_user.user_id)),
     )
     if not success:
         raise ResourceNotFoundError("Sync schedule not found")

@@ -10,8 +10,7 @@ from starlette.responses import Response
 
 
 class LoggingMiddleware(BaseHTTPMiddleware):
-    """
-    Middleware that logs HTTP requests and responses.
+    """Middleware that logs HTTP requests and responses.
 
     Logs include:
     - Request method and path
@@ -28,7 +27,6 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         """Process request and log details."""
-
         # Skip logging for health checks to reduce log noise
         if request.url.path == "/api/v1/health":
             response = await call_next(request)

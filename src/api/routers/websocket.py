@@ -17,8 +17,7 @@ async def websocket_updates(  # noqa: C901
     websocket: WebSocket,
     token: str = Query(..., description="JWT access token for authentication"),
 ) -> None:
-    """
-    WebSocket endpoint for real-time sync and operation updates.
+    """Websocket endpoint for real-time sync and operation updates.
 
     Maintains a persistent WebSocket connection to receive real-time events
     including sync progress, download progress, and system notifications.

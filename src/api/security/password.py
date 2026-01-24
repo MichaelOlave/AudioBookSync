@@ -14,8 +14,7 @@ pwd_context = CryptContext(
 
 
 def hash_password(password: str) -> str:
-    """
-    Hash a plaintext password using bcrypt.
+    """Hash a plaintext password using bcrypt.
 
     Args:
         password: The plaintext password to hash
@@ -32,8 +31,7 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """
-    Verify a plaintext password against a bcrypt hash.
+    """Verify a plaintext password against a bcrypt hash.
 
     Args:
         plain_password: The plaintext password to verify

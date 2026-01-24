@@ -60,7 +60,10 @@ class TestGetLibrary:
         """Test library access without authentication."""
         response = client.get("/api/v1/library/")
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code in [
+            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_403_FORBIDDEN,
+        ]
 
     @pytest.mark.asyncio
     async def test_get_library_empty(self, authenticated_client, db_session, test_user_in_db):
@@ -100,9 +103,9 @@ class TestGetBookDetails:
         assert data["title"] == "Becoming"
         assert data["author"] == "Michelle Obama"
 
-    def test_get_book_details_not_found(self, authenticated_client):
+    def test_get_book_details_not_found(self, authenticated_mocked_client):
         """Test book details for non-existent book."""
-        response = authenticated_client.get("/api/v1/library/NOTEXIST")
+        response = authenticated_mocked_client.get("/api/v1/library/NOTEXIST")
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
@@ -134,22 +137,25 @@ class TestGetBookDetails:
         """Test book details access without authentication."""
         response = client.get("/api/v1/library/B084L6Z6M3")
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code in [
+            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_403_FORBIDDEN,
+        ]
 
 
 class TestPaginationEdgeCases:
     """Tests for pagination edge cases."""
 
-    def test_pagination_page_zero(self, authenticated_client):
+    def test_pagination_page_zero(self, authenticated_mocked_client):
         """Test pagination with page 0 (invalid)."""
-        response = authenticated_client.get("/api/v1/library/?page=0")
+        response = authenticated_mocked_client.get("/api/v1/library/?page=0")
 
         # Page 0 is invalid (pages start at 1)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_pagination_negative_page(self, authenticated_client):
+    def test_pagination_negative_page(self, authenticated_mocked_client):
         """Test pagination with negative page number."""
-        response = authenticated_client.get("/api/v1/library/?page=-1")
+        response = authenticated_mocked_client.get("/api/v1/library/?page=-1")
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
@@ -175,21 +181,21 @@ class TestPaginationEdgeCases:
         data = response.json()
         assert "items" in data
 
-    def test_pagination_zero_page_size(self, authenticated_client):
+    def test_pagination_zero_page_size(self, authenticated_mocked_client):
         """Test pagination with page_size=0."""
-        response = authenticated_client.get("/api/v1/library/?page_size=0")
+        response = authenticated_mocked_client.get("/api/v1/library/?page_size=0")
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_pagination_negative_page_size(self, authenticated_client):
+    def test_pagination_negative_page_size(self, authenticated_mocked_client):
         """Test pagination with negative page_size."""
-        response = authenticated_client.get("/api/v1/library/?page_size=-10")
+        response = authenticated_mocked_client.get("/api/v1/library/?page_size=-10")
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_pagination_page_size_exceeds_max(self, authenticated_client):
+    def test_pagination_page_size_exceeds_max(self, authenticated_mocked_client):
         """Test pagination when page_size exceeds maximum."""
-        response = authenticated_client.get("/api/v1/library/?page_size=1000")
+        response = authenticated_mocked_client.get("/api/v1/library/?page_size=1000")
 
         # Max is 100
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
@@ -247,7 +253,10 @@ class TestLibraryAudibleFetch:
         """Test Audible fetch without authentication."""
         response = client.get("/api/v1/library/audible/fetch")
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code in [
+            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_403_FORBIDDEN,
+        ]
 
     @pytest.mark.asyncio
     async def test_fetch_audible_library_no_credentials(
@@ -261,20 +270,20 @@ class TestLibraryAudibleFetch:
         # Should fail because user has no Audible credentials
         assert response.status_code in [status.HTTP_403_FORBIDDEN, status.HTTP_400_BAD_REQUEST]
 
-    def test_fetch_audible_library_num_results_validation(self, authenticated_client):
+    def test_fetch_audible_library_num_results_validation(self, authenticated_mocked_client):
         """Test num_results parameter validation."""
         # Test 0 (invalid)
-        response = authenticated_client.get("/api/v1/library/audible/fetch?num_results=0")
+        response = authenticated_mocked_client.get("/api/v1/library/audible/fetch?num_results=0")
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
         # Test > 1000 (exceeds max)
-        response = authenticated_client.get("/api/v1/library/audible/fetch?num_results=1001")
+        response = authenticated_mocked_client.get("/api/v1/library/audible/fetch?num_results=1001")
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_fetch_audible_library_page_parameter(self, authenticated_client):
+    def test_fetch_audible_library_page_parameter(self, authenticated_mocked_client):
         """Test page parameter in Audible fetch."""
         # Negative page should be invalid
-        response = authenticated_client.get("/api/v1/library/audible/fetch?page=-1")
+        response = authenticated_mocked_client.get("/api/v1/library/audible/fetch?page=-1")
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
 

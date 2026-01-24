@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from loguru import logger
 from sqlalchemy import and_, delete, select
 
+from src.adapters.storage.minio_storage_adapter import MinIOStorageAdapter
 from src.celery_app import celery_app
 from src.core.config import Config
 from src.database.engine import AsyncSessionLocal
@@ -13,7 +14,6 @@ from src.database.models.decryption import DecryptionStatus
 from src.database.models.download import DownloadStatus
 from src.database.models.error import ErrorLog
 from src.database.models.sync import SyncHistory
-from src.infrastructure.storage_service import StorageService
 
 
 @celery_app.task(name="cleanup_orphaned_minio_files")
@@ -27,7 +27,7 @@ async def _async_cleanup_minio() -> dict:
     try:
         logger.info("Starting MinIO orphaned file cleanup")
 
-        storage_service = StorageService()
+        storage_adapter = MinIOStorageAdapter()
 
         # Get all expected file paths from database
         async with AsyncSessionLocal() as db:
@@ -54,14 +54,14 @@ async def _async_cleanup_minio() -> dict:
             expected_paths.update(row[0] for row in result.fetchall() if row[0])
 
         # List all objects in MinIO
-        all_objects = storage_service.list_all_objects()
+        all_objects = storage_adapter.minio_client.list_all_objects()
         orphaned_files = [obj for obj in all_objects if obj not in expected_paths]
 
         # Delete orphaned files
         deleted_count = 0
         for file_path in orphaned_files:
             try:
-                storage_service.delete_file(file_path)
+                storage_adapter.minio_client.delete_file(file_path)
                 deleted_count += 1
             except Exception as e:
                 logger.warning(f"Failed to delete orphaned file {file_path}: {e}")

@@ -22,6 +22,7 @@ class AudioBookSyncException(Exception):
     """Base exception class for AudioBookSync API errors."""
 
     def __init__(self, message: str, status_code: int = 500, detail: Optional[dict] = None):
+        """Initialize exception with message and status metadata."""
         self.message = message
         self.status_code = status_code
         self.detail = detail or {}
@@ -32,6 +33,7 @@ class AuthenticationError(AudioBookSyncException):
     """Raised when authentication fails."""
 
     def __init__(self, message: str = "Authentication failed"):
+        """Initialize authentication error."""
         super().__init__(message, status_code=status.HTTP_401_UNAUTHORIZED)
 
 
@@ -39,6 +41,7 @@ class AuthorizationError(AudioBookSyncException):
     """Raised when user lacks required permissions."""
 
     def __init__(self, message: str = "Not authorized"):
+        """Initialize authorization error."""
         super().__init__(message, status_code=status.HTTP_403_FORBIDDEN)
 
 
@@ -46,6 +49,7 @@ class ResourceNotFoundError(AudioBookSyncException):
     """Raised when requested resource is not found."""
 
     def __init__(self, message: str = "Resource not found"):
+        """Initialize not-found error."""
         super().__init__(message, status_code=status.HTTP_404_NOT_FOUND)
 
 
@@ -53,6 +57,7 @@ class ConflictError(AudioBookSyncException):
     """Raised when there's a resource conflict (e.g., duplicate)."""
 
     def __init__(self, message: str = "Resource conflict"):
+        """Initialize conflict error."""
         super().__init__(message, status_code=status.HTTP_409_CONFLICT)
 
 
@@ -60,6 +65,7 @@ class ValidationError(AudioBookSyncException):
     """Raised when input validation fails."""
 
     def __init__(self, message: str = "Validation failed", detail: Optional[dict] = None):
+        """Initialize validation error."""
         super().__init__(message, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail)
 
 
@@ -67,6 +73,7 @@ class InternalServerError(AudioBookSyncException):
     """Raised for internal server errors."""
 
     def __init__(self, message: str = "Internal server error"):
+        """Initialize internal server error."""
         super().__init__(message, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -76,8 +83,7 @@ class InternalServerError(AudioBookSyncException):
 
 
 def handle_route_errors(operation_name: str | None = None) -> Callable:
-    """
-    Decorator for FastAPI route handlers that provides centralized error handling.
+    """Decorator for FastAPI route handlers that provides centralized error handling.
 
     Wraps async route handlers to catch exceptions, log them appropriately, and
     return standardized error responses. HTTPException instances are re-raised

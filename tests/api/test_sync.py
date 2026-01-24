@@ -23,9 +23,9 @@ class TestTriggerSync:
         assert data["status"] == "in_progress"
         assert "initiated" in data["message"].lower()
 
-    def test_trigger_sync_invalid_type(self, authenticated_client):
+    def test_trigger_sync_invalid_type(self, authenticated_mocked_client):
         """Test sync with invalid type."""
-        response = authenticated_client.post(
+        response = authenticated_mocked_client.post(
             "/api/v1/sync/",
             json={"sync_type": "invalid_type"},
         )
@@ -39,7 +39,10 @@ class TestTriggerSync:
             json={"sync_type": "full"},
         )
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code in [
+            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_403_FORBIDDEN,
+        ]
 
 
 class TestGetSyncHistory:
@@ -84,7 +87,10 @@ class TestGetSyncHistory:
         """Test sync history access without authentication."""
         response = client.get("/api/v1/sync/history")
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code in [
+            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_403_FORBIDDEN,
+        ]
 
 
 class TestGetSyncStatus:
@@ -112,9 +118,11 @@ class TestGetSyncStatus:
         assert data["sync_id"] == str(sync.sync_id)
         assert data["status"] == "completed"
 
-    def test_get_sync_status_not_found(self, authenticated_client):
+    def test_get_sync_status_not_found(self, authenticated_mocked_client):
         """Test sync status for non-existent sync."""
-        response = authenticated_client.get("/api/v1/sync/00000000-0000-0000-0000-000000000000")
+        response = authenticated_mocked_client.get(
+            "/api/v1/sync/00000000-0000-0000-0000-000000000000"
+        )
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 

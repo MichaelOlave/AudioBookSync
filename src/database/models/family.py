@@ -47,4 +47,5 @@ class Family(Base):
     )
 
     def __repr__(self) -> str:
+        """Return a debug representation."""
         return f"<Family(family_id={self.family_id}, name={self.name})>"

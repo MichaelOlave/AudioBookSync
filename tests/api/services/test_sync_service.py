@@ -14,7 +14,7 @@ class TestSyncService:
     def test_start_sync_creates_sync_history(self, monkeypatch):
         """Test starting a sync creates sync history record."""
         from src.api.services.sync_service import SyncService
-        from src.database.db_sync import sync_ops
+        from src.database.services import sync_service as sync_ops
 
         sync_created = []
 
@@ -30,7 +30,7 @@ class TestSyncService:
     def test_complete_sync_records_statistics(self, monkeypatch):
         """Test completing sync records statistics."""
         from src.api.services.sync_service import SyncService
-        from src.database.db_sync import sync_ops
+        from src.database.services import sync_service as sync_ops
 
         completions = []
 
@@ -53,7 +53,7 @@ class TestSyncService:
     def test_fail_sync_records_error(self, monkeypatch):
         """Test failing sync records error information."""
         from src.api.services.sync_service import SyncService
-        from src.database.db_sync import sync_ops
+        from src.database.services import sync_service as sync_ops
 
         failures = []
 
@@ -123,7 +123,7 @@ class TestSyncDownloadIntegration:
     def test_sync_triggers_downloads_for_new_books(self, monkeypatch):
         """Test sync automatically triggers downloads for new books."""
         from src.api.services.sync_service import SyncService
-        from src.database.db_downloads import download_ops
+        from src.database.services import download_service as download_ops
 
         download_triggers = []
 
@@ -139,14 +139,12 @@ class TestSyncDownloadIntegration:
     def test_sync_respects_download_settings(self, monkeypatch):
         """Test sync respects user's auto-download settings."""
         from src.api.services.sync_service import SyncService
-        from src.database.db_users import user_ops
+        from src.database.services import user_service as user_ops
 
-        def mock_get_user_preferences(user_id):
-            return {
-                "auto_decrypt": False,  # User doesn't want auto-download
-            }
+        async def mock_get_user_by_id(db, user_id):
+            return {"auto_decrypt": False}
 
-        monkeypatch.setattr(user_ops, "get_user_preferences", mock_get_user_preferences)
+        monkeypatch.setattr(user_ops, "get_user_by_id", mock_get_user_by_id)
 
         service = SyncService()
         assert hasattr(service, "start_sync")
@@ -183,7 +181,7 @@ class TestSyncMetadataIntegration:
     def test_sync_stores_book_metadata(self, monkeypatch):
         """Test sync stores comprehensive book metadata."""
         from src.api.services.sync_service import SyncService
-        from src.database.db_books import book_ops
+        from src.database.services import book_service as book_ops
 
         def mock_add_book_with_metadata(asin, user_id, title, book_data, **kwargs):
             return True
@@ -196,15 +194,19 @@ class TestSyncMetadataIntegration:
     def test_sync_extracts_contributors(self, monkeypatch):
         """Test sync extracts and stores contributor information."""
         from src.api.services.sync_service import SyncService
-        from src.database.db_contributors import contributor_ops
+        from src.database.services import metadata_service as contributor_ops
 
         contributors_added = []
 
-        def mock_add_contributor(name, role):
-            contributors_added.append({"name": name, "role": role})
+        async def mock_get_or_create_contributor(*args, **kwargs):
+            contributors_added.append({"args": args, "kwargs": kwargs})
             return f"contributor-{len(contributors_added)}"
 
-        monkeypatch.setattr(contributor_ops, "add_contributor", mock_add_contributor)
+        monkeypatch.setattr(
+            contributor_ops,
+            "get_or_create_contributor",
+            mock_get_or_create_contributor,
+        )
 
         service = SyncService()
         assert hasattr(service, "start_sync")
@@ -212,20 +214,14 @@ class TestSyncMetadataIntegration:
     def test_sync_stores_media_information(self, monkeypatch):
         """Test sync stores media information."""
         from src.api.services.sync_service import SyncService
-        from src.database.db_media_info import media_info_ops
+        from src.database.services import metadata_service as media_info_ops
 
         media_records = []
 
-        def mock_add_media_info(asin, codec, bitrate, sample_rate):
-            media_records.append(
-                {
-                    "asin": asin,
-                    "codec": codec,
-                    "bitrate": bitrate,
-                }
-            )
+        async def mock_create_media_info(*args, **kwargs):
+            media_records.append({"args": args, "kwargs": kwargs})
 
-        monkeypatch.setattr(media_info_ops, "add_media_info", mock_add_media_info)
+        monkeypatch.setattr(media_info_ops, "create_media_info", mock_create_media_info)
 
         service = SyncService()
         assert service is not None
@@ -237,7 +233,7 @@ class TestSyncUserIsolation:
     def test_sync_user_cannot_access_other_syncs(self, monkeypatch):
         """Test user cannot access other users' sync records."""
         from src.api.services.sync_service import SyncService
-        from src.database.db_sync import sync_ops
+        from src.database.services import sync_service as sync_ops
 
         def mock_get_sync_by_id(sync_id):
             return {
@@ -281,12 +277,12 @@ class TestSyncStatistics:
     def test_sync_records_error_details(self, monkeypatch):
         """Test sync records detailed error information."""
         from src.api.services.sync_service import SyncService
-        from src.database.db_sync import sync_ops
+        from src.database.services import error_service as error_ops
 
-        def mock_add_sync_error(sync_id, error_type, error_message, asin=None):
+        async def mock_log_error(db, user_id, error_type, error_message, **kwargs):
             return True
 
-        monkeypatch.setattr(sync_ops, "add_sync_error", mock_add_sync_error)
+        monkeypatch.setattr(error_ops, "log_error", mock_log_error)
 
         service = SyncService()
         assert service is not None

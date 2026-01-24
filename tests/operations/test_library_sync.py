@@ -4,11 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.operations.library_sync import (
-    get_or_create_user,
-    process_book,
-    sync_library,
-)
+from src.operations.library_sync import get_or_create_user, process_book, sync_library
 
 
 @pytest.mark.asyncio

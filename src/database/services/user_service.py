@@ -22,8 +22,7 @@ async def create_user(
     activation_bytes: Optional[str] = None,
     password_hash: Optional[str] = None,
 ) -> Optional[User]:
-    """
-    Create a new user.
+    """Create a new user.
 
     Args:
         db: Database session
@@ -59,8 +58,7 @@ async def create_family(
     name: Optional[str],
     owner_user_id: Optional[Union[str, UUID]] = None,
 ) -> Optional[Family]:
-    """
-    Create a new family.
+    """Create a new family.
 
     Args:
         db: Database session
@@ -82,8 +80,7 @@ async def create_family(
 
 
 async def get_user_by_id(db: AsyncSession, user_id: str) -> Optional[User]:
-    """
-    Get user by ID.
+    """Get user by ID.
 
     Args:
         db: Database session
@@ -96,8 +93,7 @@ async def get_user_by_id(db: AsyncSession, user_id: str) -> Optional[User]:
 
 
 async def get_user_by_username(db: AsyncSession, username: str) -> Optional[User]:
-    """
-    Get user by username.
+    """Get user by username.
 
     Args:
         db: Database session
@@ -117,8 +113,7 @@ async def get_user_by_username(db: AsyncSession, username: str) -> Optional[User
 
 
 async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
-    """
-    Get user by email.
+    """Get user by email.
 
     Args:
         db: Database session
@@ -136,8 +131,7 @@ async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
 
 
 async def get_family_members(db: AsyncSession, family_id: Union[str, UUID]) -> list[User]:
-    """
-    Get all members of a family.
+    """Get all members of a family.
 
     Args:
         db: Database session
@@ -157,8 +151,7 @@ async def get_family_members(db: AsyncSession, family_id: Union[str, UUID]) -> l
 
 
 async def get_user_by_audible_email(db: AsyncSession, audible_email: str) -> Optional[User]:
-    """
-    Get user by Audible email.
+    """Get user by Audible email.
 
     Args:
         db: Database session
@@ -176,8 +169,7 @@ async def get_user_by_audible_email(db: AsyncSession, audible_email: str) -> Opt
 
 
 async def update_user_password(db: AsyncSession, user_id: str, password_hash: str) -> bool:
-    """
-    Update user's password hash.
+    """Update user's password hash.
 
     Args:
         db: Database session
@@ -192,8 +184,7 @@ async def update_user_password(db: AsyncSession, user_id: str, password_hash: st
 
 
 async def get_family_by_id(db: AsyncSession, family_id: str) -> Optional[Family]:
-    """
-    Get family by ID.
+    """Get family by ID.
 
     Args:
         db: Database session
@@ -210,8 +201,7 @@ async def update_family(
     family_id: str,
     updates: Dict[str, Any],
 ) -> Optional[Family]:
-    """
-    Update a family's fields.
+    """Update a family's fields.
 
     Args:
         db: Database session
@@ -229,8 +219,7 @@ async def update_family(
 
 
 async def delete_family(db: AsyncSession, family_id: str) -> bool:
-    """
-    Delete a family.
+    """Delete a family.
 
     Args:
         db: Database session
@@ -248,8 +237,7 @@ async def update_user_family_settings(
     user_id: str,
     updates: Dict[str, Any],
 ) -> Optional[User]:
-    """
-    Update user's family membership and sharing settings.
+    """Update user's family membership and sharing settings.
 
     Args:
         db: Database session
@@ -271,8 +259,7 @@ async def get_accessible_user_ids(
     user_id: str,
     family_id: Optional[Union[str, UUID]],
 ) -> list[str]:
-    """
-    Get list of user IDs whose books are visible to the current user.
+    """Get list of user IDs whose books are visible to the current user.
 
     Includes the current user and any family members who share their libraries.
     """
@@ -298,8 +285,7 @@ async def get_accessible_user_ids(
 
 
 async def update_user_email(db: AsyncSession, user_id: str, email: str) -> bool:
-    """
-    Update user's email address.
+    """Update user's email address.
 
     Args:
         db: Database session
@@ -314,8 +300,7 @@ async def update_user_email(db: AsyncSession, user_id: str, email: str) -> bool:
 
 
 async def update_user_last_sync(db: AsyncSession, user_id: str) -> bool:
-    """
-    Update user's last sync timestamp.
+    """Update user's last sync timestamp.
 
     Args:
         db: Database session
@@ -337,8 +322,7 @@ async def update_user_audible_auth(
     audible_email: Optional[str] = None,
     audible_device_name: Optional[str] = None,
 ) -> bool:
-    """
-    Update user's Audible authentication information.
+    """Update user's Audible authentication information.
 
     Args:
         db: Database session
@@ -368,8 +352,7 @@ async def update_user_audible_auth(
 async def update_user_activation_bytes(
     db: AsyncSession, user_id: str, activation_bytes: str
 ) -> bool:
-    """
-    Update user's Audible activation bytes.
+    """Update user's Audible activation bytes.
 
     Args:
         db: Database session
@@ -384,8 +367,7 @@ async def update_user_activation_bytes(
 
 
 async def get_active_users(db: AsyncSession) -> list[User]:
-    """
-    Get all active users.
+    """Get all active users.
 
     Args:
         db: Database session
@@ -402,8 +384,7 @@ async def get_active_users(db: AsyncSession) -> list[User]:
 
 
 async def deactivate_user(db: AsyncSession, user_id: str) -> bool:
-    """
-    Deactivate a user account.
+    """Deactivate a user account.
 
     Args:
         db: Database session
@@ -417,8 +398,7 @@ async def deactivate_user(db: AsyncSession, user_id: str) -> bool:
 
 
 async def delete_user(db: AsyncSession, user_id: str) -> bool:
-    """
-    Delete a user account (cascades to related records).
+    """Delete a user account (cascades to related records).
 
     Args:
         db: Database session
@@ -437,8 +417,7 @@ async def update_audible_auth_json(
     auth_json: Dict[str, Any],
     activation_bytes: Optional[str] = None,
 ) -> bool:
-    """
-    Update Audible auth.json with field extraction.
+    """Update Audible auth.json with field extraction.
 
     Extracts commonly used fields from nested JSON and stores them
     in dedicated columns for quick access.
@@ -486,8 +465,7 @@ async def update_audible_auth_json(
 
 
 async def clear_audible_auth(db: AsyncSession, user_id: str) -> bool:
-    """
-    Clear all Audible authentication fields.
+    """Clear all Audible authentication fields.
 
     Sets all Audible-related fields to None.
 
@@ -523,8 +501,7 @@ async def get_audible_auth_json(
     user_id: str,
     redact_secrets: bool = True,
 ) -> Optional[Dict[str, Any]]:
-    """
-    Get Audible auth.json with optional sensitive token redaction.
+    """Get Audible auth.json with optional sensitive token redaction.
 
     Args:
         db: Database session
@@ -544,11 +521,11 @@ async def get_audible_auth_json(
         if redact_secrets:
             # Redact sensitive tokens
             if "access_token" in auth_json:
-                auth_json["access_token"] = "REDACTED"
+                auth_json["access_token"] = "REDACTED"  # nosec B105
             if "refresh_token" in auth_json:
-                auth_json["refresh_token"] = "REDACTED"
+                auth_json["refresh_token"] = "REDACTED"  # nosec B105
             if "private_key" in auth_json:
-                auth_json["private_key"] = "REDACTED"
+                auth_json["private_key"] = "REDACTED"  # nosec B105
 
         logger.debug(f"Retrieved Audible auth for user: {user_id}")
         return auth_json
@@ -562,8 +539,7 @@ async def update_user_storage_config(
     user_id: str,
     storage_config: Dict[str, Any],
 ) -> bool:
-    """
-    Update user's storage configuration as JSON.
+    """Update user's storage configuration as JSON.
 
     Args:
         db: Database session

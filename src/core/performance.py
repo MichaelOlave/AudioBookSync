@@ -418,6 +418,7 @@ class LoadTester:
         elapsed_time = time.time() - start_time
         actual_rps = request_count / elapsed_time
 
+        success_rate = success_count / request_count if request_count > 0 else 0.0
         result = {
             "test_name": test_name,
             "duration_seconds": duration_seconds,
@@ -426,14 +427,14 @@ class LoadTester:
             "total_requests": request_count,
             "successful_requests": success_count,
             "failed_requests": error_count,
-            "success_rate": success_count / request_count if request_count > 0 else 0,
+            "success_rate": success_rate,
             "timestamp": datetime.now(),
         }
 
         logger.info(
             f"Load test complete: {test_name}. "
             f"Target: {self.target_rps} RPS, Actual: {actual_rps:.1f} RPS, "
-            f"Success rate: {result['success_rate'] * 100:.1f}%"
+            f"Success rate: {success_rate * 100:.1f}%"
         )
 
         self.results.append(result)

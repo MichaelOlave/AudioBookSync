@@ -86,4 +86,5 @@ class User(Base):
     )
 
     def __repr__(self) -> str:
+        """Return a debug representation."""
         return f"<User(user_id={self.user_id}, username={self.username}, email={self.email})>"

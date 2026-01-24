@@ -32,8 +32,7 @@ async def start_audible_auth(
     request: AuthStartRequest,
     current_user: Dict = Depends(get_current_user),
 ) -> AuthStartResponse:
-    """
-    Start the Audible authentication process by generating a login URL.
+    """Start the Audible authentication process by generating a login URL.
 
     The login session is tied to the current user and stored in-memory
     until the flow is completed via `/auth/complete`.
@@ -58,8 +57,7 @@ async def complete_audible_auth(
     current_user: Dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> AudibleCredentialsUpdate:
-    """
-    Complete the Audible authentication using the redirect URL from the browser.
+    """Complete the Audible authentication using the redirect URL from the browser.
 
     This will:
     - Finish the Audible login flow for the current user

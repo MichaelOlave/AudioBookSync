@@ -8,12 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...database.models.user import User
 from ...database.services import decryption_service, download_service
-from ..middleware.error_handler import InternalServerError, ResourceNotFoundError
-from ..schemas.decryption import (
-    DecryptCreate,
-    DecryptList,
-    DecryptResponse,
-)
+from ..middleware.error_handler import ConflictError, InternalServerError, ResourceNotFoundError
+from ..schemas.decryption import DecryptCreate, DecryptList, DecryptResponse
 from ..services.background_service import BackgroundTaskService
 from .router_factory import RouterConfig, StatusRouterFactory
 
@@ -49,7 +45,7 @@ async def validate_download_exists(
 
     if download.status != "completed":
         logger.warning(f"Download not completed for {create_data.asin}: {download.status}")
-        raise InternalServerError(
+        raise ConflictError(
             f"Download must be completed before decryption (current status: {download.status})"
         )
 

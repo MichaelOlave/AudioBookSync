@@ -1,15 +1,59 @@
 """Tests for authentication endpoints."""
 
+from datetime import datetime
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
 import pytest
 from fastapi import status
+
+
+def _make_user(**overrides):
+    """Create a lightweight user-like object for response/model usage."""
+    defaults = {
+        "user_id": "00000000-0000-0000-0000-000000000000",
+        "username": "testuser",
+        "email": "testuser@example.com",
+        "password_hash": None,
+        "is_active": True,
+        "family_id": None,
+        "share_library_with_family": False,
+        "last_sync_date": None,
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow(),
+    }
+    defaults.update(overrides)
+    return SimpleNamespace(**defaults)
 
 
 class TestRegister:
     """Tests for user registration endpoint."""
 
-    def test_register_success(self, client, test_user_data, mock_user_ops):
+    def test_register_success(self, mocked_client, test_user_data, monkeypatch):
         """Test successful user registration."""
-        response = client.post(
+        from src.database.services import user_service
+
+        created_user = _make_user(
+            username=test_user_data["username"],
+            email=test_user_data["email"],
+        )
+        monkeypatch.setattr(
+            user_service,
+            "get_user_by_username",
+            AsyncMock(return_value=None),
+        )
+        monkeypatch.setattr(
+            user_service,
+            "get_user_by_email",
+            AsyncMock(return_value=None),
+        )
+        monkeypatch.setattr(
+            user_service,
+            "create_user",
+            AsyncMock(return_value=created_user),
+        )
+
+        response = mocked_client.post(
             "/api/v1/auth/register",
             json=test_user_data,
         )
@@ -20,16 +64,17 @@ class TestRegister:
         assert data["email"] == test_user_data["email"]
         assert "password" not in data  # Password should not be returned
 
-    def test_register_duplicate_username(self, client, test_user_data, monkeypatch):
+    def test_register_duplicate_username(self, mocked_client, test_user_data, monkeypatch):
         """Test registration with existing username."""
-        from src.database.db_users import user_ops
+        from src.database.services import user_service
 
-        def mock_get_user_by_username(username):
-            return {"user_id": "existing", "username": username}
+        monkeypatch.setattr(
+            user_service,
+            "get_user_by_username",
+            AsyncMock(return_value=_make_user(username=test_user_data["username"])),
+        )
 
-        monkeypatch.setattr(user_ops, "get_user_by_username", mock_get_user_by_username)
-
-        response = client.post(
+        response = mocked_client.post(
             "/api/v1/auth/register",
             json=test_user_data,
         )
@@ -38,20 +83,22 @@ class TestRegister:
         data = response.json()
         assert "already taken" in data["detail"].lower()
 
-    def test_register_duplicate_email(self, client, test_user_data, monkeypatch):
+    def test_register_duplicate_email(self, mocked_client, test_user_data, monkeypatch):
         """Test registration with existing email."""
-        from src.database.db_users import user_ops
+        from src.database.services import user_service
 
-        def mock_get_user_by_email(email):
-            return {"user_id": "existing", "email": email}
+        monkeypatch.setattr(
+            user_service,
+            "get_user_by_username",
+            AsyncMock(return_value=None),
+        )
+        monkeypatch.setattr(
+            user_service,
+            "get_user_by_email",
+            AsyncMock(return_value=_make_user(email=test_user_data["email"])),
+        )
 
-        def mock_get_user_by_username(username):
-            return None
-
-        monkeypatch.setattr(user_ops, "get_user_by_username", mock_get_user_by_username)
-        monkeypatch.setattr(user_ops, "get_user_by_email", mock_get_user_by_email)
-
-        response = client.post(
+        response = mocked_client.post(
             "/api/v1/auth/register",
             json=test_user_data,
         )
@@ -60,9 +107,9 @@ class TestRegister:
         data = response.json()
         assert "already registered" in data["detail"].lower()
 
-    def test_register_invalid_email(self, client):
+    def test_register_invalid_email(self, mocked_client):
         """Test registration with invalid email."""
-        response = client.post(
+        response = mocked_client.post(
             "/api/v1/auth/register",
             json={
                 "username": "testuser",
@@ -73,9 +120,9 @@ class TestRegister:
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_register_short_password(self, client):
+    def test_register_short_password(self, mocked_client):
         """Test registration with password too short."""
-        response = client.post(
+        response = mocked_client.post(
             "/api/v1/auth/register",
             json={
                 "username": "testuser",
@@ -90,26 +137,25 @@ class TestRegister:
 class TestLogin:
     """Tests for login endpoint."""
 
-    def test_login_success(self, client, test_user_data, monkeypatch):
+    def test_login_success(self, mocked_client, test_user_data, monkeypatch):
         """Test successful login."""
         from src.api.security.password import hash_password
-        from src.database.db_users import user_ops
+        from src.database.services import user_service
 
-        user = {
-            "user_id": "test-user-123",
-            "username": test_user_data["username"],
-            "password_hash": hash_password(test_user_data["password"]),
-            "is_active": True,
-        }
+        user = _make_user(
+            user_id="test-user-123",
+            username=test_user_data["username"],
+            password_hash=hash_password(test_user_data["password"]),
+            is_active=True,
+        )
 
-        def mock_get_user_by_username(username):
-            if username == test_user_data["username"]:
-                return user
-            return None
+        monkeypatch.setattr(
+            user_service,
+            "get_user_by_username",
+            AsyncMock(return_value=user),
+        )
 
-        monkeypatch.setattr(user_ops, "get_user_by_username", mock_get_user_by_username)
-
-        response = client.post(
+        response = mocked_client.post(
             "/api/v1/auth/login",
             data={
                 "username": test_user_data["username"],
@@ -123,16 +169,17 @@ class TestLogin:
         assert "refresh_token" in data
         assert data["token_type"] == "bearer"
 
-    def test_login_invalid_username(self, client, test_user_data, monkeypatch):
+    def test_login_invalid_username(self, mocked_client, test_user_data, monkeypatch):
         """Test login with non-existent username."""
-        from src.database.db_users import user_ops
+        from src.database.services import user_service
 
-        def mock_get_user_by_username(username):
-            return None
+        monkeypatch.setattr(
+            user_service,
+            "get_user_by_username",
+            AsyncMock(return_value=None),
+        )
 
-        monkeypatch.setattr(user_ops, "get_user_by_username", mock_get_user_by_username)
-
-        response = client.post(
+        response = mocked_client.post(
             "/api/v1/auth/login",
             data={
                 "username": "nonexistent",
@@ -144,26 +191,25 @@ class TestLogin:
         data = response.json()
         assert "Invalid username or password" in data["detail"]
 
-    def test_login_invalid_password(self, client, test_user_data, monkeypatch):
+    def test_login_invalid_password(self, mocked_client, test_user_data, monkeypatch):
         """Test login with wrong password."""
         from src.api.security.password import hash_password
-        from src.database.db_users import user_ops
+        from src.database.services import user_service
 
-        user = {
-            "user_id": "test-user-123",
-            "username": test_user_data["username"],
-            "password_hash": hash_password("CorrectPassword123!"),
-            "is_active": True,
-        }
+        user = _make_user(
+            user_id="test-user-123",
+            username=test_user_data["username"],
+            password_hash=hash_password("CorrectPassword123!"),
+            is_active=True,
+        )
 
-        def mock_get_user_by_username(username):
-            if username == test_user_data["username"]:
-                return user
-            return None
+        monkeypatch.setattr(
+            user_service,
+            "get_user_by_username",
+            AsyncMock(return_value=user),
+        )
 
-        monkeypatch.setattr(user_ops, "get_user_by_username", mock_get_user_by_username)
-
-        response = client.post(
+        response = mocked_client.post(
             "/api/v1/auth/login",
             data={
                 "username": test_user_data["username"],
@@ -175,26 +221,25 @@ class TestLogin:
         data = response.json()
         assert "Invalid username or password" in data["detail"]
 
-    def test_login_inactive_user(self, client, test_user_data, monkeypatch):
+    def test_login_inactive_user(self, mocked_client, test_user_data, monkeypatch):
         """Test login with inactive user."""
         from src.api.security.password import hash_password
-        from src.database.db_users import user_ops
+        from src.database.services import user_service
 
-        user = {
-            "user_id": "test-user-123",
-            "username": test_user_data["username"],
-            "password_hash": hash_password(test_user_data["password"]),
-            "is_active": False,  # Inactive user
-        }
+        user = _make_user(
+            user_id="test-user-123",
+            username=test_user_data["username"],
+            password_hash=hash_password(test_user_data["password"]),
+            is_active=False,
+        )
 
-        def mock_get_user_by_username(username):
-            if username == test_user_data["username"]:
-                return user
-            return None
+        monkeypatch.setattr(
+            user_service,
+            "get_user_by_username",
+            AsyncMock(return_value=user),
+        )
 
-        monkeypatch.setattr(user_ops, "get_user_by_username", mock_get_user_by_username)
-
-        response = client.post(
+        response = mocked_client.post(
             "/api/v1/auth/login",
             data={
                 "username": test_user_data["username"],
@@ -210,19 +255,17 @@ class TestLogin:
 class TestRefresh:
     """Tests for token refresh endpoint."""
 
-    def test_refresh_success(self, client, test_user_with_tokens, monkeypatch):
+    def test_refresh_success(self, mocked_client, test_user_with_tokens, monkeypatch):
         """Test successful token refresh."""
-        from src.database.db_users import user_ops
+        from src.database.services import user_service
 
-        def mock_get_user_by_id(user_id):
-            return {
-                "user_id": user_id,
-                "is_active": True,
-            }
+        monkeypatch.setattr(
+            user_service,
+            "get_user_by_id",
+            AsyncMock(return_value=_make_user(user_id=test_user_with_tokens["user_id"])),
+        )
 
-        monkeypatch.setattr(user_ops, "get_user_by_id", mock_get_user_by_id)
-
-        response = client.post(
+        response = mocked_client.post(
             "/api/v1/auth/refresh",
             json={
                 "refresh_token": test_user_with_tokens["refresh_token"],
@@ -235,9 +278,9 @@ class TestRefresh:
         assert "refresh_token" in data
         assert data["token_type"] == "bearer"
 
-    def test_refresh_invalid_token(self, client):
+    def test_refresh_invalid_token(self, mocked_client):
         """Test refresh with invalid token."""
-        response = client.post(
+        response = mocked_client.post(
             "/api/v1/auth/refresh",
             json={
                 "refresh_token": "invalid-token",
@@ -246,15 +289,19 @@ class TestRefresh:
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_refresh_expired_token(self, client, monkeypatch):
+    def test_refresh_expired_token(self, mocked_client, monkeypatch):
         """Test refresh with expired token."""
+        from fastapi import HTTPException
 
         def mock_decode_token(token):
-            raise Exception("Token expired")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token expired",
+            )
 
         monkeypatch.setattr("src.api.routers.auth.decode_token", mock_decode_token)
 
-        response = client.post(
+        response = mocked_client.post(
             "/api/v1/auth/refresh",
             json={
                 "refresh_token": "expired-token",
@@ -263,19 +310,19 @@ class TestRefresh:
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_refresh_inactive_user(self, client, test_user_with_tokens, monkeypatch):
+    def test_refresh_inactive_user(self, mocked_client, test_user_with_tokens, monkeypatch):
         """Test refresh with inactive user."""
-        from src.database.db_users import user_ops
+        from src.database.services import user_service
 
-        def mock_get_user_by_id(user_id):
-            return {
-                "user_id": user_id,
-                "is_active": False,  # Inactive
-            }
+        monkeypatch.setattr(
+            user_service,
+            "get_user_by_id",
+            AsyncMock(
+                return_value=_make_user(user_id=test_user_with_tokens["user_id"], is_active=False)
+            ),
+        )
 
-        monkeypatch.setattr(user_ops, "get_user_by_id", mock_get_user_by_id)
-
-        response = client.post(
+        response = mocked_client.post(
             "/api/v1/auth/refresh",
             json={
                 "refresh_token": test_user_with_tokens["refresh_token"],
@@ -290,37 +337,37 @@ class TestRefresh:
 class TestAuthorization:
     """Tests for authorization and authentication requirements."""
 
-    def test_missing_authorization_header(self, client):
+    def test_missing_authorization_header(self, mocked_client):
         """Test request without Authorization header."""
-        response = client.get("/api/v1/library/")
+        response = mocked_client.get("/api/v1/library/")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_invalid_authorization_header_format(self, client):
+    def test_invalid_authorization_header_format(self, mocked_client):
         """Test request with malformed Authorization header."""
-        response = client.get(
+        response = mocked_client.get(
             "/api/v1/library/",
             headers={"Authorization": "InvalidFormat token"},
         )
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_invalid_token(self, client):
+    def test_invalid_token(self, mocked_client):
         """Test request with invalid token."""
-        response = client.get(
+        response = mocked_client.get(
             "/api/v1/library/",
             headers={"Authorization": "Bearer invalid-token-xyz"},
         )
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_malformed_jwt(self, client):
+    def test_malformed_jwt(self, mocked_client):
         """Test request with malformed JWT token."""
-        response = client.get(
+        response = mocked_client.get(
             "/api/v1/library/",
             headers={"Authorization": "Bearer not.a.jwt"},
         )
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     @pytest.mark.skip(reason="PyJWT not installed as dependency")
-    def test_token_with_tampered_payload(self, client):
+    def test_token_with_tampered_payload(self, mocked_client):
         """Test token with tampered payload doesn't work."""
         import jwt
 
@@ -331,24 +378,24 @@ class TestAuthorization:
             algorithm="HS256",
         )
 
-        response = client.get(
+        response = mocked_client.get(
             "/api/v1/library/",
             headers={"Authorization": f"Bearer {tampered_token}"},
         )
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_empty_bearer_token(self, client):
+    def test_empty_bearer_token(self, mocked_client):
         """Test request with empty Bearer token."""
-        response = client.get(
+        response = mocked_client.get(
             "/api/v1/library/",
             headers={"Authorization": "Bearer "},
         )
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_case_insensitive_bearer(self, client, test_user_with_tokens):
+    def test_case_insensitive_bearer(self, mocked_client, test_user_with_tokens):
         """Test that Bearer keyword is case-sensitive."""
         # FastAPI/OpenAPI expects "Bearer" with capital B
-        response = client.get(
+        response = mocked_client.get(
             "/api/v1/library/",
             headers={"Authorization": f"bearer {test_user_with_tokens['access_token']}"},
         )
@@ -359,9 +406,9 @@ class TestAuthorization:
 class TestPasswordValidation:
     """Tests for password validation during registration."""
 
-    def test_register_no_uppercase(self, client):
+    def test_register_no_uppercase(self, mocked_client):
         """Test registration with password missing uppercase."""
-        response = client.post(
+        response = mocked_client.post(
             "/api/v1/auth/register",
             json={
                 "username": "testuser",
@@ -371,9 +418,9 @@ class TestPasswordValidation:
         )
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_register_no_lowercase(self, client):
+    def test_register_no_lowercase(self, mocked_client):
         """Test registration with password missing lowercase."""
-        response = client.post(
+        response = mocked_client.post(
             "/api/v1/auth/register",
             json={
                 "username": "testuser",
@@ -383,9 +430,9 @@ class TestPasswordValidation:
         )
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_register_no_digit(self, client):
+    def test_register_no_digit(self, mocked_client):
         """Test registration with password missing digit."""
-        response = client.post(
+        response = mocked_client.post(
             "/api/v1/auth/register",
             json={
                 "username": "testuser",
@@ -395,9 +442,9 @@ class TestPasswordValidation:
         )
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_register_no_special_char(self, client):
+    def test_register_no_special_char(self, mocked_client):
         """Test registration with password missing special character."""
-        response = client.post(
+        response = mocked_client.post(
             "/api/v1/auth/register",
             json={
                 "username": "testuser",
@@ -407,9 +454,9 @@ class TestPasswordValidation:
         )
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_register_whitespace_in_password(self, client):
+    def test_register_whitespace_in_password(self, mocked_client):
         """Test registration with whitespace in password."""
-        response = client.post(
+        response = mocked_client.post(
             "/api/v1/auth/register",
             json={
                 "username": "testuser",
@@ -430,44 +477,38 @@ class TestTokenExpiration:
 
     def test_access_token_with_correct_expiration(self, test_user_with_tokens):
         """Verify access token has correct expiration time."""
-        from datetime import datetime
+        from datetime import datetime, timezone
 
-        import jwt
+        from jose import jwt
 
         token = test_user_with_tokens["access_token"]
-        decoded = jwt.decode(
-            token,
-            options={"verify_signature": False},
-        )
+        decoded = jwt.get_unverified_claims(token)
 
         # Should have exp claim
         assert "exp" in decoded
-        exp_time = datetime.fromtimestamp(decoded["exp"])
+        exp_time = datetime.fromtimestamp(decoded["exp"], tz=timezone.utc)
         # Should be approximately 30 minutes from now
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         diff = exp_time - now
         # Allow 1 minute margin
         assert 29 * 60 < diff.total_seconds() < 31 * 60
 
     def test_refresh_token_with_correct_expiration(self, test_user_with_tokens):
         """Verify refresh token has correct expiration time."""
-        from datetime import datetime
+        from datetime import datetime, timezone
 
-        import jwt
+        from jose import jwt
 
         token = test_user_with_tokens["refresh_token"]
-        decoded = jwt.decode(
-            token,
-            options={"verify_signature": False},
-        )
+        decoded = jwt.get_unverified_claims(token)
 
         # Should have exp claim
         assert "exp" in decoded
-        exp_time = datetime.fromtimestamp(decoded["exp"])
+        exp_time = datetime.fromtimestamp(decoded["exp"], tz=timezone.utc)
         # Should be approximately 7 days from now
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         diff = exp_time - now
         # Allow 1 minute margin
         assert 6 * 24 * 60 * 60 < diff.total_seconds() < 7 * 24 * 60 * 60 + 60

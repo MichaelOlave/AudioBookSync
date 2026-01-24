@@ -10,15 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...database.engine import get_db_session
 from ...database.services import user_service
 from ..middleware.error_handler import AuthenticationError, InternalServerError, handle_route_errors
-from ..schemas.credentials import (
-    AudibleCredentialsResponse,
-    AudibleCredentialsUpdate,
-)
-from ..schemas.storage import (
-    StorageConfigRequest,
-    StorageConfigResponse,
-    StorageTestResponse,
-)
+from ..schemas.credentials import AudibleCredentialsResponse, AudibleCredentialsUpdate
+from ..schemas.storage import StorageConfigRequest, StorageConfigResponse, StorageTestResponse
 from ..security.auth import get_current_user
 from ..utils.auth_utils import get_user_id
 
@@ -28,8 +21,7 @@ StorageProviderType = Literal["minio", "aws_s3", "gcs"]
 
 
 def normalize_endpoint(endpoint: str) -> str:
-    """
-    Normalize storage endpoint by removing protocol prefix.
+    """Normalize storage endpoint by removing protocol prefix.
 
     MinIO SDK expects endpoint without protocol (e.g., "localhost:9000" instead of "http://localhost:9000").
     The protocol is determined by the `secure` parameter.
@@ -65,8 +57,7 @@ async def test_minio_connection(
     access_key: str | None = None,
     secret_key: str | None = None,
 ) -> tuple[bool, str, bool]:
-    """
-    Test MinIO storage connection and bucket existence.
+    """Test MinIO storage connection and bucket existence.
 
     Args:
         endpoint: Storage endpoint (normalized or raw)
@@ -116,8 +107,7 @@ async def get_audible_credentials(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> AudibleCredentialsResponse:
-    """
-    Get the current user's Audible authentication credentials.
+    """Get the current user's Audible authentication credentials.
 
     Returns whether auth is configured and some non-sensitive metadata.
     Note: Tokens and activation bytes are never returned for security.
@@ -193,8 +183,7 @@ async def clear_audible_credentials(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> AudibleCredentialsUpdate:
-    """
-    Clear/remove the current user's Audible authentication credentials.
+    """Clear/remove the current user's Audible authentication credentials.
 
     This will disconnect the user's Audible account from AudioBookSync.
     Syncing will not be possible until credentials are re-added via the
@@ -254,8 +243,7 @@ async def clear_audible_credentials(
 async def get_storage_config(
     current_user: dict = Depends(get_current_user),
 ) -> StorageConfigResponse:
-    """
-    Get the current user's storage provider configuration.
+    """Get the current user's storage provider configuration.
 
     Returns the configured storage provider details without sensitive credentials.
 
@@ -342,8 +330,7 @@ async def update_storage_config(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> StorageConfigResponse:
-    """
-    Update the current user's storage provider configuration.
+    """Update the current user's storage provider configuration.
 
     Allows changing the storage provider type, endpoint, and credentials.
 
@@ -452,8 +439,7 @@ async def test_storage_connection(
     config: StorageConfigRequest,
     current_user: dict = Depends(get_current_user),
 ) -> StorageTestResponse:
-    """
-    Test the connection to the configured storage provider.
+    """Test the connection to the configured storage provider.
 
     Verifies that the storage provider is accessible and the bucket exists.
 

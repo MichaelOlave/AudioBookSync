@@ -179,8 +179,8 @@ async def _async_retry_decrypts_from_minio() -> dict:  # noqa: C901
     try:
         logger.info("Starting failed decryption retry from MinIO encrypted files")
 
+        from src.adapters.storage.minio_storage_adapter import MinIOStorageAdapter
         from src.database.models.book import Book
-        from src.infrastructure.storage_service import StorageService
         from src.operations.decryptor import decrypt_book
 
         async with AsyncSessionLocal() as db:
@@ -218,8 +218,8 @@ async def _async_retry_decrypts_from_minio() -> dict:  # noqa: C901
                     user_id = str(decrypt_record.user_id)
 
                     # Download encrypted file from MinIO
-                    storage_service = StorageService()
-                    encrypted_file_path = storage_service.get_file(
+                    storage = MinIOStorageAdapter()
+                    encrypted_file_path = storage.get_file(
                         user_id=user_id,
                         object_key=decrypt_record.encrypted_file_object_key,
                     )
@@ -257,7 +257,7 @@ async def _async_retry_decrypts_from_minio() -> dict:  # noqa: C901
 
                         # Delete encrypted file from MinIO
                         try:
-                            storage_service.delete_file(
+                            storage.delete_file(
                                 user_id=user_id,
                                 object_key=decrypt_record.encrypted_file_object_key,
                             )

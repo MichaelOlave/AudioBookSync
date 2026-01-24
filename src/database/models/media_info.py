@@ -45,4 +45,5 @@ class MediaInfo(Base):
     )
 
     def __repr__(self) -> str:
+        """Return a debug representation."""
         return f"<MediaInfo(media_id={self.media_id}, asin={self.asin}, codec={self.codec})>"

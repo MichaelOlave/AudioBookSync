@@ -54,4 +54,5 @@ class UserBook(Base):
     user = relationship("User", back_populates="user_books", lazy="select")
 
     def __repr__(self) -> str:
+        """Return a debug representation."""
         return f"<UserBook(user_book_id={self.user_book_id}, user_id={self.user_id}, asin={self.asin})>"

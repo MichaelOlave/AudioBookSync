@@ -98,4 +98,5 @@ class Book(Base):
     )
 
     def __repr__(self) -> str:
+        """Return a debug representation."""
         return f"<Book(asin={self.asin}, title={self.title}, author={self.author})>"

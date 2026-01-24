@@ -16,11 +16,7 @@ from ..middleware.error_handler import (
 )
 from ..schemas.auth import RefreshTokenRequest, Token, UserRegister
 from ..schemas.user import UserResponse
-from ..security.auth import (
-    create_access_token,
-    create_refresh_token,
-    decode_token,
-)
+from ..security.auth import create_access_token, create_refresh_token, decode_token
 from ..security.password import hash_password, verify_password
 
 router = APIRouter()
@@ -43,8 +39,7 @@ async def register(
     user_data: UserRegister,
     db: AsyncSession = Depends(get_db_session),
 ) -> UserResponse:
-    """
-    Register a new user account.
+    """Register a new user account.
 
     Validates that username and email are unique, hashes the password,
     and creates a new user in the database.
@@ -119,8 +114,7 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db_session),
 ) -> Token:
-    """
-    Login with username and password.
+    """Login with username and password.
 
     Verifies credentials and returns JWT access and refresh tokens.
 
@@ -169,7 +163,7 @@ async def login(
     return Token(
         access_token=access_token,
         refresh_token=refresh_token,
-        token_type="bearer",
+        token_type="bearer",  # nosec B106
     )
 
 
@@ -188,8 +182,7 @@ async def refresh(
     refresh_data: RefreshTokenRequest,
     db: AsyncSession = Depends(get_db_session),
 ) -> Token:
-    """
-    Refresh access token using refresh token.
+    """Refresh access token using refresh token.
 
     Validates the refresh token and returns new access and refresh tokens.
 
@@ -217,7 +210,7 @@ async def refresh(
 
     # Verify token type
     token_type = payload.get("type")
-    if token_type != "refresh":
+    if token_type != "refresh":  # nosec B105
         logger.warning("Token refresh failed: Invalid token type")
         raise AuthenticationError("Invalid token type")
 
@@ -246,5 +239,5 @@ async def refresh(
     return Token(
         access_token=access_token,
         refresh_token=new_refresh_token,
-        token_type="bearer",
+        token_type="bearer",  # nosec B106
     )

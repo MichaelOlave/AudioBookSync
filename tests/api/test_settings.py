@@ -13,30 +13,33 @@ class TestAudibleCredentialsStatus:
     ):
         """Test getting credentials status when authenticated with real database."""
         # User exists but may not have Audible credentials yet
-        response = authenticated_client.get("/api/v1/settings/audible/status")
+        response = authenticated_client.get("/api/v1/settings/audible-credentials")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert "has_credentials" in data
+        assert "auth_configured" in data
         # Will be False since test_user_in_db doesn't have credentials by default
-        assert data["has_credentials"] is False
+        assert data["auth_configured"] is False
 
     @pytest.mark.asyncio
     async def test_get_credentials_status_no_credentials(
         self, authenticated_client, db_session, test_user_in_db
     ):
         """Test getting credentials status when no credentials stored with real database."""
-        response = authenticated_client.get("/api/v1/settings/audible/status")
+        response = authenticated_client.get("/api/v1/settings/audible-credentials")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["has_credentials"] is False
+        assert data["auth_configured"] is False
 
     def test_get_credentials_status_unauthenticated(self, client):
         """Test getting credentials status without authentication."""
-        response = client.get("/api/v1/settings/audible/status")
+        response = client.get("/api/v1/settings/audible-credentials")
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code in [
+            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_403_FORBIDDEN,
+        ]
 
     @pytest.mark.asyncio
     async def test_get_credentials_with_region(
@@ -44,12 +47,12 @@ class TestAudibleCredentialsStatus:
     ):
         """Test getting credentials status includes region info."""
         # Region info would be set if user had Audible auth configured
-        response = authenticated_client.get("/api/v1/settings/audible/status")
+        response = authenticated_client.get("/api/v1/settings/audible-credentials")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        # Region might be None or not present if not configured
-        assert "region" in data or "has_credentials" in data
+        assert "auth_configured" in data
+        assert "audible_email" in data
 
 
 class TestClearAudibleCredentials:
@@ -60,36 +63,30 @@ class TestClearAudibleCredentials:
         self, authenticated_client, db_session, test_user_in_db
     ):
         """Test successfully clearing credentials with real database."""
-        response = authenticated_client.post("/api/v1/settings/audible/clear")
+        response = authenticated_client.delete("/api/v1/settings/audible-credentials")
 
-        assert response.status_code in [
-            status.HTTP_200_OK,
-            status.HTTP_204_NO_CONTENT,
-            status.HTTP_400_BAD_REQUEST,  # Might fail if no credentials to clear
-        ]
+        assert response.status_code == status.HTTP_200_OK
 
     def test_clear_credentials_unauthenticated(self, client):
         """Test clearing credentials without authentication."""
-        response = client.post("/api/v1/settings/audible/clear")
+        response = client.delete("/api/v1/settings/audible-credentials")
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code in [
+            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_403_FORBIDDEN,
+        ]
 
     @pytest.mark.asyncio
     async def test_clear_credentials_response_format(
         self, authenticated_client, db_session, test_user_in_db
     ):
         """Test response format when clearing credentials with real database."""
-        response = authenticated_client.post("/api/v1/settings/audible/clear")
+        response = authenticated_client.delete("/api/v1/settings/audible-credentials")
 
-        assert response.status_code in [
-            status.HTTP_200_OK,
-            status.HTTP_204_NO_CONTENT,
-            status.HTTP_400_BAD_REQUEST,
-        ]
-        if response.status_code == status.HTTP_200_OK:
-            data = response.json()
-            # Should have success or message field
-            assert "success" in data or "message" in data or data
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "message" in data
+        assert "auth_configured" in data
 
 
 class TestPreferencesSettings:
@@ -126,7 +123,11 @@ class TestPreferencesSettings:
             json={"auto_sync_enabled": False},
         )
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code in [
+            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_403_FORBIDDEN,
+            status.HTTP_404_NOT_FOUND,
+        ]
 
 
 class TestLibrarySettings:

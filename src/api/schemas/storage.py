@@ -98,8 +98,8 @@ class StorageConfigRequest(StorageProvider):
                 "provider_type": "minio",
                 "endpoint": "http://localhost:9000",
                 "bucket_name": "audiobooks",
-                "access_key": "minioadmin",
-                "secret_key": "minioadmin",
+                "access_key": "minioadmin",  # nosec B105
+                "secret_key": "minioadmin",  # nosec B105
                 "use_ssl": False,
             }
         }

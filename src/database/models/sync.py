@@ -48,6 +48,7 @@ class SyncHistory(Base):
     user = relationship("User", back_populates="sync_history", lazy="select")
 
     def __repr__(self) -> str:
+        """Return a debug representation."""
         return (
             f"<SyncHistory(sync_id={self.sync_id}, user_id={self.user_id}, status={self.status})>"
         )

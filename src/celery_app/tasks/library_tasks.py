@@ -15,8 +15,7 @@ from src.operations.library_sync import sync_library
 
 @celery_app.task(bind=True, name="sync_library_task")
 def execute_sync_library_task(self: Task, user_id: str, sync_type: str = "full") -> bool:
-    """
-    Execute library sync operation in Celery worker.
+    """Execute library sync operation in Celery worker.
 
     Args:
         self: Celery task instance
@@ -34,8 +33,7 @@ def execute_sync_library_task(self: Task, user_id: str, sync_type: str = "full")
 
 
 async def _async_sync_library(task: Task, user_id: str, sync_type: str) -> bool:
-    """
-    Async implementation of library sync task.
+    """Async implementation of library sync task.
 
     Args:
         task: Celery task instance

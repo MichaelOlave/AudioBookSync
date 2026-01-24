@@ -42,8 +42,7 @@ async def create_book(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> BookResponse:
-    """
-    Add a new book to user's library.
+    """Add a new book to user's library.
 
     Adds a book with metadata. If book already exists (by ASIN), updates it.
 
@@ -124,8 +123,7 @@ async def delete_book(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> MessageResponse:
-    """
-    Delete a book from user's library.
+    """Delete a book from user's library.
 
     Removes the book with the specified ASIN. User can only delete their own books.
 

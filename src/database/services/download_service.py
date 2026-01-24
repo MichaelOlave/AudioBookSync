@@ -1,10 +1,7 @@
 """Download status database service layer using SQLAlchemy ORM."""
 
 from src.database.models.download import DownloadStatus
-from src.database.services.status_service_factory import (
-    StatusServiceConfig,
-    StatusServiceFactory,
-)
+from src.database.services.status_service_factory import StatusServiceConfig, StatusServiceFactory
 
 # Configure download status service
 _config = StatusServiceConfig(

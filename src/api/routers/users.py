@@ -47,8 +47,7 @@ async def get_current_user_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> UserResponse:
-    """
-    Get the current authenticated user's profile information.
+    """Get the current authenticated user's profile information.
 
     This endpoint returns the profile data for the authenticated user,
     including username, email, account status, and timestamps.
@@ -110,8 +109,7 @@ async def change_password(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> MessageResponse:
-    """
-    Change the authenticated user's password.
+    """Change the authenticated user's password.
 
     Requires verification of current password before accepting new password.
     New password must meet strength requirements.
@@ -195,8 +193,7 @@ async def change_email(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> EmailChangeResponse:
-    """
-    Change the authenticated user's email address.
+    """Change the authenticated user's email address.
 
     Requires password verification before accepting new email.
     New email must be unique and valid.
@@ -282,8 +279,7 @@ async def update_family_settings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> UserResponse:
-    """
-    Update family membership and sharing preferences.
+    """Update family membership and sharing preferences.
 
     Allows the user to join/leave a family and toggle library sharing.
     """

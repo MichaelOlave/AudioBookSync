@@ -51,4 +51,5 @@ class ErrorLog(Base):
     user = relationship("User", back_populates="error_logs", lazy="select")
 
     def __repr__(self) -> str:
+        """Return a debug representation."""
         return f"<ErrorLog(error_id={self.error_id}, error_type={self.error_type}, severity={self.severity})>"

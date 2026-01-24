@@ -167,7 +167,6 @@ class StorageService:
             - success: True if upload succeeded
             - object_key: Generated object key if upload succeeded, None otherwise
         """
-
         # Generate object key
         try:
             object_key = self._generate_object_key(file_type=file_type, asin=asin, title=title)
@@ -311,7 +310,8 @@ class StorageService:
             )
         else:
             logger.error(
-                f"Failed to delete from MinIO: user_id={user_id}, " f"object_key={object_key}"
+                f"Failed to delete from MinIO: user_id={user_id}, "  # nosec B608
+                f"object_key={object_key}"
             )
 
         return success

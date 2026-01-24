@@ -44,6 +44,7 @@ class Contributor(Base):
     )
 
     def __repr__(self) -> str:
+        """Return a debug representation."""
         return f"<Contributor(contributor_id={self.contributor_id}, name={self.name}, type={self.type})>"
 
 
@@ -74,4 +75,5 @@ class BookContributor(Base):
     contributor = relationship("Contributor", back_populates="book_contributors", lazy="select")
 
     def __repr__(self) -> str:
+        """Return a debug representation."""
         return f"<BookContributor(book_contributor_id={self.book_contributor_id}, asin={self.asin}, role={self.role})>"

@@ -7,10 +7,11 @@ from fastapi.responses import StreamingResponse
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...adapters.storage.minio_storage_adapter import MinIOStorageAdapter
 from ...database.engine import get_db_session
 from ...database.services import book_service
 from ...infrastructure.file_utils import normalize_filename
-from ...infrastructure.storage_service import StorageService
+from ...ports.file_storage_port import FileStoragePort
 from ..middleware.error_handler import (
     AuthenticationError,
     InternalServerError,
@@ -29,7 +30,7 @@ async def _resolve_object_key(
     owner_user_id: str,
     book,
     user_book,
-    storage_service: StorageService,
+    storage: FileStoragePort,
 ) -> Optional[str]:
     """Resolve MinIO object key for a book, with a MinIO existence fallback."""
     if user_book.decrypted_path:
@@ -40,9 +41,8 @@ async def _resolve_object_key(
         return None
 
     candidate_key = f"decrypted/{normalized_title}.m4b"
-    bucket_name = f"user-{owner_user_id}"
 
-    if storage_service.minio_client.file_exists(bucket_name, candidate_key):
+    if storage.file_exists(owner_user_id, candidate_key):
         updated = await book_service.update_book_decryption_status(
             db=db,
             asin=book.asin,
@@ -83,8 +83,7 @@ async def stream_audiobook(  # noqa: C901
     range_header: Optional[str] = Header(default=None),
     db: AsyncSession = Depends(get_db_session),
 ):
-    """
-    Stream an audiobook file from MinIO with Range request support.
+    """Stream an audiobook file from MinIO with Range request support.
 
     Streams the decrypted audiobook file with support for HTTP Range requests,
     which allows audio players to seek through the file without downloading
@@ -124,8 +123,8 @@ async def stream_audiobook(  # noqa: C901
     user_book, book = await verify_book_access(db, asin, current_user)
     owner_user_id = str(user_book.user_id)
 
-    # Initialize storage service
-    storage_service = StorageService()
+    # Initialize storage
+    storage = MinIOStorageAdapter()
 
     # Resolve MinIO object_key from book record or infer from MinIO
     object_key = await _resolve_object_key(
@@ -133,7 +132,7 @@ async def stream_audiobook(  # noqa: C901
         owner_user_id,
         book,
         user_book,
-        storage_service,
+        storage,
     )
     if not object_key:
         logger.warning(f"MinIO object_key not available for {asin}")
@@ -174,7 +173,7 @@ async def stream_audiobook(  # noqa: C901
         f"offset={start}, length={content_length}"
     )
 
-    data = storage_service.stream_file(
+    data = storage.stream_file(
         user_id=owner_user_id,
         object_key=object_key,
         offset=start,

@@ -20,8 +20,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """
-    Create a JWT access token.
+    """Create a JWT access token.
 
     Args:
         data: Dictionary containing token claims (typically {"sub": user_id})
@@ -67,8 +66,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 
 def create_refresh_token(data: dict) -> str:
-    """
-    Create a JWT refresh token.
+    """Create a JWT refresh token.
 
     Args:
         data: Dictionary containing token claims (typically {"sub": user_id})
@@ -107,8 +105,7 @@ def create_refresh_token(data: dict) -> str:
 
 
 def decode_token(token: str) -> dict[str, Any]:
-    """
-    Decode and validate a JWT token.
+    """Decode and validate a JWT token.
 
     Args:
         token: The JWT token string to decode
@@ -142,8 +139,7 @@ async def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db_session),
 ) -> User:
-    """
-    FastAPI dependency to get the current authenticated user from JWT token.
+    """Fastapi dependency to get the current authenticated user from JWT token.
 
     This function is used as a dependency injection in route handlers to
     ensure the request is authenticated and extract user information.
@@ -183,7 +179,7 @@ async def get_current_user(
 
         # Verify token type
         token_type: Optional[str] = payload.get("type")
-        if token_type != "access":
+        if token_type != "access":  # nosec B105
             logger.warning(f"Invalid token type: {token_type}")
             raise credentials_exception
 

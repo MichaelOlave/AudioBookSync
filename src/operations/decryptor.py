@@ -8,12 +8,13 @@ from typing import Optional
 
 from loguru import logger
 
+from ..adapters.storage.minio_storage_adapter import MinIOStorageAdapter
 from ..core.config import Config
 from ..database.engine import AsyncSessionLocal
 from ..database.services import book_service, metadata_service
 from ..domain.progress import safe_progress_callback
 from ..infrastructure.file_utils import normalize_filename
-from ..infrastructure.storage_service import StorageService
+from ..ports.file_storage_port import FileStoragePort
 
 
 async def decrypt_book(  # noqa: C901
@@ -24,8 +25,7 @@ async def decrypt_book(  # noqa: C901
     is_retry: bool = False,
     activation_bytes: str | None = None,
 ) -> bool:
-    """
-    Decrypt a book using FFmpeg and activation bytes.
+    """Decrypt a book using FFmpeg and activation bytes.
 
     Uses temporary directory for decrypted output. On successful decryption,
     uploads decrypted file to MinIO and deletes encrypted file.
@@ -160,7 +160,37 @@ async def decrypt_book(  # noqa: C901
             error=str(e),
         )
 
+    return False
+
+
+async def validate_decrypted_book(
+    book: list,
+    user_id: str,
+    storage: FileStoragePort | None = None,
+) -> bool:
+    """Validate that a decrypted book exists in MinIO for the user."""
+    if not user_id:
+        logger.error("user_id is required to validate decrypted book")
         return False
+
+    if not book or len(book) < 2:
+        logger.error("Book data is missing asin/title for validation")
+        return False
+
+    normalized_title = normalize_filename(str(book[1]))
+    if not normalized_title:
+        logger.error("Book title normalization failed; cannot validate decrypted file")
+        return False
+
+    storage = storage or MinIOStorageAdapter()
+    object_key = f"decrypted/{normalized_title}.m4b"
+
+    exists = storage.file_exists(user_id, object_key)
+    if exists:
+        logger.info(f"Validated decrypted file exists: {object_key}")
+    else:
+        logger.warning(f"Decrypted file not found: {object_key}")
+    return exists
 
 
 def _parse_time_base(time_base: Optional[str]) -> Optional[float]:
@@ -302,8 +332,7 @@ async def _update_book_paths(
 async def _upload_decrypted_file_to_minio(
     book_asin: str, book_title: str, user_id: str, file_path: str
 ) -> tuple[bool, str]:
-    """
-    Upload decrypted file to MinIO after successful decryption.
+    """Upload decrypted file to MinIO after successful decryption.
 
     Args:
         book_asin: Amazon Standard Identification Number
@@ -320,8 +349,8 @@ async def _upload_decrypted_file_to_minio(
             return False, ""
 
         # Upload to MinIO
-        storage_service = StorageService()
-        success, object_key = storage_service.save_file(
+        storage = MinIOStorageAdapter()
+        success, object_key = storage.save_file(
             user_id=user_id,
             file_path=file_path,
             file_type="decrypted",
@@ -350,8 +379,7 @@ async def _upload_decrypted_file_to_minio(
 async def _upload_encrypted_file_to_minio(
     book_asin: str, user_id: str, file_path: str
 ) -> tuple[bool, str]:
-    """
-    Upload encrypted file to MinIO when decryption fails.
+    """Upload encrypted file to MinIO when decryption fails.
 
     This serves as a fallback for later retry attempts.
 
@@ -369,8 +397,8 @@ async def _upload_encrypted_file_to_minio(
             return False, ""
 
         # Upload to MinIO as a downloaded/encrypted artifact for retry
-        storage_service = StorageService()
-        success, object_key = storage_service.save_file(
+        storage = MinIOStorageAdapter()
+        success, object_key = storage.save_file(
             user_id=user_id,
             file_path=file_path,
             file_type="downloaded",

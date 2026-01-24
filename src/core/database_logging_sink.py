@@ -12,8 +12,7 @@ from src.database.models.application_log import ApplicationLog
 
 
 class DatabaseLoggingSink:
-    """
-    Custom loguru sink that writes logs to database asynchronously.
+    """Custom loguru sink that writes logs to database asynchronously.
 
     Uses a queue-based architecture:
     - write() is called synchronously by loguru and immediately returns (non-blocking)
@@ -28,8 +27,7 @@ class DatabaseLoggingSink:
         batch_timeout_seconds: float = 1.0,
         max_queue_size: int = 10000,
     ):
-        """
-        Initialize the database logging sink.
+        """Initialize the database logging sink.
 
         Args:
             batch_size: Number of logs to batch before flushing
@@ -45,8 +43,7 @@ class DatabaseLoggingSink:
         self._stop_event = threading.Event()
 
     def write(self, message: Any) -> None:
-        """
-        Called by loguru for each log message.
+        """Called by loguru for each log message.
 
         This is synchronous and must not block, so we immediately queue and return.
         Works with loguru's Message objects.
@@ -115,8 +112,7 @@ class DatabaseLoggingSink:
             loop.close()
 
     async def _process_queue(self) -> None:  # noqa: C901
-        """
-        Process logs from the queue in batches.
+        """Process logs from the queue in batches.
 
         Runs until stop() is called, batching logs and flushing periodically.
         """
@@ -131,7 +127,7 @@ class DatabaseLoggingSink:
                     batch.append(record)
                 except Exception:
                     # Timeout - check if we should flush
-                    pass
+                    record = None
 
                 current_time = asyncio.get_event_loop().time()
                 time_since_flush = current_time - last_flush
@@ -157,8 +153,7 @@ class DatabaseLoggingSink:
                 print(f"ERROR on final flush: {e}", file=sys.stderr)
 
     async def _flush_batch(self, batch: list[Dict[str, Any]]) -> None:
-        """
-        Flush a batch of logs to the database.
+        """Flush a batch of logs to the database.
 
         Args:
             batch: List of log records to insert
@@ -181,8 +176,7 @@ class DatabaseLoggingSink:
             # For now, just log error and continue
 
     def write_record(self, record: Dict[str, Any]) -> None:
-        """
-        Write a complete loguru record to the queue.
+        """Write a complete loguru record to the queue.
 
         This method is designed to be used with loguru's sink parameter
         that receives the full Record object.
@@ -210,8 +204,7 @@ class DatabaseLoggingSink:
             traceback.print_exc(file=sys.stderr)
 
     def _parse_message(self, message: str) -> Dict[str, Any]:
-        """
-        Parse loguru message into a database record.
+        """Parse loguru message into a database record.
 
         This is kept for legacy support if only string messages are passed.
 
@@ -236,8 +229,7 @@ class DatabaseLoggingSink:
         }
 
     def _parse_record(self, record: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Parse a loguru Record into a database record.
+        """Parse a loguru Record into a database record.
 
         Args:
             record: Loguru Record dictionary with full metadata
@@ -267,9 +259,7 @@ class DatabaseLoggingSink:
         # Extract process name - loguru record["process"] is a namedtuple
         process_obj = record.get("process")
         process_name = (
-            process_obj.name
-            if process_obj is not None and hasattr(process_obj, "name")
-            else ""
+            process_obj.name if process_obj is not None and hasattr(process_obj, "name") else ""
         )
 
         # Extract thread info - loguru record["thread"] is a namedtuple
@@ -294,8 +284,7 @@ class DatabaseLoggingSink:
 
 
 def configure_database_logging_sink() -> DatabaseLoggingSink:
-    """
-    Create and start a database logging sink.
+    """Create and start a database logging sink.
 
     Returns:
         DatabaseLoggingSink instance that is ready to use

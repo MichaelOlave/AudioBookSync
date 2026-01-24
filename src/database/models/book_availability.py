@@ -44,4 +44,5 @@ class BookAvailability(Base):
     )
 
     def __repr__(self) -> str:
+        """Return a debug representation."""
         return f"<BookAvailability(availability_id={self.availability_id}, asin={self.asin}, status={self.license_status})>"

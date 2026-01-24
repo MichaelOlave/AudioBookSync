@@ -33,7 +33,7 @@ class TestObjectKeyGeneration:
     """Test object key generation for different file types."""
 
     def test_generate_object_key_for_downloaded_files(self, storage_service):
-        """Test object key generation follows pattern: downloaded/{asin}.aax"""
+        """Test object key generation follows pattern: downloaded/{asin}.aax."""
         service = storage_service
 
         # Generate object key for downloaded file
@@ -43,7 +43,7 @@ class TestObjectKeyGeneration:
         assert object_key == "downloaded/B001ABC123.aax"
 
     def test_generate_object_key_for_decrypted_files(self, storage_service):
-        """Test object key generation follows pattern: decrypted/{normalized_title}.m4b"""
+        """Test object key generation follows pattern: decrypted/{normalized_title}.m4b."""
         service = storage_service
 
         # Generate object key for decrypted file with special characters in title
@@ -81,7 +81,7 @@ class TestBucketManagement:
     """Test bucket creation and management."""
 
     def test_get_user_bucket_returns_correct_pattern(self, storage_service):
-        """Test _get_user_bucket returns pattern: user-{user_id}"""
+        """Test _get_user_bucket returns pattern: user-{user_id}."""
         service = storage_service
 
         # Get bucket name for user

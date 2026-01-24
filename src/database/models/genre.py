@@ -30,6 +30,7 @@ class Genre(Base):
     children = relationship("Genre", cascade="all, delete-orphan", lazy="select")
 
     def __repr__(self) -> str:
+        """Return a debug representation."""
         return f"<Genre(genre_id={self.genre_id}, genre_name={self.genre_name})>"
 
 
@@ -56,4 +57,5 @@ class BookGenre(Base):
     genre = relationship("Genre", lazy="select")
 
     def __repr__(self) -> str:
+        """Return a debug representation."""
         return f"<BookGenre(book_genre_id={self.book_genre_id}, asin={self.asin}, genre_id={self.genre_id})>"

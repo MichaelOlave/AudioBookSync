@@ -21,8 +21,8 @@ class AudibleAuthJsonRequest(BaseModel):
         description="Audible auth.json content (JSON object)",
         json_schema_extra={
             "example": {
-                "access_token": "...",
-                "refresh_token": "...",
+                "access_token": "...",  # nosec B105
+                "refresh_token": "...",  # nosec B105
                 "expires_in": 3600,
                 "created_at": 1703100000,
                 "device_info": {"device_name": "Desktop"},
@@ -85,12 +85,12 @@ class AudibleCredentialsResponse(BaseModel):
                 "user_id": "550e8400-e29b-41d4-a716-446655440000",
                 "audible_email": "user@example.com",
                 "device_name": "Desktop",
-                "has_access_token": True,
-                "has_activation_bytes": True,
-                "auth_configured": True,
+                "has_access_token": True,  # nosec B105
+                "has_activation_bytes": True,  # nosec B105
+                "auth_configured": True,  # nosec B105
                 "auth_json_raw": {
-                    "access_token": "****REDACTED****",
-                    "refresh_token": "****REDACTED****",
+                    "access_token": "****REDACTED****",  # nosec B105
+                    "refresh_token": "****REDACTED****",  # nosec B105
                     "device_info": {"device_name": "Desktop"},
                 },
             }

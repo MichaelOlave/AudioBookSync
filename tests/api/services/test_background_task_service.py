@@ -8,7 +8,7 @@ class TestBackgroundTaskService:
 
     def test_execute_sync_operation(self, monkeypatch):
         """Test executing a sync operation as background task."""
-        from src.api.services.background_task_service import BackgroundTaskService
+        from src.api.services.background_service import BackgroundTaskService
 
         execution_log = []
 
@@ -33,21 +33,21 @@ class TestBackgroundTaskService:
 
     def test_execute_download_operation(self, monkeypatch):
         """Test executing a download operation as background task."""
-        from src.api.services.background_task_service import BackgroundTaskService
+        from src.api.services.background_service import BackgroundTaskService
 
         service = BackgroundTaskService()
         assert hasattr(service, "execute_download_operation")
 
     def test_execute_decrypt_operation(self, monkeypatch):
         """Test executing a decrypt operation as background task."""
-        from src.api.services.background_task_service import BackgroundTaskService
+        from src.api.services.background_service import BackgroundTaskService
 
         service = BackgroundTaskService()
         assert hasattr(service, "execute_decrypt_operation")
 
     def test_progress_callback_on_update(self, monkeypatch):
         """Test progress callback is called during operation."""
-        from src.api.services.background_task_service import BackgroundTaskService
+        from src.api.services.background_service import BackgroundTaskService
 
         progress_updates = []
 
@@ -64,7 +64,7 @@ class TestBackgroundTaskService:
 
     def test_error_handling_in_sync(self, monkeypatch):
         """Test error handling when sync operation fails."""
-        from src.api.services.background_task_service import BackgroundTaskService
+        from src.api.services.background_service import BackgroundTaskService
 
         service = BackgroundTaskService()
         # Service should be able to handle errors gracefully
@@ -72,8 +72,8 @@ class TestBackgroundTaskService:
 
     def test_database_logging_on_completion(self, monkeypatch):
         """Test database is updated when operation completes."""
-        from src.api.services.background_task_service import BackgroundTaskService
-        from src.database.db_sync import sync_ops
+        from src.api.services.background_service import BackgroundTaskService
+        from src.database.services import sync_service as sync_ops
 
         log_entries = []
 
@@ -94,7 +94,7 @@ class TestBackgroundTaskService:
 
     def test_concurrent_operations_handling(self, monkeypatch):
         """Test service can handle multiple concurrent operations."""
-        from src.api.services.background_task_service import BackgroundTaskService
+        from src.api.services.background_service import BackgroundTaskService
 
         service = BackgroundTaskService()
         # Service should support concurrent operations
@@ -102,7 +102,7 @@ class TestBackgroundTaskService:
 
     def test_operation_timeout_handling(self, monkeypatch):
         """Test service handles operation timeouts."""
-        from src.api.services.background_task_service import BackgroundTaskService
+        from src.api.services.background_service import BackgroundTaskService
 
         service = BackgroundTaskService()
         # Service should handle timeouts gracefully
@@ -110,7 +110,7 @@ class TestBackgroundTaskService:
 
     def test_retry_on_failure(self, monkeypatch):
         """Test operations are retried on failure."""
-        from src.api.services.background_task_service import BackgroundTaskService
+        from src.api.services.background_service import BackgroundTaskService
 
         service = BackgroundTaskService()
         # Service should support retry logic
@@ -118,7 +118,7 @@ class TestBackgroundTaskService:
 
     def test_queue_depth_monitoring(self, monkeypatch):
         """Test service can report queue depth for monitoring."""
-        from src.api.services.background_task_service import BackgroundTaskService
+        from src.api.services.background_service import BackgroundTaskService
 
         service = BackgroundTaskService()
         # Service should support monitoring
@@ -130,7 +130,7 @@ class TestSyncOperationFlow:
 
     def test_sync_operation_starts_with_pending_status(self, monkeypatch):
         """Test sync starts with pending status."""
-        from src.database.db_sync import sync_ops
+        from src.database.services import sync_service as sync_ops
 
         created_syncs = []
 
@@ -150,7 +150,6 @@ class TestSyncOperationFlow:
 
     def test_sync_operation_updates_progress(self, monkeypatch):
         """Test sync updates progress during execution."""
-
         progress_records = []
 
         def mock_record_progress(sync_id, books_found, books_added, books_downloaded):
@@ -167,7 +166,7 @@ class TestSyncOperationFlow:
 
     def test_sync_operation_completes_with_stats(self, monkeypatch):
         """Test sync completion records statistics."""
-        from src.database.db_sync import sync_ops
+        from src.database.services import sync_service as sync_ops
 
         completion_records = []
 
@@ -200,7 +199,7 @@ class TestDownloadOperationFlow:
 
     def test_download_operation_creates_status(self, monkeypatch):
         """Test download operation creates initial status record."""
-        from src.database.db_downloads import download_ops
+        from src.database.services import download_service as download_ops
 
         created_downloads = []
 
@@ -220,7 +219,6 @@ class TestDownloadOperationFlow:
 
     def test_download_operation_updates_progress(self, monkeypatch):
         """Test download updates progress percentage."""
-
         progress_updates = []
 
         def mock_update_download_progress(download_id, progress_percent):
@@ -239,7 +237,7 @@ class TestDecryptOperationFlow:
 
     def test_decrypt_operation_creates_status(self, monkeypatch):
         """Test decrypt operation creates initial status record."""
-        from src.database.db_decryptions import decryption_ops
+        from src.database.services import decryption_service as decryption_ops
 
         created_decrypts = []
 
@@ -262,7 +260,7 @@ class TestDecryptOperationFlow:
 
     def test_decrypt_operation_requires_completed_download(self, monkeypatch):
         """Test decrypt requires download to be completed first."""
-        from src.database.db_downloads import download_ops
+        from src.database.services import download_service as download_ops
 
         def mock_get_download_by_asin(asin):
             return {
@@ -273,7 +271,7 @@ class TestDecryptOperationFlow:
                 "updated_at": datetime.now(),
             }
 
-        monkeypatch.setattr(download_ops, "get_download_by_asin", mock_get_download_by_asin)
+        monkeypatch.setattr(download_ops, "get_latest_download", mock_get_download_by_asin)
 
         # Verify prerequisite checking
 
@@ -283,28 +281,28 @@ class TestServiceErrorRecovery:
 
     def test_service_recovers_from_audible_api_error(self, monkeypatch):
         """Test service handles Audible API errors gracefully."""
-        from src.api.services.background_task_service import BackgroundTaskService
+        from src.api.services.background_service import BackgroundTaskService
 
         service = BackgroundTaskService()
         assert service is not None
 
     def test_service_recovers_from_database_error(self, monkeypatch):
         """Test service handles database errors gracefully."""
-        from src.api.services.background_task_service import BackgroundTaskService
+        from src.api.services.background_service import BackgroundTaskService
 
         service = BackgroundTaskService()
         assert service is not None
 
     def test_service_recovers_from_network_error(self, monkeypatch):
         """Test service handles network errors gracefully."""
-        from src.api.services.background_task_service import BackgroundTaskService
+        from src.api.services.background_service import BackgroundTaskService
 
         service = BackgroundTaskService()
         assert service is not None
 
     def test_service_cleans_up_on_cancellation(self, monkeypatch):
         """Test service cleans up resources when operation cancelled."""
-        from src.api.services.background_task_service import BackgroundTaskService
+        from src.api.services.background_service import BackgroundTaskService
 
         service = BackgroundTaskService()
         assert service is not None

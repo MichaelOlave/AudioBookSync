@@ -52,4 +52,5 @@ class DownloadStatus(Base):
     book = relationship("Book", back_populates="download_status", lazy="select")
 
     def __repr__(self) -> str:
+        """Return a debug representation."""
         return f"<DownloadStatus(download_id={self.download_id}, asin={self.asin}, status={self.status})>"

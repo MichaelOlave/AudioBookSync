@@ -27,8 +27,7 @@ async def start_audible_auth_flow(
     user_id: str,
     country_code: str,
 ) -> AuthStartResponse:
-    """
-    Start the Audible authentication process by generating a login URL.
+    """Start the Audible authentication process by generating a login URL.
 
     Args:
         user_id: The user ID to associate with this auth session
@@ -81,8 +80,7 @@ async def complete_audible_auth_flow(  # noqa: C901
     user_id: str,
     redirect_url: str,
 ) -> AudibleCredentialsUpdate:
-    """
-    Complete the Audible authentication using the redirect URL from the browser.
+    """Complete the Audible authentication using the redirect URL from the browser.
 
     Args:
         db: Database session

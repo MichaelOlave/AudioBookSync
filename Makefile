@@ -59,7 +59,7 @@ type-check: ## Run type checking with mypy
 
 security: ## Run security checks with bandit
 	@echo "Running bandit security scanner..."
-	$(PYTHON) -m bandit -r $(SRC_DIR) -c .bandit
+	$(PYTHON) -m bandit -r $(SRC_DIR) --ini .bandit
 
 test: ## Run pytest tests
 	@echo "Running pytest..."

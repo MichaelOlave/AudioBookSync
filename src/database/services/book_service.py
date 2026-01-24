@@ -36,8 +36,7 @@ async def add_book(  # noqa: C901
     cover_art_url: Optional[str] = None,
     **kwargs,
 ) -> bool:
-    """
-    Add or update a book in the library.
+    """Add or update a book in the library.
 
     Args:
         db: Database session
@@ -146,8 +145,7 @@ async def add_book(  # noqa: C901
 
 
 async def get_book_by_asin(db: AsyncSession, asin: str) -> Optional[Book]:
-    """
-    Get book by ASIN.
+    """Get book by ASIN.
 
     Args:
         db: Database session
@@ -165,8 +163,7 @@ async def get_book_by_asin(db: AsyncSession, asin: str) -> Optional[Book]:
 
 
 async def get_user_book(db: AsyncSession, user_id: str, asin: str) -> Optional[UserBook]:
-    """
-    Get a user book entry by user and ASIN.
+    """Get a user book entry by user and ASIN.
 
     Args:
         db: Database session
@@ -189,9 +186,7 @@ async def get_user_book(db: AsyncSession, user_id: str, asin: str) -> Optional[U
 async def get_user_book_with_book(
     db: AsyncSession, user_id: str, asin: str
 ) -> Optional[Tuple[UserBook, Book]]:
-    """
-    Get a user book entry and its book metadata.
-    """
+    """Get a user book entry and its book metadata."""
     try:
         result = await db.execute(
             select(UserBook, Book)
@@ -210,9 +205,7 @@ async def get_user_book_with_book(
 async def get_user_book_for_user_ids(
     db: AsyncSession, user_ids: List[str], asin: str
 ) -> Optional[Tuple[UserBook, Book]]:
-    """
-    Get a user book entry for any user in a set of user IDs.
-    """
+    """Get a user book entry for any user in a set of user IDs."""
     if not user_ids:
         return None
 
@@ -232,8 +225,7 @@ async def get_user_book_for_user_ids(
 
 
 async def get_books_by_user(db: AsyncSession, user_id: str) -> List[dict]:
-    """
-    Get all books for a user.
+    """Get all books for a user.
 
     Args:
         db: Database session
@@ -256,8 +248,7 @@ async def get_books_by_user(db: AsyncSession, user_id: str) -> List[dict]:
 
 
 async def get_books_by_user_ids(db: AsyncSession, user_ids: List[str]) -> List[dict]:
-    """
-    Get all books for a list of users.
+    """Get all books for a list of users.
 
     Args:
         db: Database session
@@ -287,8 +278,7 @@ async def get_books_with_metadata_by_user(
     user_id: str,
     downloaded_only: bool = False,
 ) -> List[Tuple[UserBook, Book, Optional[BookMetadataJson]]]:
-    """
-    Get all books for a user with optional metadata.
+    """Get all books for a user with optional metadata.
 
     Args:
         db: Database session
@@ -321,8 +311,7 @@ async def get_books_with_metadata_by_user_ids(
     user_ids: List[str],
     downloaded_only: bool = False,
 ) -> List[Tuple[UserBook, Book, Optional[BookMetadataJson]]]:
-    """
-    Get all books for a list of users with optional metadata.
+    """Get all books for a list of users with optional metadata.
 
     Args:
         db: Database session
@@ -354,8 +343,7 @@ async def get_books_with_metadata_by_user_ids(
 
 
 async def get_downloaded_books(db: AsyncSession, user_id: str) -> List[Book]:
-    """
-    Get all downloaded books for a user.
+    """Get all downloaded books for a user.
 
     Args:
         db: Database session
@@ -383,8 +371,7 @@ async def get_downloaded_books(db: AsyncSession, user_id: str) -> List[Book]:
 
 
 async def get_not_downloaded_books(db: AsyncSession, user_id: str) -> List[Book]:
-    """
-    Get all books that have not been downloaded for a user.
+    """Get all books that have not been downloaded for a user.
 
     Args:
         db: Database session
@@ -412,8 +399,7 @@ async def get_not_downloaded_books(db: AsyncSession, user_id: str) -> List[Book]
 
 
 async def get_decrypted_books(db: AsyncSession, user_id: str) -> List[Book]:
-    """
-    Get all decrypted books for a user.
+    """Get all decrypted books for a user.
 
     Args:
         db: Database session
@@ -448,8 +434,7 @@ async def update_book_download_status(
     download_path: Optional[str] = None,
     file_size_bytes: Optional[int] = None,
 ) -> bool:
-    """
-    Update book's download status.
+    """Update book's download status.
 
     Args:
         db: Database session
@@ -498,8 +483,7 @@ async def update_book_decryption_status(
     user_id: Optional[str] = None,
     decrypted_path: Optional[str] = None,
 ) -> bool:
-    """
-    Update book's decryption status.
+    """Update book's decryption status.
 
     Args:
         db: Database session
@@ -537,8 +521,7 @@ async def update_book_decryption_status(
 
 
 async def delete_book(db: AsyncSession, asin: str, user_id: str) -> bool:
-    """
-    Delete a book (cascades to download and decryption records).
+    """Delete a book (cascades to download and decryption records).
 
     Args:
         db: Database session
@@ -575,8 +558,7 @@ async def search_books(
     user_id: str,
     query: str,
 ) -> List[Book]:
-    """
-    Search books by title, author, or narrator.
+    """Search books by title, author, or narrator.
 
     Args:
         db: Database session
@@ -614,8 +596,7 @@ async def get_books_by_series(
     user_id: str,
     series_name: str,
 ) -> List[Book]:
-    """
-    Get all books in a series for a user.
+    """Get all books in a series for a user.
 
     Args:
         db: Database session
@@ -651,8 +632,7 @@ async def add_book_with_metadata(  # noqa: C901
     book_data: Dict[str, Any],
     purchase_date: Optional[Union[str, date, datetime]] = None,
 ) -> bool:
-    """
-    Orchestrate adding book with full metadata across all metadata tables.
+    """Orchestrate adding book with full metadata across all metadata tables.
 
     This coordinates:
     1. Basic book record

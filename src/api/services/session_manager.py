@@ -12,8 +12,7 @@ class SessionManager:
     """Manages authentication session data persistence."""
 
     def __init__(self, session_dir: Path | None = None):
-        """
-        Initialize SessionManager.
+        """Initialize SessionManager.
 
         Args:
             session_dir: Directory to store session files. Defaults to logs/auth_sessions.
@@ -22,8 +21,7 @@ class SessionManager:
         self.session_dir.mkdir(parents=True, exist_ok=True)
 
     def save_session(self, user_id: str, session_data: AuthSessionData) -> None:
-        """
-        Save auth session data to disk.
+        """Save auth session data to disk.
 
         Args:
             user_id: The user ID
@@ -42,8 +40,7 @@ class SessionManager:
             raise
 
     def load_session(self, user_id: str) -> AuthSessionData | None:
-        """
-        Load auth session data from disk.
+        """Load auth session data from disk.
 
         Args:
             user_id: The user ID
@@ -69,8 +66,7 @@ class SessionManager:
             return None
 
     def delete_session(self, user_id: str) -> None:
-        """
-        Delete auth session data from disk.
+        """Delete auth session data from disk.
 
         Args:
             user_id: The user ID
