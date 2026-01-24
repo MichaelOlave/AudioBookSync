@@ -12,7 +12,7 @@ import { BookOpen, Download, Music, TrendingUp, Loader2 } from "lucide-react";
 
 export default function DashboardHome() {
   const { user } = useAuth();
-  const { books, fetchLibrary } = useLibrary();
+  const { books, total, fetchLibrary } = useLibrary();
   const { currentSync, startSync } = useSync();
   const { getDownloads } = useDownloads();
   const [isSyncing, setIsSyncing] = useState(false);
@@ -47,7 +47,7 @@ export default function DashboardHome() {
   const stats = [
     {
       title: "Books in Library",
-      value: books.length.toString(),
+      value: total.toString(),
       icon: BookOpen,
       color: "text-blue-600",
     },

@@ -9,6 +9,7 @@ export interface Download {
   progress_percent: number;
   downloaded_bytes: number;
   total_bytes: number;
+  file_size_bytes?: number;
   error_message?: string;
   completed_at?: string;
 }

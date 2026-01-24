@@ -33,19 +33,23 @@ class CeleryConfig:
     # Beat schedule for periodic tasks
     beat_schedule = {
         "cleanup-orphaned-minio-files": {
-            "task": "src.celery_app.tasks.cleanup_tasks.cleanup_orphaned_minio_files",
+            "task": "cleanup_orphaned_minio_files",
             "schedule": crontab(hour=2, minute=0),  # Daily at 2 AM
         },
         "retry-failed-downloads": {
-            "task": "src.celery_app.tasks.retry_tasks.retry_failed_downloads",
+            "task": "retry_failed_downloads",
             "schedule": crontab(hour="*/6", minute=0),  # Every 6 hours
         },
         "retry-failed-decrypts": {
-            "task": "src.celery_app.tasks.retry_tasks.retry_failed_decrypts",
+            "task": "retry_failed_decrypts",
             "schedule": crontab(hour="*/6", minute=0),  # Every 6 hours
         },
         "cleanup-old-database-records": {
-            "task": "src.celery_app.tasks.cleanup_tasks.cleanup_old_database_records",
+            "task": "cleanup_old_database_records",
             "schedule": crontab(hour=3, minute=0, day_of_week=0),  # Weekly Sunday 3 AM
+        },
+        "run-scheduled-syncs": {
+            "task": "run_scheduled_syncs",
+            "schedule": crontab(minute="*/1"),  # Every minute
         },
     }

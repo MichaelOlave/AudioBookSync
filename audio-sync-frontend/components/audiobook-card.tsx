@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ export function AudiobookCard({
   rating,
   purchaseDate,
 }: AudiobookCardProps) {
+  const router = useRouter();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -449,37 +451,46 @@ export function AudiobookCard({
           )}
 
           {/* Actions */}
-          <div className="flex gap-2 pt-4">
-            <Button
-              className="flex-1"
-              onClick={handlePlay}
-              disabled={isLoading || isDownloading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Loading...
-                </>
-              ) : isPlaying ? (
-                <>
-                  <Pause className="w-4 h-4 mr-2" />
-                  Pause
-                </>
-              ) : (
-                <>
-                  <Play className="w-4 h-4 mr-2" />
-                  Play
-                </>
-              )}
-            </Button>
+          <div className="flex flex-col gap-2 pt-4">
+            <div className="flex gap-2">
+              <Button
+                className="flex-1"
+                onClick={handlePlay}
+                disabled={isLoading || isDownloading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Loading...
+                  </>
+                ) : isPlaying ? (
+                  <>
+                    <Pause className="w-4 h-4 mr-2" />
+                    Pause
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 mr-2" />
+                    Play
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={handleDownload}
+                disabled={isLoading || isDownloading}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                {isDownloading ? "Downloading..." : "Download"}
+              </Button>
+            </div>
             <Button
               variant="outline"
-              className="flex-1"
-              onClick={handleDownload}
-              disabled={isLoading || isDownloading}
+              className="w-full"
+              onClick={() => router.push(`/dashboard/now-playing?asin=${id}`)}
             >
-              <Download className="w-4 h-4 mr-2" />
-              {isDownloading ? "Downloading..." : "Download"}
+              Play Now (Full Page)
             </Button>
           </div>
         </div>

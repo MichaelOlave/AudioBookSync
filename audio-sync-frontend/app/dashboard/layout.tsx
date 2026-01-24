@@ -21,6 +21,7 @@ import {
   Home,
   Music,
   Cloud,
+  Clock,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/components/protected-route";
@@ -58,6 +59,11 @@ export default function DashboardLayout({
       title: "Downloads",
       icon: DownloadCloud,
       href: "/dashboard/downloads",
+    },
+    {
+      title: "Schedules",
+      icon: Clock,
+      href: "/dashboard/schedules",
     },
     {
       title: "Settings",

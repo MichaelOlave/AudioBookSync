@@ -68,8 +68,31 @@ async def _async_download(
             await db.commit()
 
         # Create progress callback that publishes to Redis
+        last_persisted_bytes = 0
+
         async def progress_callback(event_type: str, **data):
+            nonlocal last_persisted_bytes
             data["download_id"] = download_id
+
+            if event_type == "download.progress":
+                bytes_downloaded = data.get("bytes_downloaded")
+                if isinstance(bytes_downloaded, (int, float)):
+                    new_size = int(bytes_downloaded)
+                    if new_size > 0 and new_size != last_persisted_bytes:
+                        last_persisted_bytes = new_size
+                        try:
+                            async with AsyncSessionLocal() as db:
+                                download = await download_service.get_download_by_id(
+                                    db, UUID(download_id)
+                                )
+                                if download:
+                                    download.file_size_bytes = new_size
+                                    await db.commit()
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to persist download size for {download_id}: {e}"
+                            )
+
             publish_progress(user_id=user_id, event_type=event_type, data=data)
 
         # Fetch Audible auth from database

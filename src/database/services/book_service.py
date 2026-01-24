@@ -234,6 +234,34 @@ async def get_downloaded_books(db: AsyncSession, user_id: str) -> List[Book]:
         return []
 
 
+async def get_not_downloaded_books(db: AsyncSession, user_id: str) -> List[Book]:
+    """
+    Get all books that have not been downloaded for a user.
+
+    Args:
+        db: Database session
+        user_id: User UUID
+
+    Returns:
+        List of Book objects not marked as downloaded
+    """
+    try:
+        result = await db.execute(
+            select(Book)
+            .where(
+                and_(
+                    Book.user_id == user_id,
+                    Book.is_downloaded.is_(False),
+                )
+            )
+            .order_by(Book.title)
+        )
+        return result.scalars().all()
+    except Exception as e:
+        logger.error(f"Failed to get not downloaded books: {e}")
+        return []
+
+
 async def get_decrypted_books(db: AsyncSession, user_id: str) -> List[Book]:
     """
     Get all decrypted books for a user.

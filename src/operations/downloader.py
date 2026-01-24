@@ -60,6 +60,12 @@ async def download_book(
             filename=book_title,
         )
 
+        # Initialize monitor state for cleanup/logging paths.
+        last_file_sizes = {}
+        progress_emitted = False
+        progress_check_count = 0
+        iterations = 0
+
         # Use temporary directory for encrypted file
         with tempfile.TemporaryDirectory() as temp_dir:
             logger.info(f"[Download] Using temp directory: {temp_dir}")
@@ -108,15 +114,9 @@ async def download_book(
                     env=env,
                 )
 
-                # Monitor file size while download is in progress
-                last_file_sizes = {}
-                progress_emitted = False
-                progress_check_count = 0
-
                 async def monitor_download():
                     """Monitor temporary directory for growing file."""
-                    nonlocal last_file_sizes, progress_emitted, progress_check_count
-                    iterations = 0
+                    nonlocal last_file_sizes, progress_emitted, progress_check_count, iterations
 
                     logger.warning(f"[Monitor] STARTING monitoring for temp_dir: {temp_dir}")  # Use warning for visibility
 
@@ -248,6 +248,21 @@ async def download_book(
 
                 if not downloaded_file_path or not os.path.exists(downloaded_file_path):
                     raise Exception(f"Downloaded file not found for {book_asin}")
+
+                try:
+                    final_size = os.path.getsize(downloaded_file_path)
+                    await safe_progress_callback(
+                        progress_callback,
+                        event_type="download.progress",
+                        asin=book_asin,
+                        filename=book_title,
+                        progress_percent=100.0,
+                        bytes_downloaded=final_size,
+                        total_bytes=final_size,
+                        speed_kbps=0.0,
+                    )
+                except OSError as e:
+                    logger.debug(f"[Download] Failed to read final size for {book_asin}: {e}")
 
                 logger.success(f"{stdout_text}")
 

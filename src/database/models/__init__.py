@@ -11,9 +11,11 @@ from src.database.models.contributor import BookContributor, Contributor
 from src.database.models.decryption import DecryptionStatus
 from src.database.models.download import DownloadStatus
 from src.database.models.error import ErrorLog
+from src.database.models.family import Family
 from src.database.models.genre import BookGenre, Genre
 from src.database.models.media_info import MediaInfo
 from src.database.models.reading_progress import ReadingProgress
+from src.database.models.sync_schedule import SyncSchedule
 from src.database.models.sync import SyncHistory
 from src.database.models.user import User
 
@@ -27,7 +29,9 @@ __all__ = [
     "DownloadStatus",
     "DecryptionStatus",
     "SyncHistory",
+    "SyncSchedule",
     "ErrorLog",
+    "Family",
     "Genre",
     "BookGenre",
     "Contributor",

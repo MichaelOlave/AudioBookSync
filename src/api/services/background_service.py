@@ -57,6 +57,10 @@ class OperationExecutor:
         self.asin = None
         self.title = None
 
+    async def _create_progress_callback(self) -> Callable:
+        """Create a progress callback for this operation."""
+        return await BackgroundTaskService._create_progress_callback(self.user_id)
+
     async def execute(self) -> None:
         """Template method that orchestrates operation execution.
 
@@ -78,7 +82,7 @@ class OperationExecutor:
             await self._update_status("in_progress")
 
             # Create progress callback
-            progress_callback = await BackgroundTaskService._create_progress_callback(self.user_id)
+            progress_callback = await self._create_progress_callback()
 
             # Execute the actual operation (subclass-specific)
             success = await self._execute_operation(book_list, progress_callback)
@@ -244,6 +248,36 @@ class DownloadExecutor(OperationExecutor):
 
     def __init__(self, user_id: str, download_id: str, book: dict):
         super().__init__(user_id, download_id, book, "download")
+
+    async def _create_progress_callback(self) -> Callable:
+        """Create a progress callback that persists download size."""
+        base_callback = await BackgroundTaskService._create_progress_callback(self.user_id)
+        last_persisted_bytes = 0
+
+        async def progress_callback(event_type: str, **data: Any) -> None:
+            nonlocal last_persisted_bytes
+            if event_type == "download.progress":
+                bytes_downloaded = data.get("bytes_downloaded")
+                if isinstance(bytes_downloaded, (int, float)):
+                    new_size = int(bytes_downloaded)
+                    if new_size > 0 and new_size != last_persisted_bytes:
+                        last_persisted_bytes = new_size
+                        try:
+                            async with AsyncSessionLocal() as db:
+                                download = await download_service.get_download_by_id(
+                                    db, UUID(self.operation_id)
+                                )
+                                if download:
+                                    download.file_size_bytes = new_size
+                                    await db.commit()
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to persist download size for {self.operation_id}: {e}"
+                            )
+
+            await base_callback(event_type, **data)
+
+        return progress_callback
 
     async def _execute_operation(self, book_list: list, progress_callback) -> bool:
         """Execute download operation."""

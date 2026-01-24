@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,8 @@ import { useLibrary } from "@/hooks/use-library";
 import { getAPIClient } from "@/lib/api/client";
 
 export default function NowPlayingPage() {
+  const searchParams = useSearchParams();
+  const requestedAsin = searchParams.get("asin");
   const { books, loading, fetchDashboard } = useLibrary();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
@@ -30,24 +33,31 @@ export default function NowPlayingPage() {
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const apiClient = getAPIClient();
 
+  const currentBook =
+    books.length > 0
+      ? requestedAsin
+        ? books.find((b) => b.asin === requestedAsin) || books[0]
+        : books[0]
+      : null;
+
   useEffect(() => {
     fetchDashboard(true);
   }, [fetchDashboard]);
 
   // Load progress and chapters when book is available
   useEffect(() => {
-    if (books.length > 0) {
+    if (currentBook) {
       loadProgress();
       loadChapters();
     }
-  }, [books.length]);
+  }, [currentBook?.asin]);
 
   const loadChapters = async () => {
-    if (books.length === 0) return;
+    if (!currentBook) return;
     try {
       setIsLoadingChapters(true);
       const chaptersData = (await apiClient.getChapters(
-        books[0].asin
+        currentBook.asin
       )) as Array<{
         start_offset_ms: number;
         title: string;
@@ -63,9 +73,9 @@ export default function NowPlayingPage() {
   };
 
   const loadProgress = async () => {
-    if (books.length === 0 || !audioRef.current) return;
+    if (!currentBook || !audioRef.current) return;
     try {
-      const progress = (await apiClient.getProgress(books[0].asin)) as {
+      const progress = (await apiClient.getProgress(currentBook.asin)) as {
         position_ms: number;
       } | null;
       if (progress) {
@@ -77,9 +87,8 @@ export default function NowPlayingPage() {
   };
 
   const saveProgress = async () => {
-    if (!audioRef.current || books.length === 0) return;
+    if (!audioRef.current || !currentBook) return;
 
-    const currentBook = books[0];
     const duration_ms = (audioRef.current.duration || 0) * 1000;
     const position_ms = audioRef.current.currentTime * 1000;
     const percent_complete =
@@ -130,8 +139,6 @@ export default function NowPlayingPage() {
       saveProgress();
     };
   }, []);
-
-  const currentBook = books.length > 0 ? books[0] : null;
 
   if (!currentBook) {
     return (

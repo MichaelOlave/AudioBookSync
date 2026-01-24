@@ -22,5 +22,6 @@ celery_app.autodiscover_tasks(
         "src.celery_app.tasks.library_tasks",
         "src.celery_app.tasks.cleanup_tasks",
         "src.celery_app.tasks.retry_tasks",
+        "src.celery_app.tasks.scheduled_sync_tasks",
     ]
 )
