@@ -318,7 +318,7 @@ export default function SettingsPage() {
         body: storageConfig,
       });
       setStorageConnected(data.is_connected);
-      setStorageMessage(data.message);
+      setStorageMessage(data.message || "");
       setSuccess("Storage configuration updated successfully");
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {

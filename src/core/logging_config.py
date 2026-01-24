@@ -1,12 +1,15 @@
 """Logging configuration for AudioBookSync."""
 
 import sys
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from loguru import logger
 
+if TYPE_CHECKING:
+    from src.core.database_logging_sink import DatabaseLoggingSink
+
 # Global database sink instance
-_db_sink: Optional[object] = None
+_db_sink: Optional["DatabaseLoggingSink"] = None
 
 
 def configure_logging(log_level: str = "INFO", enable_database: bool = True) -> None:

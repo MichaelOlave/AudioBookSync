@@ -33,7 +33,7 @@ async def _resolve_object_key(
 ) -> Optional[str]:
     """Resolve MinIO object key for a book, with a MinIO existence fallback."""
     if user_book.decrypted_path:
-        return user_book.decrypted_path
+        return str(user_book.decrypted_path)
 
     normalized_title = normalize_filename(book.title or "")
     if not normalized_title:

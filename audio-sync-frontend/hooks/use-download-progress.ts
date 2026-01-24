@@ -38,7 +38,7 @@ export function useDownloadProgress() {
     }
 
     const url = `${wsUrl}/ws/updates?token=${encodeURIComponent(token)}`;
-    logger.debug('WebSocket URL:', url.replace(token, 'TOKEN_HIDDEN'));
+    logger.debug('WebSocket URL configured', { url: url.replace(token, 'TOKEN_HIDDEN') });
     return url;
   }, []);
 

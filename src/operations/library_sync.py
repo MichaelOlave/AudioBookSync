@@ -123,9 +123,6 @@ async def sync_library(
     # Create async database session for the entire sync operation
     async with AsyncSessionLocal() as db:
         try:
-            # Ensure all directories exist
-            Config.ensure_directories()
-
             # Get or create user (if not provided, use default)
             if user_id is None:
                 user_id = await get_user()

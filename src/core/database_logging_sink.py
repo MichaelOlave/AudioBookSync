@@ -258,15 +258,25 @@ class DatabaseLoggingSink:
 
         # Extract level name - loguru record["level"] is a namedtuple with a 'name' attribute
         level_obj = record.get("level")
-        level_name = level_obj.name if hasattr(level_obj, "name") else str(level_obj)
+        level_name = (
+            level_obj.name
+            if level_obj is not None and hasattr(level_obj, "name")
+            else str(level_obj or "")
+        )
 
         # Extract process name - loguru record["process"] is a namedtuple
         process_obj = record.get("process")
-        process_name = process_obj.name if hasattr(process_obj, "name") else ""
+        process_name = (
+            process_obj.name
+            if process_obj is not None and hasattr(process_obj, "name")
+            else ""
+        )
 
         # Extract thread info - loguru record["thread"] is a namedtuple
         thread_obj = record.get("thread")
-        thread_id = str(thread_obj.id) if hasattr(thread_obj, "id") else ""
+        thread_id = (
+            str(thread_obj.id) if thread_obj is not None and hasattr(thread_obj, "id") else ""
+        )
 
         return {
             "message": record.get("message", ""),

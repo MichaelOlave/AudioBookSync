@@ -215,9 +215,9 @@ async def get_sync_status(
         raise ResourceNotFoundError(f"Sync '{sync_id}' not found")
 
     # Verify ownership
-    if sync.get("user_id") != user_id:
+    if str(sync.user_id) != user_id:
         logger.warning(f"Unauthorized access attempt to sync {sync_id} by user {user_id}")
         raise AuthorizationError("Not authorized to access this sync")
 
     logger.info(f"Retrieved sync details: {sync_id}")
-    return SyncResponse(**sync)
+    return SyncResponse.model_validate(sync, from_attributes=True)

@@ -73,6 +73,9 @@ async def get_active_tasks(
             progress_percentage=None,
             started_at=task["started_at"],
             attempt_number=task["attempt_number"],
+            sync_type=None,
+            books_found=None,
+            books_added=None,
             error_message=task["error_message"],
         )
         for task in tasks_data["downloads"]
@@ -87,7 +90,11 @@ async def get_active_tasks(
             title=task["title"],
             progress_percentage=None,
             started_at=task["started_at"],
-            error_message=task["error_message"],
+            attempt_number=task.get("attempt_number"),
+            sync_type=None,
+            books_found=None,
+            books_added=None,
+            error_message=task.get("error_message"),
         )
         for task in tasks_data["decryptions"]
     ]
@@ -97,10 +104,15 @@ async def get_active_tasks(
             task_id=task["task_id"],
             task_type=TaskType.SYNC,
             status=task["status"],
+            asin=None,
+            title=None,
+            progress_percentage=None,
             started_at=task["started_at"],
+            attempt_number=None,
             sync_type=task["sync_type"],
             books_found=task["books_found"],
             books_added=task["books_added"],
+            error_message=task.get("error_message"),
         )
         for task in tasks_data["syncs"]
     ]

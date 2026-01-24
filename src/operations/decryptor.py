@@ -19,7 +19,7 @@ from ..infrastructure.storage_service import StorageService
 async def decrypt_book(  # noqa: C901
     book: list,
     user_id: str,
-    encrypted_file_path: str = None,
+    encrypted_file_path: str | None = None,
     progress_callback=None,
     is_retry: bool = False,
     activation_bytes: str | None = None,
@@ -174,7 +174,7 @@ def _parse_time_base(time_base: Optional[str]) -> Optional[float]:
         return None
 
 
-def _seconds_to_ms(value: Optional[object]) -> Optional[int]:
+def _seconds_to_ms(value: str | int | float | None) -> Optional[int]:
     """Convert a seconds value (string/number) to milliseconds."""
     if value is None:
         return None
@@ -247,7 +247,7 @@ async def _store_chapters(asin: str, chapters: list[dict]) -> None:
             await metadata_service.replace_chapters(db, asin=asin, chapters=chapters)
             media = await metadata_service.get_media_info(db, asin)
             if media:
-                media.chapters_count = len(chapters)
+                setattr(media, "chapters_count", len(chapters))
             else:
                 await metadata_service.create_media_info(
                     db,

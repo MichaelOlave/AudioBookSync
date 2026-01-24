@@ -288,7 +288,9 @@ class DownloadExecutor(OperationExecutor):
                 redact_secrets=False,
             )
             user = await user_service.get_user_by_id(db, self.user_id)
-            activation_bytes = user.activation_bytes if user else None
+            activation_bytes = (
+                str(user.activation_bytes) if user and user.activation_bytes else None
+            )
 
         if not audible_auth:
             raise ValueError("Audible credentials not configured for user")
@@ -345,7 +347,9 @@ class DecryptExecutor(OperationExecutor):
         """Execute decrypt operation."""
         async with AsyncSessionLocal() as db:
             user = await user_service.get_user_by_id(db, self.user_id)
-            activation_bytes = user.activation_bytes if user else None
+            activation_bytes = (
+                str(user.activation_bytes) if user and user.activation_bytes else None
+            )
 
         if not activation_bytes:
             raise ValueError("Activation bytes not configured for user")

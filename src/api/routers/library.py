@@ -10,7 +10,13 @@ from ...database.engine import get_db_session
 from ...database.models.user import User
 from ...database.services import book_service, user_service
 from ..middleware.error_handler import ResourceNotFoundError, handle_route_errors
-from ..schemas.book import BookDashboardResponse, BookList, BookResponse
+from ..schemas.book import (
+    BookDashboardBook,
+    BookDashboardResponse,
+    BookList,
+    BookMetadataResponse,
+    BookResponse,
+)
 from ..security.auth import get_current_user
 from ..services.audible_library_service import fetch_audible_library_to_db
 from ..utils.auth_utils import get_user_id
@@ -61,7 +67,7 @@ async def get_library(
         GET /api/v1/library?page=1&page_size=50
     """
 
-    family_id = current_user.family_id
+    family_id = str(current_user.family_id) if current_user.family_id else None
     accessible_user_ids = await user_service.get_accessible_user_ids(
         db=db,
         user_id=get_user_id(current_user),
@@ -176,7 +182,7 @@ async def get_dashboard_books(
     Optionally filters to downloaded books when requested.
     """
     user_id = get_user_id(current_user)
-    family_id = current_user.family_id
+    family_id = str(current_user.family_id) if current_user.family_id else None
     accessible_user_ids = await user_service.get_accessible_user_ids(
         db=db,
         user_id=user_id,
@@ -191,8 +197,12 @@ async def get_dashboard_books(
     )
     return [
         BookDashboardResponse(
-            book=book_service.build_dashboard_book_data(book, user_book),
-            metadata=metadata,
+            book=BookDashboardBook.model_validate(
+                book_service.build_dashboard_book_data(book, user_book)
+            ),
+            metadata=BookMetadataResponse.model_validate(metadata, from_attributes=True)
+            if metadata
+            else None,
         )
         for user_book, book, metadata in rows
     ]

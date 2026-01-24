@@ -6,7 +6,7 @@ from uuid import UUID
 
 from loguru import logger
 
-from ...database.engine import get_db_session
+from ...database.engine import AsyncSessionLocal
 from ...database.services import sync_service as orm_sync_service
 from ...operations.library_sync import sync_library
 from ..websockets import EventType, ws_manager
@@ -134,7 +134,7 @@ class SyncService:
                 return
 
             # Update sync record in database using ORM
-            async with get_db_session() as db:
+            async with AsyncSessionLocal() as db:
                 success = await orm_sync_service.complete_sync(
                     db=db,
                     sync_id=sync_uuid,
@@ -152,7 +152,7 @@ class SyncService:
                 return
 
             # Get final sync record
-            async with get_db_session() as db:
+            async with AsyncSessionLocal() as db:
                 sync_obj = await orm_sync_service.get_sync_by_id(db, sync_uuid)
                 if not sync_obj:
                     logger.error(f"Sync record not found: {sync_id}")
@@ -213,7 +213,7 @@ class SyncService:
                 return
 
             # Mark as failed in database using ORM
-            async with get_db_session() as db:
+            async with AsyncSessionLocal() as db:
                 success = await orm_sync_service.fail_sync(
                     db=db,
                     sync_id=sync_uuid,
