@@ -8,10 +8,10 @@ from typing import Optional
 
 from loguru import logger
 
-from ..adapters.storage.minio_storage_adapter import MinIOStorageAdapter
+from ..adapters.storage.storage_factory import get_storage_adapter
 from ..core.config import Config
 from ..database.engine import AsyncSessionLocal
-from ..database.services import book_service, metadata_service
+from ..database.services import book_service, metadata_service, user_service
 from ..domain.progress import safe_progress_callback
 from ..infrastructure.file_utils import normalize_filename
 from ..ports.file_storage_port import FileStoragePort
@@ -289,6 +289,47 @@ async def _store_chapters(asin: str, chapters: list[dict]) -> None:
         logger.warning(f"Failed to store chapters for {asin}: {e}")
 
 
+async def _get_user_storage_adapter(user_id: str) -> FileStoragePort:
+    """Get the appropriate storage adapter for a user based on their configuration.
+
+    Fetches the user's storage configuration from the database and returns the
+    appropriate storage adapter (MinIO, AWS S3, etc.).
+
+    Args:
+        user_id: User UUID
+
+    Returns:
+        FileStoragePort: Configured storage adapter instance
+
+    Raises:
+        ValueError: If user not found or storage configuration is invalid
+    """
+    try:
+        async with AsyncSessionLocal() as db:
+            user = await user_service.get_user_by_id(db, str(user_id))
+            if not user:
+                raise ValueError(f"User not found: {user_id}")
+
+            storage_config = user.storage_config
+            if not storage_config:
+                # Default to MinIO if no config is set
+                logger.info(f"No storage config for user {user_id}, defaulting to MinIO")
+                return get_storage_adapter("minio", {
+                    "endpoint": "minio:9000",
+                    "access_key": "minioadmin",
+                    "secret_key": "minioadmin",
+                    "secure": False
+                })
+
+            provider_type = storage_config.get("provider_type", "minio")
+            logger.info(f"Using storage provider '{provider_type}' for user {user_id}")
+            return get_storage_adapter(provider_type, storage_config)
+
+    except Exception as e:
+        logger.error(f"Failed to get storage adapter for user {user_id}: {e}")
+        raise
+
+
 async def _update_book_paths(
     asin: str,
     user_id: str,
@@ -332,7 +373,7 @@ async def _update_book_paths(
 async def _upload_decrypted_file_to_minio(
     book_asin: str, book_title: str, user_id: str, file_path: str
 ) -> tuple[bool, str]:
-    """Upload decrypted file to MinIO after successful decryption.
+    """Upload decrypted file to configured storage after successful decryption.
 
     Args:
         book_asin: Amazon Standard Identification Number
@@ -348,8 +389,8 @@ async def _upload_decrypted_file_to_minio(
             logger.warning(f"Decrypted file not found at {file_path}")
             return False, ""
 
-        # Upload to MinIO
-        storage = MinIOStorageAdapter()
+        # Get user's configured storage adapter
+        storage = await _get_user_storage_adapter(user_id)
         success, object_key = storage.save_file(
             user_id=user_id,
             file_path=file_path,
@@ -358,7 +399,7 @@ async def _upload_decrypted_file_to_minio(
         )
 
         if success and object_key:
-            logger.info(f"Successfully uploaded decryption to MinIO: {object_key}")
+            logger.info(f"Successfully uploaded decryption: {object_key}")
             await _update_book_paths(
                 book_asin,
                 user_id,
@@ -368,18 +409,18 @@ async def _upload_decrypted_file_to_minio(
             )
             return True, object_key
         else:
-            logger.warning(f"Failed to upload decryption to MinIO for {book_title}")
+            logger.warning(f"Failed to upload decryption for {book_title}")
             return False, ""
 
     except Exception as e:
-        logger.error(f"Error uploading decryption to MinIO: {e}")
+        logger.error(f"Error uploading decryption: {e}")
         return False, ""
 
 
 async def _upload_encrypted_file_to_minio(
     book_asin: str, user_id: str, file_path: str
 ) -> tuple[bool, str]:
-    """Upload encrypted file to MinIO when decryption fails.
+    """Upload encrypted file to configured storage when decryption fails.
 
     This serves as a fallback for later retry attempts.
 
@@ -396,8 +437,8 @@ async def _upload_encrypted_file_to_minio(
             logger.warning(f"Encrypted file not found at {file_path}")
             return False, ""
 
-        # Upload to MinIO as a downloaded/encrypted artifact for retry
-        storage = MinIOStorageAdapter()
+        # Get user's configured storage adapter
+        storage = await _get_user_storage_adapter(user_id)
         success, object_key = storage.save_file(
             user_id=user_id,
             file_path=file_path,
@@ -406,7 +447,7 @@ async def _upload_encrypted_file_to_minio(
         )
 
         if success and object_key:
-            logger.info(f"Successfully uploaded encrypted file to MinIO for retry: {object_key}")
+            logger.info(f"Successfully uploaded encrypted file for retry: {object_key}")
             await _update_book_paths(
                 book_asin,
                 user_id,
@@ -415,9 +456,9 @@ async def _upload_encrypted_file_to_minio(
             )
             return True, object_key
         else:
-            logger.warning(f"Failed to upload encrypted file to MinIO for {book_asin}")
+            logger.warning(f"Failed to upload encrypted file for {book_asin}")
             return False, ""
 
     except Exception as e:
-        logger.error(f"Error uploading encrypted file to MinIO: {e}")
+        logger.error(f"Error uploading encrypted file: {e}")
         return False, ""

@@ -286,6 +286,9 @@ async def get_storage_config(
     )
     bucket_name = storage_config.get("bucket_name", "audiobooks") if is_dict else "audiobooks"
     use_ssl = storage_config.get("use_ssl", False) if is_dict else False
+    access_key = storage_config.get("access_key") if is_dict else None
+    secret_key = storage_config.get("secret_key") if is_dict else None
+    region = storage_config.get("region") if is_dict else None
 
     # Test if storage is connected
     if endpoint and bucket_name:
@@ -293,6 +296,8 @@ async def get_storage_config(
             endpoint=endpoint,
             bucket_name=bucket_name,
             use_ssl=use_ssl,
+            access_key=access_key,
+            secret_key=secret_key,
         )
         if is_connected:
             message = "Storage is configured and healthy"
@@ -307,7 +312,10 @@ async def get_storage_config(
         provider_type=provider_type,
         endpoint=endpoint,
         bucket_name=bucket_name,
+        access_key=access_key,
+        secret_key=secret_key,
         use_ssl=use_ssl,
+        region=region,
         is_connected=is_connected,
         message=message,
     )
@@ -418,7 +426,10 @@ async def update_storage_config(
         provider_type=config.provider_type,
         endpoint=config.endpoint,
         bucket_name=config.bucket_name,
+        access_key=config.access_key,
+        secret_key=config.secret_key,
         use_ssl=config.use_ssl,
+        region=config.region,
         is_connected=is_connected,
         message=message,
     )

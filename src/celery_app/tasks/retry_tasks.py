@@ -175,16 +175,16 @@ def retry_failed_decrypts_from_minio() -> dict:
 
 
 async def _async_retry_decrypts_from_minio() -> dict:  # noqa: C901
-    """Async implementation of decryption retry from MinIO encrypted files."""
+    """Async implementation of decryption retry from encrypted files in configured storage."""
     try:
-        logger.info("Starting failed decryption retry from MinIO encrypted files")
+        logger.info("Starting failed decryption retry from encrypted files")
 
-        from src.adapters.storage.minio_storage_adapter import MinIOStorageAdapter
+        from src.adapters.storage.storage_factory import get_storage_adapter
         from src.database.models.book import Book
         from src.operations.decryptor import decrypt_book
 
         async with AsyncSessionLocal() as db:
-            # Find decryptions with encrypted files stored in MinIO (failed decryptions)
+            # Find decryptions with encrypted files stored (failed decryptions)
             result = await db.execute(
                 select(DecryptionStatus).where(
                     and_(
@@ -217,8 +217,23 @@ async def _async_retry_decrypts_from_minio() -> dict:  # noqa: C901
 
                     user_id = str(decrypt_record.user_id)
 
-                    # Download encrypted file from MinIO
-                    storage = MinIOStorageAdapter()
+                    # Get user's configured storage adapter
+                    user = await user_service.get_user_by_id(db, user_id)
+                    if not user:
+                        logger.warning(f"User not found: {user_id}")
+                        continue
+
+                    storage_config = user.storage_config or {
+                        "provider_type": "minio",
+                        "endpoint": "minio:9000",
+                        "access_key": "minioadmin",
+                        "secret_key": "minioadmin",
+                        "secure": False
+                    }
+                    provider_type = storage_config.get("provider_type", "minio")
+                    storage = get_storage_adapter(provider_type, storage_config)
+
+                    # Download encrypted file from user's configured storage
                     encrypted_file_path = storage.get_file(
                         user_id=user_id,
                         object_key=decrypt_record.encrypted_file_object_key,

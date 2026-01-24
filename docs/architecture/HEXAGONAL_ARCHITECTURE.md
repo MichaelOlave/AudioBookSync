@@ -69,6 +69,20 @@ Implements `FileStoragePort` using MinIO:
 - Range request support for audio seeking
 - Comprehensive error handling
 
+### S3StorageAdapter (`src/adapters/storage/s3_storage_adapter.py`)
+
+Implements `FileStoragePort` using AWS S3:
+
+- Per-user bucket isolation (`user-{user_id}`)
+- Same object key patterns as MinIO
+- HTTP Range support for audio seeking via S3 GetObject Range header
+- Comprehensive error handling with boto3
+- Configurable region (default: us-east-1)
+
+**Configuration Requirements:**
+- AWS credentials via environment variables or IAM role
+- Required S3 permissions: CreateBucket, ListBucket, GetObject, PutObject, DeleteObject
+
 ## Usage
 
 ### Before (Tightly Coupled)
@@ -86,46 +100,93 @@ success, key = service.save_file(...)
 from src.ports.file_storage_port import FileStoragePort
 from src.adapters.storage.minio_storage_adapter import MinIOStorageAdapter
 
+# Use MinIO
 storage: FileStoragePort = MinIOStorageAdapter()
 success, key = storage.save_file(...)
 ```
 
-Now you can swap implementations:
+Swap implementations without changing code:
 
 ```python
-# Use a different storage backend
+# Use AWS S3 instead
 from src.adapters.storage.s3_storage_adapter import S3StorageAdapter
-storage: FileStoragePort = S3StorageAdapter()
+
+storage: FileStoragePort = S3StorageAdapter(region_name="us-west-2")
+success, key = storage.save_file(...)
 ```
+
+## Switching Storage Backends
+
+### Using MinIO (Default)
+
+```python
+from src.adapters.storage.minio_storage_adapter import MinIOStorageAdapter
+from src.ports.file_storage_port import FileStoragePort
+
+storage: FileStoragePort = MinIOStorageAdapter()
+```
+
+### Using AWS S3
+
+```python
+from src.adapters.storage.s3_storage_adapter import S3StorageAdapter
+from src.ports.file_storage_port import FileStoragePort
+
+# Requires AWS credentials configured
+storage: FileStoragePort = S3StorageAdapter(region_name="us-east-1")
+```
+
+**Configuration:**
+
+Set AWS credentials via environment:
+```bash
+export AWS_ACCESS_KEY_ID="your-access-key"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"
+```
+
+Or use `~/.aws/credentials`:
+```ini
+[default]
+aws_access_key_id = your-access-key
+aws_secret_access_key = your-secret-key
+```
+
+Or use IAM role when running on EC2/ECS/Lambda.
 
 ## Adding New Storage Adapters
 
-To add a new storage adapter (e.g., AWS S3):
+To add a new storage adapter (e.g., Google Cloud Storage):
 
-1. Create `src/adapters/storage/s3_storage_adapter.py`
-2. Implement `FileStoragePort`
+1. Create `src/adapters/storage/gcs_storage_adapter.py`
+2. Implement `FileStoragePort` (all abstract methods)
 3. Update imports in `src/adapters/storage/__init__.py`
-4. Use in code: `storage: FileStoragePort = S3StorageAdapter()`
+4. Use in code: `storage: FileStoragePort = GCSStorageAdapter()`
 
-Example:
+Template:
 
 ```python
 from src.ports.file_storage_port import FileStoragePort
+from typing import Optional, Tuple
 
-class S3StorageAdapter(FileStoragePort):
-    def __init__(self, s3_client=None):
-        self.s3_client = s3_client or boto3.client('s3')
+class GCSStorageAdapter(FileStoragePort):
+    """Google Cloud Storage adapter."""
+
+    def __init__(self, project_id: str, storage_client=None):
+        self.project_id = project_id
+        self.storage_client = storage_client or StorageClient(project=project_id)
 
     def ensure_user_bucket(self, user_id: str) -> bool:
-        # AWS S3 bucket creation logic
+        bucket_name = f"user-{user_id}"
+        # GCS bucket creation logic
         pass
 
-    def save_file(self, user_id: str, file_path: str, file_type: str, ...)
-                  -> Tuple[bool, Optional[str]]:
-        # AWS S3 upload logic
+    def save_file(self, user_id: str, file_path: str, file_type: str,
+                  asin: Optional[str] = None, title: Optional[str] = None
+                  ) -> Tuple[bool, Optional[str]]:
+        # GCS upload logic
         pass
 
-    # ... implement other methods
+    # ... implement other abstract methods
 ```
 
 ## Migration Path

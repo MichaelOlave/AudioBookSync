@@ -3,6 +3,7 @@ cryptography
 pycryptodome
 loguru
 minio==7.2.3
+boto3==1.34.14  # AWS S3 support (optional - only needed for S3StorageAdapter)
 python-dotenv
 
 # Database: SQLAlchemy ORM with async support

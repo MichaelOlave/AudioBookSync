@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import relationship
 
 from src.database.models.base import Base, get_current_timestamp
@@ -38,6 +38,7 @@ class User(Base):
         index=True,
     )
     share_library_with_family = Column(Boolean, default=False, nullable=False)
+    storage_config = Column(JSON, nullable=True, comment="Storage provider configuration (provider_type, endpoint, credentials, etc)")
     last_sync_date = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=get_current_timestamp, nullable=False)
     updated_at = Column(

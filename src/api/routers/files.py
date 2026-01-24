@@ -7,9 +7,9 @@ from fastapi.responses import StreamingResponse
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...adapters.storage.minio_storage_adapter import MinIOStorageAdapter
+from ...adapters.storage.storage_factory import get_storage_adapter
 from ...database.engine import get_db_session
-from ...database.services import book_service
+from ...database.services import book_service, user_service
 from ...infrastructure.file_utils import normalize_filename
 from ...ports.file_storage_port import FileStoragePort
 from ..middleware.error_handler import (
@@ -123,8 +123,21 @@ async def stream_audiobook(  # noqa: C901
     user_book, book = await verify_book_access(db, asin, current_user)
     owner_user_id = str(user_book.user_id)
 
-    # Initialize storage
-    storage = MinIOStorageAdapter()
+    # Get owner's storage configuration
+    owner = await user_service.get_user_by_id(db, owner_user_id)
+    if not owner:
+        logger.error(f"Owner user not found: {owner_user_id}")
+        raise InternalServerError("Book owner information not available")
+
+    storage_config = owner.storage_config or {
+        "provider_type": "minio",
+        "endpoint": "minio:9000",
+        "access_key": "minioadmin",
+        "secret_key": "minioadmin",
+        "secure": False
+    }
+    provider_type = storage_config.get("provider_type", "minio")
+    storage = get_storage_adapter(provider_type, storage_config)
 
     # Resolve MinIO object_key from book record or infer from MinIO
     object_key = await _resolve_object_key(

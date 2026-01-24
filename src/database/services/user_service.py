@@ -2,7 +2,7 @@
 
 import json
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 from uuid import UUID
 
 from loguru import logger
@@ -12,6 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database.models.family import Family
 from src.database.models.user import User
 from src.database.services.base_service import delete_entity, get_by_id, update_entity
+
+if TYPE_CHECKING:
+    from src.ports.file_storage_port import FileStoragePort
 
 
 async def create_user(
@@ -555,10 +558,68 @@ async def update_user_storage_config(
             logger.warning(f"User not found for storage config update: {user_id}")
             return False
 
-        user.storage_config = json.dumps(storage_config)
+        user.storage_config = storage_config
         await db.flush()
         logger.info(f"Updated storage config for user: {user_id}")
         return True
     except Exception as e:
         logger.error(f"Failed to update storage config: {e}")
         return False
+
+
+async def get_user_storage_adapter(
+    db: AsyncSession,
+    user_id: str,
+) -> "FileStoragePort":
+    """Get storage adapter instance for a user based on their configuration.
+
+    Retrieves the user's storage provider preference from the database and
+    returns an instantiated storage adapter ready to use.
+
+    Args:
+        db: Database session
+        user_id: User's UUID
+
+    Returns:
+        FileStoragePort: Configured storage adapter for the user
+
+    Raises:
+        ValueError: If user not found or storage config is invalid
+        ImportError: If required storage adapter dependencies are missing
+
+    Example:
+        >>> storage = await get_user_storage_adapter(db, user_id)
+        >>> success, key = storage.save_file(
+        ...     user_id=user_id,
+        ...     file_path="/path/to/file.aax",
+        ...     file_type="downloaded",
+        ...     asin="B001ABC123"
+        ... )
+    """
+    from src.adapters.storage.storage_factory import get_storage_adapter
+    from src.ports.file_storage_port import FileStoragePort
+
+    try:
+        user = await get_user_by_id(db, user_id)
+        if not user:
+            raise ValueError(f"User not found: {user_id}")
+
+        # Get storage config from user
+        storage_config = user.storage_config or {}
+
+        # Default to MinIO if no config set
+        provider_type = storage_config.get("provider_type", "minio")
+
+        logger.info(f"Getting storage adapter for user {user_id}: provider={provider_type}")
+
+        # Get adapter from factory
+        adapter = get_storage_adapter(provider_type, storage_config)
+
+        logger.debug(f"Successfully created {provider_type} adapter for user {user_id}")
+        return adapter
+
+    except ValueError:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get storage adapter for user {user_id}: {e}")
+        raise ValueError(f"Failed to initialize storage adapter: {e}")

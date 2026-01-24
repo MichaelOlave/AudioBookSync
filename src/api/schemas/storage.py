@@ -61,9 +61,21 @@ class StorageConfigResponse(BaseModel):
         ...,
         description="Bucket name",
     )
+    access_key: Optional[str] = Field(
+        default=None,
+        description="Access key for authentication",
+    )
+    secret_key: Optional[str] = Field(
+        default=None,
+        description="Secret key for authentication",
+    )
     use_ssl: bool = Field(
         default=False,
         description="Whether SSL/TLS is enabled",
+    )
+    region: Optional[str] = Field(
+        default=None,
+        description="AWS region (for S3 only)",
     )
     is_connected: bool = Field(
         default=False,
@@ -78,10 +90,13 @@ class StorageConfigResponse(BaseModel):
         json_schema_extra={
             "example": {
                 "user_id": "550e8400-e29b-41d4-a716-446655440000",
-                "provider_type": "minio",
-                "endpoint": "http://localhost:9000",
-                "bucket_name": "audiobooks",
+                "provider_type": "aws_s3",
+                "endpoint": "http://minio:9000",
+                "bucket_name": "audiobooksync-michael",
+                "access_key": "AKIAVJR37M7Q7P5PN2FB",
+                "secret_key": "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",
                 "use_ssl": False,
+                "region": "us-east-2",
                 "is_connected": True,
                 "message": "Storage is configured and healthy",
             }

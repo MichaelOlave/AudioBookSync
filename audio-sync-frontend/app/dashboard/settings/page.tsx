@@ -80,6 +80,9 @@ export default function SettingsPage() {
     endpoint: "http://localhost:9000",
     bucket_name: "audiobooks",
     use_ssl: false,
+    access_key: "",
+    secret_key: "",
+    region: null as string | null,
   });
   const [storageLoading, setStorageLoading] = useState(false);
   const [storageConnected, setStorageConnected] = useState(false);
@@ -98,8 +101,11 @@ export default function SettingsPage() {
 
   // Fetch storage config and family on mount
   useEffect(() => {
-    fetchStorageConfig();
-    fetchAudibleStatus();
+    const loadConfigs = async () => {
+      await fetchStorageConfig();
+      await fetchAudibleStatus();
+    };
+    loadConfigs();
     fetchMyFamily();
   }, [fetchMyFamily]);
 
@@ -188,14 +194,24 @@ export default function SettingsPage() {
 
   const fetchStorageConfig = async () => {
     try {
-      const data = await apiClient.request<StorageConfig>("GET", "/settings/storage");
-      setStorageConfig({
-        provider_type: data.provider_type,
-        endpoint: data.endpoint,
-        bucket_name: data.bucket_name,
-        use_ssl: data.use_ssl,
-      });
-      setStorageConnected(data.is_connected);
+      const data = await apiClient.request<any>("GET", "/settings/storage");
+
+      if (!data) {
+        return;
+      }
+
+      const config = {
+        provider_type: data.provider_type || "minio",
+        endpoint: data.endpoint || "",
+        bucket_name: data.bucket_name || "",
+        use_ssl: typeof data.use_ssl === "boolean" ? data.use_ssl : false,
+        access_key: data.access_key || "",
+        secret_key: data.secret_key || "",
+        region: data.region || null,
+      };
+
+      setStorageConfig(config);
+      setStorageConnected(data.is_connected === true);
       setStorageMessage(data.message || "");
     } catch (err) {
       logger.error("Failed to fetch storage config:", err);
@@ -306,8 +322,16 @@ export default function SettingsPage() {
   };
 
   const handleStorageUpdate = async () => {
-    if (!storageConfig.endpoint || !storageConfig.bucket_name) {
-      setError("Endpoint and bucket name are required");
+    if (!storageConfig.bucket_name || !storageConfig.access_key || !storageConfig.secret_key) {
+      setError("Bucket name, access key, and secret key are required");
+      return;
+    }
+    if (storageConfig.provider_type !== "aws_s3" && !storageConfig.endpoint) {
+      setError("Endpoint is required for this provider");
+      return;
+    }
+    if (storageConfig.provider_type === "aws_s3" && !storageConfig.region) {
+      setError("Region is required for AWS S3");
       return;
     }
 
@@ -474,6 +498,20 @@ export default function SettingsPage() {
     }
   };
 
+  const handleProviderChange = (newProvider: string) => {
+    setStorageConfig({
+      ...storageConfig,
+      provider_type: newProvider,
+      access_key: "",
+      secret_key: "",
+      endpoint: "",
+      bucket_name: "",
+      region: null,
+    });
+    setStorageMessage("");
+    setStorageConnected(false);
+  };
+
   return (
     <div className="space-y-8">
       {/* Status Messages */}
@@ -582,12 +620,7 @@ export default function SettingsPage() {
               </label>
               <select
                 value={storageConfig.provider_type}
-                onChange={(e) =>
-                  setStorageConfig({
-                    ...storageConfig,
-                    provider_type: e.target.value,
-                  })
-                }
+                onChange={(e) => handleProviderChange(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border border-border bg-background"
                 disabled={storageLoading}
               >
@@ -597,22 +630,28 @@ export default function SettingsPage() {
               </select>
             </div>
 
-            <div>
-              <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                Storage Endpoint
-              </label>
-              <Input
-                value={storageConfig.endpoint}
-                onChange={(e) =>
-                  setStorageConfig({
-                    ...storageConfig,
-                    endpoint: e.target.value,
-                  })
-                }
-                placeholder="http://localhost:9000"
-                disabled={storageLoading}
-              />
-            </div>
+            {storageConfig.provider_type !== "aws_s3" && (
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                  Storage Endpoint
+                </label>
+                <Input
+                  value={storageConfig.endpoint}
+                  onChange={(e) =>
+                    setStorageConfig({
+                      ...storageConfig,
+                      endpoint: e.target.value,
+                    })
+                  }
+                  placeholder={
+                    storageConfig.provider_type === "minio"
+                      ? "http://localhost:9000"
+                      : "storage.googleapis.com"
+                  }
+                  disabled={storageLoading}
+                />
+              </div>
+            )}
 
             <div>
               <label className="text-sm font-medium text-muted-foreground mb-2 block">
@@ -631,27 +670,84 @@ export default function SettingsPage() {
               />
             </div>
 
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="use_ssl"
-                checked={storageConfig.use_ssl}
+            {storageConfig.provider_type === "aws_s3" && (
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                  Region
+                </label>
+                <Input
+                  value={storageConfig.region || ""}
+                  onChange={(e) =>
+                    setStorageConfig({
+                      ...storageConfig,
+                      region: e.target.value || null,
+                    })
+                  }
+                  placeholder="us-east-1"
+                  disabled={storageLoading}
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                Access Key
+              </label>
+              <Input
+                value={storageConfig.access_key}
                 onChange={(e) =>
                   setStorageConfig({
                     ...storageConfig,
-                    use_ssl: e.target.checked,
+                    access_key: e.target.value,
                   })
                 }
+                placeholder="minioadmin"
                 disabled={storageLoading}
-                className="rounded"
+                type="password"
               />
-              <label
-                htmlFor="use_ssl"
-                className="text-sm font-medium text-muted-foreground cursor-pointer"
-              >
-                Use SSL/TLS
-              </label>
             </div>
+
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                Secret Key
+              </label>
+              <Input
+                value={storageConfig.secret_key}
+                onChange={(e) =>
+                  setStorageConfig({
+                    ...storageConfig,
+                    secret_key: e.target.value,
+                  })
+                }
+                placeholder="minioadmin"
+                disabled={storageLoading}
+                type="password"
+              />
+            </div>
+
+            {storageConfig.provider_type !== "aws_s3" && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="use_ssl"
+                  checked={storageConfig.use_ssl}
+                  onChange={(e) =>
+                    setStorageConfig({
+                      ...storageConfig,
+                      use_ssl: e.target.checked,
+                    })
+                  }
+                  disabled={storageLoading}
+                  className="rounded"
+                />
+                <label
+                  htmlFor="use_ssl"
+                  className="text-sm font-medium text-muted-foreground cursor-pointer"
+                >
+                  Use SSL/TLS
+                </label>
+              </div>
+            )}
 
             <div className="flex gap-2">
               <Button
