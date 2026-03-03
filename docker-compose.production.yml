@@ -57,7 +57,9 @@ services:
       start_period: 5s
 
   app:
-    image: michaelolave/audiobook-sync:latest
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
     container_name: audiobooksync-api
     restart: always
     expose:
@@ -163,7 +165,9 @@ services:
       retries: 3
 
   celery-worker:
-    image: michaelolave/audiobook-sync:latest
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
     container_name: audiobooksync-celery-worker
     restart: always
     working_dir: /app
@@ -189,7 +193,9 @@ services:
       - ./audiobooks:/app/audiobooks
 
   celery-beat:
-    image: michaelolave/audiobook-sync:latest
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
     container_name: audiobooksync-celery-beat
     restart: always
     working_dir: /app
