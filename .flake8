@@ -1,0 +1,59 @@
+# ============================================================================
+# FLAKE8 Configuration
+# ============================================================================
+# Documentation: https://flake8.pycqa.org/en/latest/user/configuration.html
+
+[flake8]
+# Maximum line length (Black default)
+max-line-length = 100
+
+# Complexity threshold
+max-complexity = 10
+
+# Error codes to ignore
+# E203: whitespace before ':' (conflicts with Black)
+# E501: line too long (handled by Black)
+# W503: line break before binary operator (conflicts with Black)
+# D100: Missing docstring in public module (optional)
+# D104: Missing docstring in public package (optional)
+ignore = E203, E501, W503, D100, D104
+
+# Directories to exclude
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    build,
+    dist,
+    migrations,
+    .eggs,
+    *.egg-info,
+    .pytest_cache,
+    .mypy_cache,
+    .tox
+
+# Per-file ignores
+per-file-ignores =
+    __init__.py: F401
+    tests/*: D100, D101, D102, D103
+    src/core/config.py: E501
+
+# Enable plugins
+enable-extensions =
+    E,
+    W,
+    F,
+    D
+
+# Docstring convention (Google style)
+docstring-convention = google
+
+# Statistics
+statistics = True
+
+# Show sources of violations
+show-source = True
+
+# Report format
+format = default

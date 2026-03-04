@@ -1,0 +1,110 @@
+# ============================================================================
+# Pre-commit Hooks Configuration
+# ============================================================================
+# Documentation: https://pre-commit.com/
+# Install: pip install pre-commit
+# Setup: pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # ========================================================================
+  # GENERAL FILE CHECKS
+  # ========================================================================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      # Check for files that would conflict in merge
+      - id: check-merge-conflict
+      # Check YAML syntax
+      - id: check-yaml
+        args: ["--unsafe"]
+      # Check JSON syntax
+      - id: check-json
+      # Check for large files
+      - id: check-added-large-files
+        args: ["--maxkb=1000"]
+      # Ensure files end with newline
+      - id: end-of-file-fixer
+      # Trim trailing whitespace
+      - id: trailing-whitespace
+      # Check for debugger imports
+      - id: debug-statements
+
+  # ========================================================================
+  # ISORT - Import Sorting
+  # ========================================================================
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ["--profile=black", "--line-length=100"]
+        language_version: python3.10
+
+  # ========================================================================
+  # BLACK - Code Formatter
+  # ========================================================================
+  - repo: https://github.com/psf/black
+    rev: 24.1.1
+    hooks:
+      - id: black
+        language_version: python3.10
+        args: ["--line-length=100"]
+
+  # ========================================================================
+  # FLAKE8 - Linting
+  # ========================================================================
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        language_version: python3.10
+        additional_dependencies:
+          - flake8-docstrings
+        args: ["--max-line-length=100", "--max-complexity=10"]
+
+  # ========================================================================
+  # MYPY - Type Checking
+  # ========================================================================
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        language_version: python3.10
+        additional_dependencies:
+          - sqlalchemy
+          - fastapi
+          - types-python-jose
+        args: ["--ignore-missing-imports", "--no-error-summary"]
+        exclude: migrations/
+
+  # ========================================================================
+  # SECURITY - Bandit
+  # ========================================================================
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        args: ["-c", ".bandit", "-r", "src/"]
+        exclude: tests/
+
+  # ========================================================================
+  # DOCSTRING FORMAT CHECK
+  # ========================================================================
+  - repo: https://github.com/PyCQA/pydocstyle
+    rev: 6.3.0
+    hooks:
+      - id: pydocstyle
+        args: ["--convention=google"]
+        exclude: tests/|migrations/
+
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+default_language_version:
+  python: python3.10
+
+# Skip slow hooks for push (enable on pull requests)
+default_stages: [commit]
+
+# Don't fail fast - run all hooks
+fail_fast: false
