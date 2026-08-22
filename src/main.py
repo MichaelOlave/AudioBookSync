@@ -1,6 +1,7 @@
 import asyncio
 import aiofiles
 import audible
+import json
 import sys
 import os
 from pathlib import Path
@@ -21,7 +22,13 @@ AUDIBLE_LIBRARY_CSV_FILE = 'audiobooks/test_library.csv'
 LOCAL_LIBRARY_CSV_FILE = 'audiobooks/local_library.csv'
 DOWNLOAD_DIR = 'audiobooks/downloaded'
 DECRYPTED_DIR = 'audiobooks/decrypted'
-ACC_BYTES = 'c3f80507'
+ACC_BYTES = os.getenv('ACTIVATION_BYTES', 'c3f80507')
+
+# Encrypted formats audible-cli can hand us. aax is unlocked with the account
+# wide activation bytes, aaxc with a per file key/iv from its .voucher file.
+ENCRYPTED_EXTENSIONS = ('.aax', '.aaxc')
+
+_ffmpeg_aaxc_support = None
 
 def sync_get_library(client):
     """Synchronous method to get library"""
@@ -189,6 +196,74 @@ async def download_book(book):
         logger.error(f"Unexpected error downloading {book_title}: {e}")
         return False
     
+def find_encrypted_file(book_asin):
+    """Locate the downloaded encrypted file for a book.
+
+    Returns a (path, extension) pair, or (None, None) when nothing matches. The
+    voucher that accompanies an aaxc download carries the ASIN in its name too,
+    so matching on the ASIN alone is not enough to pick the audio file.
+    """
+    for item in sorted(os.listdir(DOWNLOAD_DIR)):
+        if book_asin not in item:
+            continue
+
+        extension = os.path.splitext(item)[1].lower()
+        if extension in ENCRYPTED_EXTENSIONS:
+            return os.path.join(DOWNLOAD_DIR, item), extension
+
+    return None, None
+
+async def ffmpeg_supports_aaxc():
+    """Check once whether FFmpeg exposes the aaxc decryption options.
+
+    The audible_key/audible_iv demuxer options landed in FFmpeg 4.4. Probing the
+    demuxer help avoids parsing version strings and gives a clear failure up
+    front instead of a cryptic error mid decryption.
+    """
+    global _ffmpeg_aaxc_support
+
+    if _ffmpeg_aaxc_support is None:
+        process = await asyncio.create_subprocess_exec(
+            'ffmpeg', '-hide_banner', '-h', 'demuxer=mov',
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, _ = await process.communicate()
+        _ffmpeg_aaxc_support = 'audible_key' in stdout.decode(errors='replace')
+
+    return _ffmpeg_aaxc_support
+
+async def load_voucher(input_file):
+    """Read the AES key/iv audible-cli wrote alongside an aaxc download.
+
+    The key is unique to the file and cannot be derived offline, so a missing
+    voucher makes the download unusable.
+    """
+    voucher_file = f"{os.path.splitext(input_file)[0]}.voucher"
+
+    if not os.path.exists(voucher_file):
+        raise FileNotFoundError(f"No voucher found at {voucher_file}")
+
+    async with aiofiles.open(voucher_file, 'r', encoding='utf-8') as f:
+        voucher = json.loads(await f.read())
+
+    # The nesting has moved between audible-cli releases, so accept the shapes
+    # it has used rather than assuming one.
+    candidates = [
+        voucher.get('content_license', {}).get('license_response'),
+        voucher.get('license_response'),
+        voucher
+    ]
+
+    for candidate in candidates:
+        if isinstance(candidate, dict) and candidate.get('key') and candidate.get('iv'):
+            return candidate['key'], candidate['iv']
+
+    raise ValueError(
+        f"No key/iv pair in {voucher_file}. If the license response is still a "
+        f"string it was not decrypted, and audible-cli needs to fetch it again."
+    )
+
 async def decrypt_book(book):
     """Decrypt a book using FFmpeg"""
     book_asin = book[0]
@@ -200,40 +275,53 @@ async def decrypt_book(book):
         # Ensure output directory exists
         await ensure_directory(DECRYPTED_DIR)
 
-        # Iterate over files in the input directory
-        for item in os.listdir(DOWNLOAD_DIR):
-            input_file = os.path.join(DOWNLOAD_DIR, item)
-            output_file = os.path.join(DECRYPTED_DIR, f"{book_title}.m4b")
+        input_file, extension = find_encrypted_file(book_asin)
 
-            if book_asin not in item:
-                continue
+        if not input_file:
+            raise Exception(f"No aax or aaxc file found in {DOWNLOAD_DIR} for {book_asin}")
 
-            # Create and await the FFmpeg subprocess
-            process = await asyncio.create_subprocess_exec(
-                'ffmpeg',
-                '-activation_bytes', ACC_BYTES,
-                '-i', input_file,
-                '-c', 'copy',
-                output_file,
-                '-n',
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
+        output_file = os.path.join(DECRYPTED_DIR, f"{book_title}.m4b")
 
-            # Wait for the process to complete
-            stdout, stderr = await process.communicate()
+        # aaxc carries its own key, aax is unlocked with the activation bytes.
+        if extension == '.aaxc':
+            if not await ffmpeg_supports_aaxc():
+                raise Exception("FFmpeg 4.4 or newer is required to decrypt aaxc files")
 
-            if process.returncode == 0:
-                if await validate_book(book, DECRYPTED_DIR):
-                    logger.success(f"Decrypted: {output_file}: {stdout.decode().strip()}")
-                    return True
-                else:
-                    raise Exception(f"Decryption failed for '{item}': {stdout.decode().strip()}")
-            else:
-                raise Exception(f"FFmpeg error decrypting '{item}': {stderr.decode().strip()}")
+            key, iv = await load_voucher(input_file)
+            drm_options = ['-audible_key', key, '-audible_iv', iv]
+        else:
+            if not ACC_BYTES:
+                raise Exception("ACTIVATION_BYTES is not set, cannot decrypt aax files")
+
+            drm_options = ['-activation_bytes', ACC_BYTES]
+
+        # Create and await the FFmpeg subprocess
+        process = await asyncio.create_subprocess_exec(
+            'ffmpeg',
+            *drm_options,
+            '-i', input_file,
+            '-c', 'copy',
+            output_file,
+            '-n',
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+
+        # Wait for the process to complete
+        stdout, stderr = await process.communicate()
+
+        if process.returncode != 0:
+            raise Exception(f"FFmpeg error decrypting '{os.path.basename(input_file)}': {stderr.decode().strip()}")
+
+        if not await validate_book(book, DECRYPTED_DIR):
+            raise Exception(f"Decryption failed for '{os.path.basename(input_file)}': {stdout.decode().strip()}")
+
+        logger.success(f"Decrypted: {output_file}")
+        return True
 
     except Exception as e:
         logger.error(f"An error occurred during decryption: {e}")
+        return False
 
 async def compare_libraries():
     """Check the local library for existing books."""

@@ -272,7 +272,8 @@ class DatabaseOperations:
 
     def update_download_status(self, download_id: str, status: str,
                                download_path: str = None, file_size: int = None,
-                               error_message: str = None) -> bool:
+                               error_message: str = None,
+                               download_format: str = None) -> bool:
         """Update download status"""
         try:
             with self.db.get_cursor() as cursor:
@@ -282,9 +283,10 @@ class DatabaseOperations:
                         SET status = %s,
                             download_path = %s,
                             file_size_bytes = %s,
+                            download_format = COALESCE(%s, download_format),
                             download_completed_at = CURRENT_TIMESTAMP
                         WHERE download_id = %s
-                    """, (status, download_path, file_size, download_id))
+                    """, (status, download_path, file_size, download_format, download_id))
                 elif status == 'failed':
                     cursor.execute("""
                         UPDATE download_status
